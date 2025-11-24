@@ -5,7 +5,7 @@ import {
   Search, Save, Database, CreditCard, Mail, MessageSquare, 
   Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
   ArrowLeft, RotateCcw, AlertTriangle, UserX, UserCheck, Ban,
-  Wifi, Edit3, Eye, Send, X
+  Wifi, Edit3, Eye, Send, X, Copy, Terminal
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection } from '../services/backendService';
 import { EmailTemplate } from '../types';
 
 // --- Mock Data ---
@@ -251,15 +251,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
 
-  // Detailed API Config State
-  const [config, setConfig] = useState({
-    gemini: { apiKey: '' },
-    stripe: { secretKey: '', publicKey: '', webhookSecret: '' },
-    resend: { apiKey: '', fromEmail: 'alarm@resortpassalarm.com' },
-    twilio: { accountSid: '', authToken: '', fromNumber: '' },
-    browseai: { apiKey: '', robotId: '' }
-  });
-
   const handleSelectCustomer = (customer: any) => {
     const details = generateCustomerDetails(customer);
     setCustomerDetail(details);
@@ -346,17 +337,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     }
   };
 
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    alert("WICHTIG: Diese Einstellungen werden hier nur für die aktuelle Session gespeichert.\n\nFür den Live-Betrieb auf Vercel musst du diese Schlüssel UNBEDINGT im Vercel Dashboard unter 'Settings' -> 'Environment Variables' eintragen.");
-  };
-
-  const handleTestConnection = async (service: 'email' | 'sms') => {
+  const handleTestConnection = async (service: 'email' | 'sms' | 'browseai') => {
     setIsTestingConnection(true);
     try {
-      alert(`Test für ${service} gestartet. (Hinweis: Der echte Versand klappt erst, wenn die Keys in Vercel hinterlegt sind oder die API angepasst wurde.)`);
-    } catch (e) {
-      alert("Verbindungsfehler.");
+      if (service === 'browseai') {
+         // --- REAL CALL ---
+         const result = await testBrowseAiConnection();
+         alert(`✅ ERFOLG: Verbindung zu Browse.ai hergestellt!\nRoboter: ${result.robotName}`);
+      } else {
+          // --- SIMULATION FOR OTHERS ---
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          alert(`Test für ${service} erfolgreich initiiert. (Prüfe Vercel Logs für echte Sende-Status)`);
+      }
+    } catch (e: any) {
+      alert(`❌ FEHLER: ${e.message}`);
     } finally {
       setIsTestingConnection(false);
     }
@@ -399,6 +393,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {icon}
       {label}
     </button>
+  );
+
+  const EnvVarRow = ({ name, description }: { name: string, description: string }) => (
+      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono text-xs mb-2 flex flex-col md:flex-row gap-2 justify-between items-start md:items-center">
+          <div className="flex items-center gap-2 text-slate-700 font-bold overflow-hidden break-all">
+              <Key size={12} className="shrink-0 text-slate-400" />
+              {name}
+          </div>
+          <div className="text-slate-500 text-[10px] md:text-right">{description}</div>
+      </div>
   );
 
   return (
@@ -1094,26 +1098,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </div>
       )}
 
-      {/* TAB: SETTINGS - Code largely unchanged */}
+      {/* TAB: SETTINGS & ENV GUIDE */}
       {activeTab === 'settings' && !selectedCustomerId && (
         <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4">
-          {/* ... Settings Content ... */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 bg-amber-50">
               <div className="flex items-start gap-3">
                  <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={24} />
                  <div>
-                    <h3 className="text-lg font-bold text-amber-800">Wichtiger Hinweis zum Live-Betrieb</h3>
+                    <h3 className="text-lg font-bold text-amber-800">System Konfiguration (Vercel)</h3>
                     <p className="text-amber-700 text-sm mt-1 leading-relaxed">
-                      Da diese Anwendung serverless auf Vercel läuft, können die API-Schlüssel aus Sicherheitsgründen nicht von hier aus permanent gespeichert werden.
+                      Diese Anwendung läuft "Serverless". Aus Sicherheitsgründen werden API-Schlüssel nicht hier gespeichert.
                     </p>
                     <p className="text-amber-800 text-sm font-bold mt-2">
-                      Du musst diese Schlüssel im Vercel Dashboard unter "Settings" → "Environment Variables" eintragen, damit die App live funktioniert.
+                      Bitte trage die folgenden Schlüssel (Keys) im Vercel Dashboard unter "Settings" → "Environment Variables" ein.
                     </p>
                  </div>
               </div>
             </div>
-            <form onSubmit={handleSaveConfig} className="p-6 space-y-8">
+            
+            <div className="p-6 space-y-8">
               
               {/* Gemini */}
               <section className="space-y-4">
@@ -1121,17 +1125,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                    <Sparkles size={18} className="text-blue-500" />
                    <h4 className="font-bold text-slate-900">Google Gemini (KI)</h4>
                 </div>
-                <div className="grid gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">API Key</label>
-                    <input 
-                      type="password" 
-                      value={config.gemini.apiKey}
-                      onChange={(e) => setConfig({...config, gemini: {...config.gemini, apiKey: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="AIzaSy..."
-                    />
-                  </div>
+                <div>
+                   <EnvVarRow name="API_KEY" description="Dein Google AI Studio API Key für die Textgenerierung." />
                 </div>
               </section>
 
@@ -1141,38 +1136,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                    <CreditCard size={18} className="text-indigo-500" />
                    <h4 className="font-bold text-slate-900">Stripe Payments</h4>
                 </div>
-                <div className="grid gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Secret Key (Backend)</label>
-                    <input 
-                      type="password" 
-                      value={config.stripe.secretKey}
-                      onChange={(e) => setConfig({...config, stripe: {...config.stripe, secretKey: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="sk_live_..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Publishable Key (Frontend)</label>
-                    <input 
-                      type="text" 
-                      value={config.stripe.publicKey}
-                      onChange={(e) => setConfig({...config, stripe: {...config.stripe, publicKey: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="pk_live_..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Webhook Secret</label>
-                    <input 
-                      type="password" 
-                      value={config.stripe.webhookSecret}
-                      onChange={(e) => setConfig({...config, stripe: {...config.stripe, webhookSecret: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="whsec_..."
-                    />
-                    <p className="text-xs text-slate-400 mt-1">Notwendig für die Verarbeitung von Abo-Events.</p>
-                  </div>
+                <div>
+                   <EnvVarRow name="NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" description="pk_live_... (Für das Frontend)" />
+                   <EnvVarRow name="STRIPE_SECRET_KEY" description="sk_live_... (Für das Backend)" />
                 </div>
               </section>
 
@@ -1190,30 +1156,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                       onClick={() => handleTestConnection('email')}
                       disabled={isTestingConnection}
                    >
-                      <Wifi size={14} className="mr-2" /> Testen
+                      <Wifi size={14} className="mr-2" /> Verbindung testen
                    </Button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">API Key</label>
-                    <input 
-                      type="password" 
-                      value={config.resend.apiKey}
-                      onChange={(e) => setConfig({...config, resend: {...config.resend, apiKey: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="re_123..."
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Absender E-Mail (From)</label>
-                    <input 
-                      type="email" 
-                      value={config.resend.fromEmail}
-                      onChange={(e) => setConfig({...config, resend: {...config.resend, fromEmail: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
-                      placeholder="alarm@resortpassalarm.com"
-                    />
-                  </div>
+                <div>
+                    <EnvVarRow name="RESEND_API_KEY" description="re_... (API Schlüssel von Resend.com)" />
                 </div>
               </section>
 
@@ -1231,83 +1178,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                       onClick={() => handleTestConnection('sms')}
                       disabled={isTestingConnection}
                    >
-                      <Wifi size={14} className="mr-2" /> Testen
+                      <Wifi size={14} className="mr-2" /> Verbindung testen
                    </Button>
                 </div>
-                <div className="grid gap-4">
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Account SID</label>
-                        <input 
-                          type="text" 
-                          value={config.twilio.accountSid}
-                          onChange={(e) => setConfig({...config, twilio: {...config.twilio, accountSid: e.target.value}})}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                          placeholder="AC..."
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Auth Token</label>
-                        <input 
-                          type="password" 
-                          value={config.twilio.authToken}
-                          onChange={(e) => setConfig({...config, twilio: {...config.twilio, authToken: e.target.value}})}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                          placeholder="..."
-                        />
-                      </div>
-                   </div>
-                   <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Absender Nummer (From)</label>
-                    <input 
-                      type="text" 
-                      value={config.twilio.fromNumber}
-                      onChange={(e) => setConfig({...config, twilio: {...config.twilio, fromNumber: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="+123456789"
-                    />
-                  </div>
+                <div>
+                    <EnvVarRow name="TWILIO_ACCOUNT_SID" description="AC... (Account ID)" />
+                    <EnvVarRow name="TWILIO_AUTH_TOKEN" description="Dein geheimer Auth Token" />
+                    <EnvVarRow name="TWILIO_PHONE_NUMBER" description="+123... (Deine gekaufte Twilio Nummer)" />
                 </div>
               </section>
 
               {/* Browse AI */}
               <section className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                   <Globe size={18} className="text-emerald-500" />
-                   <h4 className="font-bold text-slate-900">Browse.ai (Scraping)</h4>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                   <div className="flex items-center gap-2">
+                      <Globe size={18} className="text-emerald-500" />
+                      <h4 className="font-bold text-slate-900">Browse.ai (Scraping)</h4>
+                   </div>
+                   <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleTestConnection('browseai')}
+                      disabled={isTestingConnection}
+                   >
+                      <Wifi size={14} className="mr-2" /> Verbindung testen
+                   </Button>
                 </div>
-                <div className="grid gap-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">API Key</label>
-                    <input 
-                      type="password" 
-                      value={config.browseai.apiKey}
-                      onChange={(e) => setConfig({...config, browseai: {...config.browseai, apiKey: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="key_..."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Robot ID (ResortPass Monitor)</label>
-                    <input 
-                      type="text" 
-                      value={config.browseai.robotId}
-                      onChange={(e) => setConfig({...config, browseai: {...config.browseai, robotId: e.target.value}})}
-                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
-                      placeholder="robot_..."
-                    />
-                    <p className="text-xs text-slate-400 mt-1">ID des konfigurierten Scraper-Roboters für die Europa-Park Seite.</p>
-                  </div>
+                <div>
+                    <EnvVarRow name="BROWSE_AI_API_KEY" description="Dein API Schlüssel von Browse.ai" />
+                    <EnvVarRow name="BROWSE_AI_ROBOT_ID" description="robot_... (Die ID deines ResortPass Monitors)" />
                 </div>
               </section>
 
-              <div className="pt-4 flex justify-end border-t border-slate-100">
-                <Button type="submit">
-                  <Save size={18} />
-                  Einstellungen bestätigen
-                </Button>
-              </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

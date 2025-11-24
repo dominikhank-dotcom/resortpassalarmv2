@@ -47,3 +47,20 @@ export const sendTemplateTest = async (template: EmailTemplate) => {
   await new Promise(resolve => setTimeout(resolve, 1500));
   return true;
 };
+
+// Real connection test for Browse.AI
+export const testBrowseAiConnection = async () => {
+  try {
+    const response = await fetch('/api/test-browse-ai');
+    const data = await response.json();
+    
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Verbindung fehlgeschlagen');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error("Browse.ai Test Error:", error);
+    throw error;
+  }
+};
