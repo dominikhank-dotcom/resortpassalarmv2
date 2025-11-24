@@ -1,0 +1,5 @@
+{
+  "name": "ResortPassAlarmV2",
+  "description": "Überwachungstool für Europa-Park ResortPass Gold & Silver.",
+  "requestFramePermissions": []
+}
