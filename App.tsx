@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
 import { UserDashboard } from './pages/UserDashboard';
@@ -131,6 +131,16 @@ const App: React.FC = () => {
     gold: "https://tickets.mackinternational.de/de/ticket/resortpass-gold",
     silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
   });
+
+  // Track Referral Link
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const refCode = params.get('ref');
+    if (refCode) {
+      console.log("Partner Tracking active:", refCode);
+      localStorage.setItem('resortpass_referral', refCode);
+    }
+  }, []);
 
   const navigate = (page: string) => {
     setCurrentPage(page);

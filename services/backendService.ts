@@ -33,10 +33,13 @@ export const sendTestAlarm = async (email: string, phone: string, sendEmail: boo
 
 export const createCheckoutSession = async (email: string) => {
   try {
+    // Check for referral code in local storage
+    const referralCode = localStorage.getItem('resortpass_referral');
+
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, referralCode })
     });
 
     const data = await handleResponse(response);

@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, priceId } = req.body;
+    const { email, referralCode } = req.body;
 
     // In a real app, create or get the Stripe Customer ID based on the email
     // const customer = await stripe.customers.create({ email });
@@ -38,7 +38,8 @@ export default async function handler(req, res) {
       cancel_url: `${req.headers.origin}/dashboard?payment_cancelled=true`,
       customer_email: email,
       metadata: {
-        service: 'ResortPassAlarm'
+        service: 'ResortPassAlarm',
+        referralCode: referralCode || '' // Store the partner code here!
       }
     });
 
