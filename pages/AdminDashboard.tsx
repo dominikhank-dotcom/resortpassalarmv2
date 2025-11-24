@@ -5,7 +5,7 @@ import {
   Search, Save, Database, CreditCard, Mail, MessageSquare, 
   Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
   ArrowLeft, RotateCcw, AlertTriangle, UserX, UserCheck, Ban,
-  Wifi, Edit3, Eye, Send, X, Copy, Terminal
+  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -47,6 +47,7 @@ const generateCustomerDetails = (summary: any) => {
       startDate: summary.joined,
       endDate: summary.status === 'Inactive' ? '20.06.2024' : null,
       plan: 'Monatsabo (1,99 €)',
+      isFree: false, // New field for manual override
       paymentMethod: 'PayPal (max...@test.de)'
     },
     referrer: summary.id === 'KD-1001' ? { name: 'Freizeitpark News DE', id: 'P-502', date: '12.05.2024' } : null,
@@ -265,11 +266,59 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleToggleSubscription = () => {
     if (customerDetail.subscription.status === 'Active') {
       if (confirm("Möchtest du das Abo dieses Kunden wirklich sofort beenden?")) {
-        setCustomerDetail({...customerDetail, subscription: {...customerDetail.subscription, status: 'Inactive', endDate: new Date().toLocaleDateString()}});
+        setCustomerDetail({
+            ...customerDetail, 
+            subscription: {
+                ...customerDetail.subscription, 
+                status: 'Inactive', 
+                endDate: new Date().toLocaleDateString(),
+                isFree: false,
+                plan: 'Monatsabo (1,99 €)'
+            }
+        });
       }
     } else {
-       setCustomerDetail({...customerDetail, subscription: {...customerDetail.subscription, status: 'Active', endDate: null}});
+       // Standard reactivation (Paid)
+       setCustomerDetail({
+           ...customerDetail, 
+           subscription: {
+               ...customerDetail.subscription, 
+               status: 'Active', 
+               endDate: null,
+               isFree: false
+           }
+       });
     }
+  };
+
+  const handleToggleFreeSubscription = () => {
+      if (customerDetail.subscription.isFree) {
+          if(confirm("Möchtest du das kostenlose Abo widerrufen? Der Nutzer verliert sofort den Zugriff.")) {
+            setCustomerDetail({
+                ...customerDetail,
+                subscription: {
+                    ...customerDetail.subscription,
+                    status: 'Inactive',
+                    isFree: false,
+                    plan: 'Monatsabo (1,99 €)',
+                    endDate: new Date().toLocaleDateString()
+                }
+            });
+          }
+      } else {
+          if(confirm("Diesen Nutzer manuell kostenlos freischalten? Er erhält alle Premium-Funktionen ohne Zahlung.")) {
+            setCustomerDetail({
+                ...customerDetail,
+                subscription: {
+                    ...customerDetail.subscription,
+                    status: 'Active',
+                    isFree: true,
+                    plan: 'Manuell (Gratis)',
+                    endDate: null
+                }
+            });
+          }
+      }
   };
 
   const handleRefundSingle = (txId: string) => {
@@ -592,6 +641,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                 }`}>
                                     {customerDetail.subscription.status === 'Active' ? 'Abo Aktiv' : 'Gekündigt'}
                                 </span>
+                                {customerDetail.subscription.isFree && (
+                                    <span className="text-sm px-3 py-1 rounded-full border bg-purple-50 border-purple-200 text-purple-700 flex items-center gap-1">
+                                        <Gift size={12} /> Kostenlos
+                                    </span>
+                                )}
                             </h2>
                             <p className="text-slate-500 text-sm font-mono">{customerDetail.id}</p>
                         </div>
@@ -776,9 +830,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                     <div><p className="text-xs text-slate-500 uppercase">Aktueller Plan</p><p className="font-medium text-slate-900">{customerDetail.subscription.plan}</p></div>
                                     <div><p className="text-xs text-slate-500 uppercase">Startdatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.startDate}</p></div>
                                     <div><p className="text-xs text-slate-500 uppercase">Enddatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.endDate || '– (Laufend)'}</p></div>
-                                    <div className="pt-4 border-t border-slate-100">
-                                        <Button onClick={handleToggleSubscription} className={`w-full justify-center ${customerDetail.subscription.status === 'Active' ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none' : 'bg-green-600 text-white hover:bg-green-700'}`}>
-                                            {customerDetail.subscription.status === 'Active' ? <><UserX size={16} className="mr-2" /> Abo sofort beenden</> : <><UserCheck size={16} className="mr-2" /> Abo reaktivieren</>}
+                                    
+                                    <div className="pt-4 border-t border-slate-100 space-y-2">
+                                        <Button onClick={handleToggleSubscription} className={`w-full justify-center ${customerDetail.subscription.status === 'Active' && !customerDetail.subscription.isFree ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+                                            {customerDetail.subscription.status === 'Active' && !customerDetail.subscription.isFree ? <><UserX size={16} className="mr-2" /> Abo regulär beenden</> : <><UserCheck size={16} className="mr-2" /> Abo regulär reaktivieren</>}
+                                        </Button>
+
+                                        <Button 
+                                            onClick={handleToggleFreeSubscription}
+                                            variant="secondary"
+                                            className={`w-full justify-center border ${customerDetail.subscription.isFree ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
+                                        >
+                                            {customerDetail.subscription.isFree ? <><UserX size={16} className="mr-2" /> Kostenloses Abo entziehen</> : <><Gift size={16} className="mr-2" /> Kostenloses Abo geben</>}
                                         </Button>
                                     </div>
                                 </div>

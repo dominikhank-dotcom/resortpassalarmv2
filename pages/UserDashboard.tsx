@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText } from 'lucide-react';
+import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
@@ -14,13 +14,15 @@ interface LogEntry {
   message: string;
 }
 
+type SubscriptionStatus = 'NONE' | 'PAID' | 'FREE';
+
 interface UserDashboardProps {
   navigate: (page: string) => void;
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
   // Simulation State
-  const [hasSubscription, setHasSubscription] = useState(false); // Default false to test checkout
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
 
@@ -66,6 +68,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
   // Alarm History State
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
 
+  // Derived state for easy checking
+  const hasActiveSubscription = subscriptionStatus !== 'NONE';
+
   // Simulation logic for auto-update time
   useEffect(() => {
     const interval = setInterval(() => {
@@ -77,7 +82,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
     // Check for payment success query param
     const query = new URLSearchParams(window.location.search);
     if (query.get('payment_success')) {
-      setHasSubscription(true);
+      setSubscriptionStatus('PAID');
       alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
     }
 
@@ -93,6 +98,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
     if (type === 'gold') setMonitorGold(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
     if (type === 'silver') setMonitorSilver(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
   };
+
+  // Helper for dev testing
+  const toggleFreeSub = () => {
+    setSubscriptionStatus(prev => prev === 'FREE' ? 'NONE' : 'FREE');
+  }
 
   const handleManualCheck = (type: 'gold' | 'silver') => {
     setIsChecking(type);
@@ -272,13 +282,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Mein Überwachungs-Dashboard</h1>
             <p className="text-slate-500">
-              {hasSubscription 
+              {hasActiveSubscription 
                 ? 'ResortPass Alarm ist aktiv. Lehn dich zurück.' 
                 : 'Dein Abo ist inaktiv. Aktiviere es, um Alarme zu erhalten.'}
             </p>
           </div>
           
-          {hasSubscription ? (
+          {hasActiveSubscription ? (
             <div className="flex items-center gap-2 bg-[#00305e] text-white px-4 py-2 rounded-lg shadow-sm text-sm font-medium animate-in fade-in">
               <Shield size={16} className="text-[#ffcc00]" />
               Premium Schutz Aktiv
@@ -291,7 +301,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
           )}
         </div>
 
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${!hasSubscription ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${!hasActiveSubscription ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
           <StatusCard title="ResortPass Silver" type="silver" monitor={monitorSilver} />
           <StatusCard title="ResortPass Gold" type="gold" monitor={monitorGold} />
         </div>
@@ -441,36 +451,60 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
             </div>
 
             <div className="p-6 flex-1 flex flex-col">
-              {hasSubscription ? (
+              {hasActiveSubscription ? (
                 <div className="flex-1">
-                  <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-slate-600 font-medium flex items-center gap-2">
-                        <CreditCard size={14} /> Stripe Checkout
-                      </span>
-                      <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
+                  
+                  {subscriptionStatus === 'FREE' ? (
+                     <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-purple-700 font-medium flex items-center gap-2">
+                                <Gift size={16} /> Geschenk / Admin
+                            </span>
+                            <span className="bg-purple-200 text-purple-800 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
+                        </div>
+                        <div className="text-xl font-bold text-slate-900 mb-1">Kostenlos</div>
+                        <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+                            Dein Account wurde manuell für alle Premium-Funktionen freigeschaltet.
+                        </p>
+                     </div>
+                  ) : (
+                    <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-4">
+                        <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-600 font-medium flex items-center gap-2">
+                            <CreditCard size={14} /> Stripe Checkout
+                        </span>
+                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
+                        </div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">1,99 € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
+                        <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
                     </div>
-                    <div className="text-3xl font-bold text-slate-900 mb-1">1,99 € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
-                    <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
-                  </div>
+                  )}
+
                   
                   <div className="space-y-2 mt-auto">
-                    <Button variant="outline" size="sm" className="w-full justify-between group">
-                      Zahlungsmethode bearbeiten
-                      <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
-                    </Button>
-                    <Button variant="outline" size="sm" className="w-full justify-between group">
-                      Rechnungen anzeigen
-                      <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
-                      onClick={() => { if(confirm('Abo wirklich kündigen?')) setHasSubscription(false); }}
-                    >
-                      Abo kündigen
-                    </Button>
+                    {subscriptionStatus === 'PAID' && (
+                        <>
+                            <Button variant="outline" size="sm" className="w-full justify-between group">
+                            Zahlungsmethode bearbeiten
+                            <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
+                            </Button>
+                            <Button variant="outline" size="sm" className="w-full justify-between group">
+                            Rechnungen anzeigen
+                            <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
+                            </Button>
+                            <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
+                            onClick={() => { if(confirm('Abo wirklich kündigen?')) setSubscriptionStatus('NONE'); }}
+                            >
+                            Abo kündigen
+                            </Button>
+                        </>
+                    )}
+                    {subscriptionStatus === 'FREE' && (
+                        <p className="text-xs text-center text-purple-400">Dieser Status ist dauerhaft aktiv.</p>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -643,6 +677,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
               </div>
           </div>
         </div>
+      </div>
+      <div className="hidden">
+         {/* Hidden Dev Tool to simulate Free status for testing */}
+         <button onClick={toggleFreeSub}>Toggle Free</button>
       </div>
       <Footer navigate={navigate} />
     </div>
