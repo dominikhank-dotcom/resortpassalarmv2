@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, Users, Settings, Handshake, 
+  LayoutDashboard, Users, Settings, Briefcase, 
   TrendingUp, DollarSign, Activity, Calendar, 
   Search, Save, Database, CreditCard, Mail, MessageSquare, 
   Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
@@ -421,7 +421,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         <div className="border-b border-slate-200 flex overflow-x-auto">
             {renderTabButton('dashboard', 'Dashboard', <LayoutDashboard size={18} />)}
             {renderTabButton('customers', 'Kunden', <Users size={18} />)}
-            {renderTabButton('partners', 'Partner', <Handshake size={18} />)}
+            {renderTabButton('partners', 'Partner', <Briefcase size={18} />)}
             {renderTabButton('emails', 'E-Mail Management', <Mail size={18} />)}
             {renderTabButton('settings', 'Einstellungen', <Settings size={18} />)}
         </div>
@@ -779,7 +779,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                 </div>
                             </div>
                             <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-6">
-                                <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><Handshake size={20} /> Partner Info</h3>
+                                <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><Briefcase size={20} /> Partner Info</h3>
                                 {customerDetail.referrer ? (
                                     <div className="space-y-2">
                                         <p className="text-sm text-indigo-800">Geworben von: <br/><span className="font-bold">{customerDetail.referrer.name}</span></p>
