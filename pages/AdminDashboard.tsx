@@ -254,9 +254,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
   // Admin Account Settings State
   const [adminAuth, setAdminAuth] = useState({
-      currentEmail: 'admin@resortpassalarm.com',
+      currentEmail: 'dominikhank@gmail.com', // Default updated to your email
       newEmail: '',
-      emailPassword: '', // Password to confirm email change
+      emailPassword: '', 
       pwCurrent: '',
       pwNew: '',
       pwConfirm: ''
@@ -433,10 +433,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleSendTestEmail = async (template: EmailTemplate) => {
     setIsSendingTestEmail(true);
     try {
-      await sendTemplateTest(template);
-      alert(`Test-E-Mail "${template.subject}" wurde gesendet! (Simulation)`);
-    } catch (error) {
-      alert("Fehler beim Senden der Test-Mail.");
+      // Pass the current admin email (dominikhank@gmail.com) to the backend service
+      const result = await sendTemplateTest(template, adminAuth.currentEmail);
+      alert(`Test-E-Mail "${template.subject}" wurde an ${adminAuth.currentEmail} gesendet!`);
+    } catch (error: any) {
+      alert(`Fehler beim Senden: ${error.message}`);
     } finally {
       setIsSendingTestEmail(false);
     }

@@ -52,10 +52,18 @@ export const createCheckoutSession = async (email: string) => {
   }
 };
 
-export const sendTemplateTest = async (template: EmailTemplate) => {
-  console.log("Sending Template Test (Simulation):", template);
-  await new Promise(resolve => setTimeout(resolve, 1500));
-  return true;
+export const sendTemplateTest = async (template: EmailTemplate, toEmail: string) => {
+  try {
+    const response = await fetch('/api/send-template-test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ template, toEmail })
+    });
+    return await handleResponse(response);
+  } catch (error: any) {
+    console.error("Template Test Error:", error);
+    throw error;
+  }
 };
 
 // Real connection test for Browse.AI
