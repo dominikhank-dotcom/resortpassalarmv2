@@ -1,6 +1,9 @@
 export default async function handler(req, res) {
+  // Set JSON content type explicitly
+  res.setHeader('Content-Type', 'application/json');
+
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
   const apiKey = process.env.BROWSE_AI_API_KEY;
@@ -14,7 +17,6 @@ export default async function handler(req, res) {
   }
 
   try {
-    // We try to fetch the specific robot details to verify access
     const response = await fetch(`https://api.browse.ai/v2/robots/${robotId}`, {
       method: 'GET',
       headers: {
@@ -31,10 +33,18 @@ export default async function handler(req, res) {
         robotName: data.robot?.name || 'Unbekannt' 
       });
     } else {
-      const errorData = await response.json();
+      // Try to parse error details, fallback to status text
+      let errorMessage = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // Response was not JSON
+      }
+      
       return res.status(response.status).json({ 
         success: false, 
-        message: `Browse.ai Fehler: ${errorData.message || response.statusText}` 
+        message: `Browse.ai Fehler: ${errorMessage}` 
       });
     }
 
@@ -42,7 +52,7 @@ export default async function handler(req, res) {
     console.error("Browse.ai Test Error:", error);
     return res.status(500).json({ 
       success: false, 
-      message: 'Server-Fehler bei der Verbindungsprüfung.' 
+      message: `Server-Fehler: ${error.message}` 
     });
   }
 }

@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection } from '../services/backendService';
 import { EmailTemplate } from '../types';
 
 // --- Mock Data ---
@@ -337,13 +337,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     }
   };
 
-  const handleTestConnection = async (service: 'email' | 'sms' | 'browseai') => {
+  const handleTestConnection = async (service: 'email' | 'sms' | 'browseai' | 'gemini') => {
     setIsTestingConnection(true);
     try {
       if (service === 'browseai') {
-         // --- REAL CALL ---
          const result = await testBrowseAiConnection();
          alert(`✅ ERFOLG: Verbindung zu Browse.ai hergestellt!\nRoboter: ${result.robotName}`);
+      } else if (service === 'gemini') {
+         const result = await testGeminiConnection();
+         alert(`✅ ERFOLG: ${result.message}`);
       } else {
           // --- SIMULATION FOR OTHERS ---
           await new Promise(resolve => setTimeout(resolve, 1500));
@@ -436,7 +438,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {/* ... Existing Dashboard Cards ... */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -523,7 +524,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </div>
       )}
 
-      {/* TAB: CUSTOMERS (List & Details) - Code largely unchanged from previous step */}
+      {/* TAB: CUSTOMERS (List & Details) */}
       {activeTab === 'customers' && (
         <>
             {!selectedCustomerId ? (
@@ -805,12 +806,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </>
       )}
 
-      {/* TAB: PARTNER - Code largely unchanged */}
+      {/* TAB: PARTNER */}
       {activeTab === 'partners' && !selectedCustomerId && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-          {/* ... Partner Tab Content ... */}
           <div className="bg-indigo-900 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
-            {/* ... */}
              <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-indigo-800 to-transparent pointer-events-none"></div>
             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
               <div>
@@ -839,7 +838,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             </div>
           </div>
           
-          {/* ... Stats Grid ... */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <p className="text-slate-500 text-sm mb-1">Partner Gesamt</p>
@@ -864,7 +862,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-             {/* ... Top 10 Table ... */}
              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
                 <h3 className="font-bold text-slate-900">Top 10 Partner (Nach Umsatz)</h3>
@@ -889,7 +886,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               </table>
             </div>
 
-             {/* ... Conversion Chart ... */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="font-bold text-slate-900 mb-6">Conversion Qualität</h3>
               <div className="h-[300px]">
@@ -908,13 +904,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             </div>
           </div>
 
-           {/* ... AI Insights ... */}
           <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-100">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Sparkles className="text-blue-600" size={20} /> KI Insights
+                <Sparkles className="text-blue-600" size={20} /> KI Insights (Server-Side)
               </h3>
-              <Button onClick={handleAnalyze} disabled={isAnalyzing} size="sm" className="bg-white text-blue-600 hover:bg-blue-50 border border-blue-200">
+              <Button onClick={handleAnalyze} disabled={isAnalyzing} size="sm" className="bg-[#00305e] text-white hover:bg-[#002040] border-0 shadow-md">
                 {isAnalyzing ? 'Analysiere...' : 'Analyse starten'}
               </Button>
             </div>
@@ -1121,9 +1116,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               
               {/* Gemini */}
               <section className="space-y-4">
-                <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                   <Sparkles size={18} className="text-blue-500" />
-                   <h4 className="font-bold text-slate-900">Google Gemini (KI)</h4>
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                   <div className="flex items-center gap-2">
+                      <Sparkles size={18} className="text-blue-500" />
+                      <h4 className="font-bold text-slate-900">Google Gemini (KI)</h4>
+                   </div>
+                   <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => handleTestConnection('gemini')}
+                      disabled={isTestingConnection}
+                   >
+                      <Wifi size={14} className="mr-2" /> Verbindung testen
+                   </Button>
                 </div>
                 <div>
                    <EnvVarRow name="API_KEY" description="Dein Google AI Studio API Key für die Textgenerierung." />
