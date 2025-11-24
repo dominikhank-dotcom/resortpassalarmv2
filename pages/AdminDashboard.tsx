@@ -5,7 +5,7 @@ import {
   Search, Save, Database, CreditCard, Mail, MessageSquare, 
   Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
   ArrowLeft, RotateCcw, AlertTriangle, UserX, UserCheck, Ban,
-  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift
+  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift, Lock, Shield
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -252,6 +252,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [isSendingTestEmail, setIsSendingTestEmail] = useState(false);
 
+  // Admin Account Settings State
+  const [adminAuth, setAdminAuth] = useState({
+      currentEmail: 'admin@resortpassalarm.com',
+      newEmail: '',
+      emailPassword: '', // Password to confirm email change
+      pwCurrent: '',
+      pwNew: '',
+      pwConfirm: ''
+  });
+
   const handleSelectCustomer = (customer: any) => {
     const details = generateCustomerDetails(customer);
     setCustomerDetail(details);
@@ -430,6 +440,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     } finally {
       setIsSendingTestEmail(false);
     }
+  };
+
+  // --- ADMIN ACCOUNT HANDLERS ---
+  const handleUpdateAdminPassword = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!adminAuth.pwCurrent) {
+          alert("Bitte aktuelles Passwort eingeben.");
+          return;
+      }
+      if (adminAuth.pwNew.length < 6) {
+          alert("Das neue Passwort muss mindestens 6 Zeichen lang sein.");
+          return;
+      }
+      if (adminAuth.pwNew !== adminAuth.pwConfirm) {
+          alert("Die neuen Passwörter stimmen nicht überein.");
+          return;
+      }
+      alert("Admin-Passwort erfolgreich geändert!");
+      setAdminAuth(prev => ({...prev, pwCurrent: '', pwNew: '', pwConfirm: ''}));
+  };
+
+  const handleUpdateAdminEmail = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!adminAuth.newEmail) {
+          alert("Bitte neue E-Mail Adresse eingeben.");
+          return;
+      }
+      if (!adminAuth.emailPassword) {
+          alert("Bitte aktuelles Passwort zur Bestätigung eingeben.");
+          return;
+      }
+      // Simulation of verification
+      alert(`Bestätigungs-Link wurde an ${adminAuth.newEmail} gesendet. Bitte rufe die E-Mail ab und klicke auf den Link, um die Änderung abzuschließen.`);
+      setAdminAuth(prev => ({...prev, newEmail: '', emailPassword: ''}));
   };
 
   const renderTabButton = (id: typeof activeTab, label: string, icon: React.ReactNode) => (
@@ -1158,7 +1202,92 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
       {/* TAB: SETTINGS & ENV GUIDE */}
       {activeTab === 'settings' && !selectedCustomerId && (
-        <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4">
+        <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 space-y-8">
+          
+          {/* Admin Account Settings */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+             <div className="p-6 border-b border-slate-100 bg-slate-50">
+                 <div className="flex items-center gap-3">
+                     <div className="bg-white p-2 rounded-lg text-slate-700 shadow-sm border border-slate-100"><Lock size={20} /></div>
+                     <div>
+                         <h3 className="text-lg font-bold text-slate-900">Admin Sicherheit & Login</h3>
+                         <p className="text-slate-500 text-sm">Verwalte deine Zugangsdaten für diesen Bereich.</p>
+                     </div>
+                 </div>
+             </div>
+             
+             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                 {/* Change Email */}
+                 <form onSubmit={handleUpdateAdminEmail} className="space-y-4">
+                     <h4 className="font-bold text-slate-800 flex items-center gap-2"><Mail size={16} /> E-Mail ändern</h4>
+                     <div className="bg-blue-50 px-3 py-2 rounded text-xs text-blue-700 border border-blue-100">
+                         Aktuell: <strong>{adminAuth.currentEmail}</strong>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Neue E-Mail Adresse</label>
+                         <input 
+                             type="email" 
+                             required
+                             value={adminAuth.newEmail}
+                             onChange={(e) => setAdminAuth({...adminAuth, newEmail: e.target.value})}
+                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none"
+                         />
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Zur Bestätigung: Aktuelles Passwort</label>
+                         <input 
+                             type="password" 
+                             required
+                             value={adminAuth.emailPassword}
+                             onChange={(e) => setAdminAuth({...adminAuth, emailPassword: e.target.value})}
+                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none"
+                         />
+                     </div>
+                     <Button type="submit" variant="secondary" size="sm" className="w-full justify-center">
+                         Bestätigungs-Link anfordern
+                     </Button>
+                 </form>
+
+                 {/* Change Password */}
+                 <form onSubmit={handleUpdateAdminPassword} className="space-y-4 md:border-l md:pl-8 border-slate-100">
+                     <h4 className="font-bold text-slate-800 flex items-center gap-2"><Key size={16} /> Passwort ändern</h4>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Aktuelles Passwort</label>
+                         <input 
+                             type="password" 
+                             required
+                             value={adminAuth.pwCurrent}
+                             onChange={(e) => setAdminAuth({...adminAuth, pwCurrent: e.target.value})}
+                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none"
+                         />
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Neues Passwort</label>
+                         <input 
+                             type="password" 
+                             required
+                             value={adminAuth.pwNew}
+                             onChange={(e) => setAdminAuth({...adminAuth, pwNew: e.target.value})}
+                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none"
+                         />
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Neues Passwort bestätigen</label>
+                         <input 
+                             type="password" 
+                             required
+                             value={adminAuth.pwConfirm}
+                             onChange={(e) => setAdminAuth({...adminAuth, pwConfirm: e.target.value})}
+                             className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none"
+                         />
+                     </div>
+                     <Button type="submit" size="sm" className="w-full bg-[#00305e] text-white hover:bg-[#002040] justify-center">
+                         Passwort ändern
+                     </Button>
+                 </form>
+             </div>
+          </div>
+
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="p-6 border-b border-slate-100 bg-amber-50">
               <div className="flex items-start gap-3">
