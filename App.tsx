@@ -126,6 +126,12 @@ const App: React.FC = () => {
   // Global Commission State to sync between Admin and Affiliate Page
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
 
+  // Global Product URLs State
+  const [productUrls, setProductUrls] = useState({
+    gold: "https://tickets.mackinternational.de/de/ticket/resortpass-gold",
+    silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
+  });
+
   const navigate = (page: string) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
@@ -157,7 +163,12 @@ const App: React.FC = () => {
         return <LoginScreen role={UserRole.ADMIN} onLogin={() => { setRole(UserRole.ADMIN); navigate('admin-dashboard'); }} onCancel={() => navigate('landing')} />;
       case 'admin-dashboard':
          return role === UserRole.ADMIN 
-          ? <AdminDashboard commissionRate={globalCommissionRate} onUpdateCommission={setGlobalCommissionRate} /> 
+          ? <AdminDashboard 
+              commissionRate={globalCommissionRate} 
+              onUpdateCommission={setGlobalCommissionRate} 
+              productUrls={productUrls}
+              onUpdateProductUrls={setProductUrls}
+            /> 
           : <LoginScreen role={UserRole.ADMIN} onLogin={() => { setRole(UserRole.ADMIN); navigate('admin-dashboard'); }} onCancel={() => navigate('landing')} />;
       
       // Legal Pages
@@ -171,7 +182,7 @@ const App: React.FC = () => {
         return <RevocationPage onBack={() => navigate('landing')} />;
 
       case 'dashboard':
-        if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} />;
+        if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} />;
         return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { setRole(UserRole.CUSTOMER); navigate('dashboard'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
       
       case 'affiliate':

@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
-  const { template, toEmail } = req.body;
+  const { template, toEmail, urls } = req.body;
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -23,13 +23,16 @@ export default async function handler(req, res) {
     let body = template.body;
     let subject = template.subject;
     
+    // Default URLs if not provided
+    const shopLink = urls?.gold || 'https://tickets.mackinternational.de';
+
     const replacements = {
         '{firstName}': 'Admin',
         '{productName}': 'ResortPass Gold',
         '{loginLink}': 'https://resortpassalarm.com/login',
         '{resetLink}': 'https://resortpassalarm.com/reset',
         '{dashboardLink}': 'https://resortpassalarm.com/dashboard',
-        '{shopLink}': 'https://tickets.mackinternational.de',
+        '{shopLink}': shopLink,
         '{affiliateLink}': 'https://resortpassalarm.com/affiliate',
         '{month}': 'Mai 2024',
         '{newCustomers}': '12',

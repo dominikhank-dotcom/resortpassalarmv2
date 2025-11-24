@@ -5,8 +5,6 @@ import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { sendTestAlarm, createCheckoutSession } from '../services/backendService';
 
-const TARGET_URL = "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
-
 interface LogEntry {
   id: string;
   date: string;
@@ -18,9 +16,10 @@ type SubscriptionStatus = 'NONE' | 'PAID' | 'FREE';
 
 interface UserDashboardProps {
   navigate: (page: string) => void;
+  productUrls: { gold: string, silver: string };
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls }) => {
   // Simulation State
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
   const [isChecking, setIsChecking] = useState<string | null>(null); 
@@ -30,15 +29,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
     isActive: true,
     lastChecked: new Date().toLocaleTimeString(),
     isAvailable: false,
-    url: TARGET_URL
+    url: productUrls.gold
   });
 
   const [monitorSilver, setMonitorSilver] = useState<MonitorStatus>({
     isActive: true,
     lastChecked: new Date().toLocaleTimeString(),
     isAvailable: false,
-    url: TARGET_URL
+    url: productUrls.silver
   });
+  
+  // Update monitors when props change
+  useEffect(() => {
+    setMonitorGold(prev => ({...prev, url: productUrls.gold}));
+    setMonitorSilver(prev => ({...prev, url: productUrls.silver}));
+  }, [productUrls]);
 
   // Notification State
   const [notifications, setNotifications] = useState<NotificationConfig>({
@@ -257,7 +262,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate }) => {
             </Button>
             
             <a 
-              href={TARGET_URL}
+              href={monitor.url}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#00305e] hover:underline transition-colors"

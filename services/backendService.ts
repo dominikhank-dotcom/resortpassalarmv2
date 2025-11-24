@@ -52,12 +52,12 @@ export const createCheckoutSession = async (email: string) => {
   }
 };
 
-export const sendTemplateTest = async (template: EmailTemplate, toEmail: string) => {
+export const sendTemplateTest = async (template: EmailTemplate, toEmail: string, urls?: { gold: string, silver: string }) => {
   try {
     const response = await fetch('/api/send-template-test', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ template, toEmail })
+      body: JSON.stringify({ template, toEmail, urls })
     });
     return await handleResponse(response);
   } catch (error: any) {
