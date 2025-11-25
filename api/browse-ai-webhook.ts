@@ -1,13 +1,6 @@
 import { Resend } from 'resend';
 import twilio from 'twilio';
-
-// This webhook is called by Browse.ai when the robot finishes a task
-// You configure this URL in Browse.ai: https://resortpassalarm.com/api/browse-ai-webhook
-
-// Mock database of subscribers (In real app, use Supabase/Firebase)
-const SUBSCRIBERS = [
-  { email: 'dominik@example.com', phone: '+491510000000', wantsGold: true, wantsSilver: true }
-];
+import { getServiceSupabase } from './_lib/supabase.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -15,65 +8,111 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { event, data } = req.body;
-
-    // Browse.ai sends captured text/data
-    // Let's assume the robot captures the text "Ausverkauft" or "Verfügbar"
-    // Data structure depends on your Robot configuration in Browse.ai
-    const capturedTextGold = data?.capturedLists?.GoldStatus?.[0]?.text || "Ausverkauft";
-    const capturedTextSilver = data?.capturedLists?.SilverStatus?.[0]?.text || "Ausverkauft";
-
-    const goldAvailable = !capturedTextGold.toLowerCase().includes("ausverkauft");
-    const silverAvailable = !capturedTextSilver.toLowerCase().includes("ausverkauft");
-
-    if (!goldAvailable && !silverAvailable) {
-       return res.status(200).json({ message: 'Nothing available, no alarms sent.' });
-    }
-
-    // --- INITIALIZE SERVICES ONLY IF NEEDED ---
-    let resend = null;
-    let twilioClient = null;
-
-    if (process.env.RESEND_API_KEY) {
-        resend = new Resend(process.env.RESEND_API_KEY);
-    }
+    const { data } = req.body;
     
-    if (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
-        twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    // 1. Produkt erkennen anhand der URL (Gold oder Silver)
+    const originUrl = data?.inputParameters?.originUrl || '';
+    let productUrl = originUrl;
+    let productName = 'ResortPass';
+    
+    if (originUrl.toLowerCase().includes('gold')) {
+        productName = 'ResortPass Gold';
+    } else if (originUrl.toLowerCase().includes('silver')) {
+        productName = 'ResortPass Silver';
     }
 
-    // --- TRIGGER ALARMS ---
-    for (const user of SUBSCRIBERS) {
-      if (goldAvailable && user.wantsGold) {
-         // Send Email
-         if (resend) {
-             try {
+    // 2. Verfügbarkeit prüfen (Universelle Textsuche)
+    // Wir wandeln alle gescrapten Daten in einen Text um und suchen nach negativen Keywords.
+    // Wenn KEIN negatives Keyword gefunden wird, nehmen wir an, es ist verfügbar.
+    const capturedLists = data?.capturedLists || {};
+    const textDump = JSON.stringify(capturedLists).toLowerCase();
+    
+    const negativeKeywords = [
+        'ausverkauft', 
+        'nicht verfügbar', 
+        'derzeit nicht verfügbar', 
+        'sold out', 
+        'leider ist dieses produkt',
+        'momentan nicht verfügbar'
+    ];
+    
+    const isSoldOut = negativeKeywords.some(kw => textDump.includes(kw));
+    
+    if (isSoldOut) {
+        // Loggen für Debugging, aber kein Alarm
+        console.log(`Check ${productName}: Weiterhin ausverkauft.`);
+        return res.status(200).json({ message: `Checked ${productName}: Still sold out.`, status: 'sold_out' });
+    }
+
+    // WENN WIR HIER SIND -> ALARM! VERFÜGBAR!
+    console.log(`🚨 ALARM TRIGGERED FOR ${productName}`);
+
+    // 3. Echte Abonnenten aus der Datenbank laden
+    // Lazy Load Services (nur initialisieren wenn Keys da sind)
+    const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+    const twilioClient = (process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) 
+        ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN) 
+        : null;
+
+    const supabase = getServiceSupabase();
+    
+    // Wir holen alle Profile, die ein aktives Abonnement haben
+    const { data: subs, error } = await supabase
+        .from('subscriptions')
+        .select(`
+            user_id,
+            profiles (email) 
+        `)
+        .eq('status', 'active');
+
+    if (error) {
+        console.error("DB Error:", error);
+        return res.status(500).json({ error: 'Database error fetching subscribers' });
+    }
+
+    let sentCount = 0;
+
+    // 4. Benachrichtigungen versenden
+    for (const sub of subs || []) {
+        const email = sub.profiles?.email;
+        if (!email) continue;
+
+        // E-Mail Senden
+        if (resend) {
+            try {
                 await resend.emails.send({
-                    from: 'ALARM <alarm@resortpassalarm.com>',
-                    to: user.email,
-                    subject: '🚨 GOLD PASS VERFÜGBAR! SCHNELL SEIN!',
-                    html: `<h1>ResortPass GOLD ist da!</h1><p>Klicke sofort hier: <a href="https://tickets.mackinternational.de/de/ticket/resortpass-gold">Zum Shop</a></p>`
+                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    to: email,
+                    subject: `🚨 ${productName.toUpperCase()} VERFÜGBAR!`,
+                    html: `
+                        <div style="font-family: sans-serif; padding: 20px; border: 1px solid #eee; border-radius: 10px; max-width: 600px; margin: 0 auto;">
+                            <h1 style="color: #d32f2f; margin-bottom: 10px;">Schnell sein!</h1>
+                            <p style="font-size: 16px; color: #333;">Der <strong>${productName}</strong> scheint wieder verfügbar zu sein.</p>
+                            <p>Warte nicht lange, die Kontingente sind oft winzig.</p>
+                            
+                            <a href="${productUrl}" style="background-color: #00305e; color: #ffcc00; padding: 15px 30px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 18px; display: inline-block; margin: 20px 0;">
+                                Direkt zum Shop
+                            </a>
+                            
+                            <p style="font-size: 12px; color: #888; margin-top: 30px; border-top: 1px solid #eee; padding-top: 10px;">
+                                Dies ist eine automatische Nachricht von deinem ResortPassWächter.<br/>
+                                <a href="https://resortpassalarm.com/dashboard" style="color: #888;">Einstellungen ändern</a>
+                            </p>
+                        </div>
+                    `
                 });
-             } catch(e) { console.error("Webhook Email Error", e); }
-         }
-         
-         // Send SMS
-         if (twilioClient && process.env.TWILIO_PHONE_NUMBER) {
-             try {
-                await twilioClient.messages.create({
-                    body: '🚨 ALARM: ResortPass GOLD ist verfügbar! Sofort prüfen: https://tickets.mackinternational.de/de/ticket/resortpass-gold',
-                    from: process.env.TWILIO_PHONE_NUMBER,
-                    to: user.phone
-                });
-             } catch(e) { console.error("Webhook SMS Error", e); }
-         }
-      }
+                sentCount++;
+            } catch(e) { console.error(`Failed to email ${email}`, e); }
+        }
+        
+        // SMS Logik hier, falls Telefonnummern in DB gespeichert werden
+        // if (twilioClient && sub.profiles.phone) { ... }
     }
 
-    res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, sent: sentCount, product: productName });
 
   } catch (error) {
-    console.error("Webhook Error:", error);
-    res.status(500).json({ error: 'Internal Server Error' });
+     console.error("Webhook Error:", error);
+     return res.status(500).json({ error: error.message });
   }
 }
