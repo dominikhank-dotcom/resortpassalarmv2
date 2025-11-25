@@ -35,18 +35,17 @@ const getSupabaseConfig = () => {
 
 const config = getSupabaseConfig();
 
-// Fallback to prevent crash ("White Screen") if config is missing
-// This allows the app to render the Login screen (where auth will fail gracefully with an error message)
-// instead of throwing an Uncaught Exception in the root.
-const isConfigMissing = !config.url || !config.key;
-const validUrl = isConfigMissing ? 'https://placeholder.supabase.co' : config.url;
-const validKey = isConfigMissing ? 'placeholder' : config.key;
+// Check if config is missing or placeholder
+export const isSupabaseConfigured = !!config.url && !!config.key && !config.url.includes('placeholder');
 
-if (isConfigMissing) {
+const validUrl = config.url || 'https://placeholder.supabase.co';
+const validKey = config.key || 'placeholder';
+
+if (!isSupabaseConfigured) {
   console.warn("⚠️ Supabase Configuration missing in Client.");
   if (typeof window !== 'undefined') {
     // Log to console for developer visibility
-    console.log("Please check Vercel Settings -> Environment Variables. Ensure NEXT_PUBLIC_SUPABASE_URL is set.");
+    console.log("Please check Vercel Settings -> Environment Variables. Ensure NEXT_PUBLIC_SUPABASE_URL is set and redeploy.");
   }
 }
 

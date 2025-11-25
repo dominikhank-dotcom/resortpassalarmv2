@@ -9,7 +9,7 @@ import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
-import { supabase } from './lib/supabase';
+import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Loader2 } from 'lucide-react';
 
 // Login Screen with Supabase Integration
@@ -21,6 +21,12 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
+    // 1. Immediate Config Check
+    if (!isSupabaseConfigured) {
+        setError("Konfigurationsfehler: Datenbank-Verbindung fehlt. Bitte Environment Variables in Vercel prüfen.");
+        return;
+    }
+
     if (!email || !password) {
       setError("Bitte E-Mail und Passwort eingeben.");
       return;
@@ -29,10 +35,19 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
     setError(null);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      // 2. Timeout Promise (15s) to prevent infinite spinning
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Zeitüberschreitung: Datenbank antwortet nicht. Prüfe Internetverbindung.")), 15000)
+      );
+
+      const loginPromise = supabase.auth.signInWithPassword({
         email,
         password,
       });
+
+      // Race: Whichever finishes first wins
+      const result = await Promise.race([loginPromise, timeoutPromise]) as any;
+      const { data, error } = result;
 
       if (error) throw error;
       if (data.user) {
@@ -47,6 +62,10 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   };
 
   const handleResetPassword = async () => {
+    if (!isSupabaseConfigured) {
+        alert("Fehler: Datenbank nicht konfiguriert.");
+        return;
+    }
     if (!email) {
       alert("Bitte gib deine E-Mail Adresse ein.");
       return;
@@ -83,7 +102,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
             <p className="text-slate-500 mb-8">Bitte melde dich an, um fortzufahren.</p>
             
             {error && (
-               <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 border border-red-200">
+               <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 border border-red-200 text-left">
                   {error}
                </div>
             )}
@@ -182,6 +201,10 @@ const UpdatePasswordScreen: React.FC<{ onComplete: () => void }> = ({ onComplete
   const [message, setMessage] = useState('');
 
   const handleUpdate = async () => {
+    if (!isSupabaseConfigured) {
+        setMessage("Datenbank nicht konfiguriert.");
+        return;
+    }
     if (password !== confirm) {
       setMessage("Passwörter stimmen nicht überein.");
       return;
@@ -257,6 +280,8 @@ const App: React.FC = () => {
 
   // Auth State Listener
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
     supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'PASSWORD_RECOVERY') {
             setIsRecoveryMode(true);

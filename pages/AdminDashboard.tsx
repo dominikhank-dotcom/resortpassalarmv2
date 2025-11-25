@@ -16,7 +16,7 @@ import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
 import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, fetchAdminPayouts, markPayoutPaid, toggleFreeSubscription } from '../services/backendService';
 import { EmailTemplate } from '../types';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 // Real Templates List
 const DEFAULT_TEMPLATES: EmailTemplate[] = [
@@ -173,6 +173,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [isLoadingPayouts, setIsLoadingPayouts] = useState(false);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
     if (activeTab === 'dashboard') {
         loadDashboardStats();
     }
