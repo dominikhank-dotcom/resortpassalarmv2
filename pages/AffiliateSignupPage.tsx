@@ -6,9 +6,10 @@ import { supabase } from '../lib/supabase';
 interface AffiliateSignupProps {
   onLoginClick: () => void;
   onRegister: () => void;
+  onNavigate: (page: string) => void;
 }
 
-export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginClick, onRegister }) => {
+export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginClick, onRegister, onNavigate }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -173,7 +174,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
                 className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500" 
               />
               <label htmlFor="terms" className="text-sm text-slate-600">
-                Ich stimme den <a href="#" className="text-blue-600 hover:underline">Partnerbedingungen</a> zu.
+                Ich stimme den <button type="button" onClick={() => onNavigate('partner-terms')} className="text-blue-600 hover:underline">Partnerbedingungen</button> zu.
               </label>
             </div>
 

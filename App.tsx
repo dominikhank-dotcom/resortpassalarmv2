@@ -8,6 +8,7 @@ import { AffiliateSignupPage } from './pages/AffiliateSignupPage';
 import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
+import { PartnerTermsPage } from './pages/PartnerTermsPage';
 import { UserRole } from './types';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { Loader2, AlertTriangle } from 'lucide-react';
@@ -52,7 +53,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
          await Promise.race([pingPromise, pingTimeout]);
       } catch(e: any) {
          if (e.message === 'TIMEOUT_PING') {
-             throw new Error("Verbindung blockiert. Bitte AdBlocker/Erweiterungen deaktivieren oder Inkognito-Modus nutzen.");
+             throw new Error("Verbindung blockiert. Bitte AdBlocker/Erweiterungen deaktivieren oder Inkognito-Modus nutzen oder anderen Browser versuchen.");
          }
          throw e;
       }
@@ -372,7 +373,7 @@ const App: React.FC = () => {
           />
         );
       case 'affiliate-signup':
-        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} />;
+        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} onNavigate={navigate} />;
       case 'affiliate-login':
         return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
       case 'user-signup':
@@ -398,6 +399,8 @@ const App: React.FC = () => {
         return <TermsPage onBack={() => navigate('landing')} />;
       case 'revocation':
         return <RevocationPage onBack={() => navigate('landing')} />;
+      case 'partner-terms':
+        return <PartnerTermsPage onBack={() => navigate('affiliate-signup')} />;
 
       case 'dashboard':
         if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} />;
