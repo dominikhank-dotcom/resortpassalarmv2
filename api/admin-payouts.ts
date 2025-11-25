@@ -4,7 +4,6 @@ export default async function handler(req, res) {
   const supabase = getServiceSupabase();
 
   if (req.method === 'GET') {
-    // List all payouts
     const { data: payouts, error } = await supabase
       .from('payouts')
       .select(`
@@ -18,11 +17,9 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    // Mark as Paid
     const { payoutId } = req.body;
     
     try {
-        // 1. Update Payout
         const { error: payoutError } = await supabase
             .from('payouts')
             .update({ 
@@ -33,7 +30,6 @@ export default async function handler(req, res) {
 
         if (payoutError) throw payoutError;
 
-        // 2. Update linked commissions to 'paid'
         const { error: commError } = await supabase
             .from('commissions')
             .update({ status: 'paid' })

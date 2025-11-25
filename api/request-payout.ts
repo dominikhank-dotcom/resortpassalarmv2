@@ -13,7 +13,6 @@ export default async function handler(req, res) {
   const supabase = getServiceSupabase();
 
   try {
-    // 1. Calculate total pending amount
     const { data: pendingCommissions, error: fetchError } = await supabase
       .from('commissions')
       .select('id, amount')
@@ -28,7 +27,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: 'Mindestauszahlungsbetrag (20€) nicht erreicht.' });
     }
 
-    // 2. Create Payout Record
     const { data: payout, error: payoutError } = await supabase
       .from('payouts')
       .insert([{
@@ -42,7 +40,6 @@ export default async function handler(req, res) {
 
     if (payoutError) throw payoutError;
 
-    // 3. Update Commissions to link to payout and set status to 'requested'
     const commissionIds = pendingCommissions.map(c => c.id);
     const { error: updateError } = await supabase
       .from('commissions')

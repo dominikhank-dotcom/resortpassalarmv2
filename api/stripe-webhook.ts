@@ -63,8 +63,6 @@ async function handleNewSubscription(session, supabase) {
 
   console.log(`Processing New Subscription: ${email}, Ref: ${referralCode}`);
 
-  // 1. Upsert User Profile
-  // We search by email. If not found, we create a placeholder user.
   const { data: user, error: userError } = await supabase
     .from('profiles')
     .select('id')
@@ -74,14 +72,13 @@ async function handleNewSubscription(session, supabase) {
   let userId = user?.id;
 
   if (!userId) {
-    // Create new profile
     const { data: newUser, error: createError } = await supabase
       .from('profiles')
       .insert([{ 
         email, 
         stripe_customer_id: stripeCustomerId,
         role: 'CUSTOMER',
-        first_name: 'Customer', // Placeholder until they update profile
+        first_name: 'Customer', 
         last_name: '(New)'
       }])
       .select()
@@ -93,14 +90,12 @@ async function handleNewSubscription(session, supabase) {
     }
     userId = newUser.id;
   } else {
-    // Update existing profile with stripe ID
     await supabase
       .from('profiles')
       .update({ stripe_customer_id: stripeCustomerId })
       .eq('id', userId);
   }
 
-  // 2. Create Subscription Record
   const { error: subError } = await supabase
     .from('subscriptions')
     .insert([{
@@ -108,12 +103,11 @@ async function handleNewSubscription(session, supabase) {
       stripe_subscription_id: subscriptionId,
       status: 'active',
       plan: 'premium',
-      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Approx 1 month
+      current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
     }]);
 
   if (subError) console.error("Error creating subscription:", subError);
 
-  // 3. Handle Affiliate Commission
   if (referralCode) {
     await distributeCommission(supabase, referralCode, 1.99, userId, subscriptionId);
   }
@@ -121,11 +115,10 @@ async function handleNewSubscription(session, supabase) {
 
 async function handleRecurringPayment(invoice, supabase) {
   const subscriptionId = invoice.subscription;
-  const amountPaid = invoice.amount_paid / 100; // Convert cents to EUR
+  const amountPaid = invoice.amount_paid / 100;
 
   console.log(`Processing Recurring Payment: ${subscriptionId}`);
 
-  // 1. Extend Subscription in DB
   await supabase
     .from('subscriptions')
     .update({ 
@@ -134,17 +127,10 @@ async function handleRecurringPayment(invoice, supabase) {
     })
     .eq('stripe_subscription_id', subscriptionId);
 
-  // 2. Check for Affiliate Link and Distribute Commission
-  // We need to find who referred this user originally.
-  // We look up the original subscription in our DB (or Stripe) to find metadata, 
-  // OR we look up a "referrals" table if we created one. 
-  // For simplicity, let's check Stripe subscription metadata.
-  
   const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
   const referralCode = stripeSub.metadata?.referralCode;
 
   if (referralCode) {
-    // Find the user ID associated with this subscription to link the commission
     const { data: sub } = await supabase.from('subscriptions').select('user_id').eq('stripe_subscription_id', subscriptionId).single();
     if (sub) {
         await distributeCommission(supabase, referralCode, amountPaid, sub.user_id, subscriptionId);
@@ -153,16 +139,10 @@ async function handleRecurringPayment(invoice, supabase) {
 }
 
 async function distributeCommission(supabase, referralCode, amount, sourceUserId, subscriptionId) {
-  // 1. Find Affiliate Partner ID
-  // referralCode usually matches the partner's ref_link slug or ID
-  // Assuming we have a `referral_code` column in profiles or separate table
-  // For this MVP, let's assume referralCode IS the partner's profile ID or a mapped code
-  
-  // Let's verify if a partner exists with this referral code
   const { data: partner } = await supabase
     .from('profiles')
     .select('id')
-    .eq('referral_code', referralCode) // You need to add this column to profiles!
+    .eq('referral_code', referralCode)
     .single();
 
   if (!partner) {
@@ -170,16 +150,15 @@ async function distributeCommission(supabase, referralCode, amount, sourceUserId
     return;
   }
 
-  const commissionAmount = amount * 0.5; // 50% Commission
+  const commissionAmount = amount * 0.5;
 
-  // 2. Insert Commission Record
   const { error } = await supabase
     .from('commissions')
     .insert([{
       partner_id: partner.id,
       source_user_id: sourceUserId,
       amount: commissionAmount,
-      status: 'pending', // payout pending
+      status: 'pending',
       stripe_subscription_id: subscriptionId,
       description: 'Monatsabo Provision'
     }]);
