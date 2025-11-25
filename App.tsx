@@ -35,9 +35,10 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
     setError(null);
 
     try {
-      // 2. Timeout Promise (15s) to prevent infinite spinning
+      // 2. Timeout Promise (60s) to prevent infinite spinning
+      // Increased to 60s to allow waking up paused Supabase instances
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Zeitüberschreitung: Datenbank antwortet nicht. Prüfe Internetverbindung.")), 15000)
+        setTimeout(() => reject(new Error("Zeitüberschreitung (60s): Datenbank antwortet nicht. Prüfe Konsole (F12) auf Netzwerkfehler.")), 60000)
       );
 
       const loginPromise = supabase.auth.signInWithPassword({

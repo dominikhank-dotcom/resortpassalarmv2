@@ -14,10 +14,6 @@ const getSupabaseConfig = () => {
     if (typeof __SUPABASE_ANON_KEY__ !== 'undefined') key = __SUPABASE_ANON_KEY__;
   } catch (e) {}
 
-  // Clean strings
-  if (url === '""' || url === "''") url = '';
-  if (key === '""' || key === "''") key = '';
-
   // 2. Try Runtime Variables (Development / Fallback)
   if (!url || !key) {
     try {
@@ -29,6 +25,19 @@ const getSupabaseConfig = () => {
       if (!key) key = env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
     } catch (e) {}
   }
+
+  // Robust cleanup: Remove surrounding quotes if present (common Vercel env var mistake)
+  const clean = (str: string) => {
+      if (!str) return '';
+      let s = str.trim();
+      if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+          s = s.slice(1, -1);
+      }
+      return s;
+  }
+
+  url = clean(url);
+  key = clean(key);
 
   return { url, key };
 };
