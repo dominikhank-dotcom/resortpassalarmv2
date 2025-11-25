@@ -10,7 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 
 // Login Screen with Supabase Integration
 const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () => void; onRegisterClick?: () => void }> = ({ role, onLogin, onCancel, onRegisterClick }) => {
@@ -18,6 +18,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showSlowLoadingHint, setShowSlowLoadingHint] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
@@ -31,34 +32,43 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
       setError("Bitte E-Mail und Passwort eingeben.");
       return;
     }
+    
     setIsLoading(true);
     setError(null);
+    setShowSlowLoadingHint(false);
+
+    // Timer to show hint if it takes longer than 3 seconds (likely blocked)
+    const slowTimer = setTimeout(() => setShowSlowLoadingHint(true), 3000);
 
     try {
-      // 2. Connectivity Ping
-      // Try to fetch session status locally/fast to see if client is blocked
-      try {
-         const { error: pingError } = await supabase.auth.getSession();
-         if (pingError && pingError.message === 'Failed to fetch') {
-             throw new Error("Netzwerkfehler: Verbindung blockiert (z.B. durch AdBlocker).");
-         }
-      } catch(e: any) {
-         if (e.message && e.message.includes('Netzwerkfehler')) throw e;
-         // Ignore other errors here, proceed to login attempt
-      }
-
-      // 3. Timeout Promise (60s)
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Zeitüberschreitung (60s): Datenbank antwortet nicht. Prüfe Konsole (F12) auf Netzwerkfehler oder AdBlocker.")), 60000)
+      // 2. Connectivity Ping with short Timeout (5s)
+      // If getSession hangs, it's likely an extension blocking the storage/network
+      const pingPromise = supabase.auth.getSession();
+      const pingTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("TIMEOUT_PING")), 5000)
       );
 
+      try {
+         await Promise.race([pingPromise, pingTimeout]);
+      } catch(e: any) {
+         if (e.message === 'TIMEOUT_PING') {
+             throw new Error("Verbindung blockiert. Bitte AdBlocker/Erweiterungen deaktivieren oder Inkognito-Modus nutzen.");
+         }
+         throw e;
+      }
+
+      // 3. Login with Timeout (15s)
       const loginPromise = supabase.auth.signInWithPassword({
         email,
         password,
       });
+      
+      const loginTimeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("TIMEOUT_LOGIN")), 15000)
+      );
 
       // Race: Whichever finishes first wins
-      const result = await Promise.race([loginPromise, timeoutPromise]) as any;
+      const result = await Promise.race([loginPromise, loginTimeout]) as any;
       const { data, error } = result;
 
       if (error) throw error;
@@ -68,10 +78,15 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
     } catch (err: any) {
       console.error("Login Error:", err);
       let msg = err.message || "Anmeldung fehlgeschlagen.";
-      if (msg === 'Failed to fetch') msg = "Verbindungsfehler. Bitte Internet prüfen oder AdBlocker deaktivieren.";
+      
+      if (msg === 'TIMEOUT_LOGIN') msg = "Zeitüberschreitung. Der Server antwortet nicht.";
+      if (msg === 'Failed to fetch') msg = "Netzwerkfehler. Bitte Internet prüfen.";
+      
       setError(msg);
     } finally {
+      clearTimeout(slowTimer);
       setIsLoading(false);
+      setShowSlowLoadingHint(false);
     }
   };
 
@@ -117,6 +132,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
             
             {error && (
                <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 border border-red-200 text-left">
+                  <span className="font-bold block mb-1">Fehler:</span>
                   {error}
                </div>
             )}
@@ -153,6 +169,14 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               >
                 {isLoading ? <Loader2 className="animate-spin" /> : 'Anmelden'}
               </button>
+              
+              {showSlowLoadingHint && (
+                  <div className="text-xs text-amber-600 bg-amber-50 p-2 rounded border border-amber-100 flex items-center gap-2 text-left animate-in fade-in">
+                      <AlertTriangle size={16} className="shrink-0" />
+                      <span>Dauert es zu lange? Deaktiviere AdBlocker oder nutze den Inkognito-Modus.</span>
+                  </div>
+              )}
+
               <button onClick={onCancel} className="text-slate-400 text-sm hover:text-slate-600 block w-full py-2">Abbrechen</button>
             </div>
             
