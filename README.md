@@ -57,6 +57,16 @@ create table if not exists profiles (
   role text default 'CUSTOMER', -- 'CUSTOMER', 'AFFILIATE', 'ADMIN'
   stripe_customer_id text,
   referral_code text unique, -- Für Partner
+  
+  -- Adressdaten
+  street text,
+  house_number text,
+  zip text,
+  city text,
+  country text,
+  company text,
+  vat_id text,
+
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 

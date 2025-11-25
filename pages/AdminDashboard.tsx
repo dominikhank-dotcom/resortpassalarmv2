@@ -251,13 +251,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                   plan: isFree ? 'Manuell (Gratis)' : sub?.plan || '-',
                   isFree: isFree,
                   since: new Date(p.created_at).toLocaleDateString(),
-                  referrer: '-', // Would need extra logic to fetch referrer name
-                  street: '',
-                  nr: '',
-                  zip: '',
-                  city: '',
-                  country: 'Deutschland',
-                  payments: 0 // Would need to count payments in Stripe
+                  street: p.street || '',
+                  nr: p.house_number || '',
+                  zip: p.zip || '',
+                  city: p.city || '',
+                  country: p.country || 'Deutschland'
               };
           });
 
@@ -509,6 +507,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               <Activity size={48} className="mb-4 opacity-50"/>
               <p>Diagramm wird verfügbar sobald historische Daten gesammelt wurden.</p>
             </div>
+            
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-lg font-bold flex items-center gap-2">
+                        <Sparkles size={20} className="text-[#ffcc00]" />
+                        KI Insights
+                    </h3>
+                    <Button onClick={handleGenerateInsights} disabled={isAnalyzing} size="sm" className="bg-[#00305e] text-white">
+                        {isAnalyzing ? <Loader2 className="animate-spin" size={16} /> : <Sparkles size={16} className="mr-2" />}
+                        {isAnalyzing ? 'Analysiere...' : 'Analyse generieren'}
+                    </Button>
+                </div>
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 min-h-[100px]">
+                    {aiAnalysis ? (
+                        <p className="whitespace-pre-wrap text-slate-700">{aiAnalysis}</p>
+                    ) : (
+                        <p className="text-slate-400 text-center pt-8">Klicke auf Generieren für eine KI-Analyse deiner aktuellen Daten.</p>
+                    )}
+                </div>
+            </div>
           </div>
         )}
 
@@ -603,7 +621,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                             </div>
                         </div>
                         <div className="p-6 grid grid-cols-2 gap-6">
-                             {/* ... existing fields ... */}
                              <div>
                                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-4">Stammdaten</h3>
                                 <div className="space-y-4">
@@ -611,7 +628,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                         <label className="block text-xs text-slate-500 mb-1">Name</label>
                                         <input disabled={!isEditMode} value={selectedCustomer.name} onChange={e => setSelectedCustomer({...selectedCustomer, name: e.target.value})} className="w-full p-2 border rounded bg-slate-50 disabled:bg-slate-100" />
                                     </div>
-                                    {/* ... other fields identical ... */}
                                     <div>
                                         <label className="block text-xs text-slate-500 mb-1">Email</label>
                                         <input disabled={!isEditMode} value={selectedCustomer.email} onChange={e => setSelectedCustomer({...selectedCustomer, email: e.target.value})} className="w-full p-2 border rounded bg-slate-50 disabled:bg-slate-100" />
@@ -636,6 +652,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                             <input disabled={!isEditMode} value={selectedCustomer.city} onChange={e => setSelectedCustomer({...selectedCustomer, city: e.target.value})} className="w-full p-2 border rounded bg-slate-50 disabled:bg-slate-100" />
                                         </div>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 mb-1">Land</label>
+                                        <input disabled={!isEditMode} value={selectedCustomer.country} onChange={e => setSelectedCustomer({...selectedCustomer, country: e.target.value})} className="w-full p-2 border rounded bg-slate-50 disabled:bg-slate-100" />
+                                    </div>
                                 </div>
                              </div>
                              <div>
@@ -649,6 +669,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                          <div className="flex justify-between items-center mb-2">
                                              <span className="text-sm font-medium">Plan</span>
                                              <span>{selectedCustomer.plan}</span>
+                                         </div>
+                                         <div className="flex justify-between items-center mb-2">
+                                             <span className="text-sm font-medium">Seit</span>
+                                             <span>{selectedCustomer.since}</span>
                                          </div>
                                      </div>
                                 </div>
@@ -854,19 +878,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             </div>
         )}
 
-        {/* SETTINGS TAB - Identical to previous */}
+        {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
              <div className="space-y-8 animate-in fade-in">
                  <h1 className="text-2xl font-bold text-slate-900">System Einstellungen</h1>
-                 {/* ... (Keep existing settings code) ... */}
                  
-                 {/* Just restoring the container to avoid breaking structure if needed */}
                   <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                      <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                          <Shield className="text-blue-600" size={20} />
                          Admin Sicherheit & Login
                      </h3>
-                     {/* ... content ... */}
                      <div className="grid md:grid-cols-2 gap-8">
                          <div className="space-y-4">
                              <h4 className="text-sm font-semibold text-slate-700">Admin E-Mail Adresse</h4>
@@ -881,17 +902,154 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                      <CheckCircle size={14} className="mr-1"/> Aktiv
                                  </div>
                              </div>
+                             
+                             <div className="border-t border-slate-100 pt-4 mt-4">
+                                 <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail ändern</label>
+                                 <input type="email" placeholder="Neue E-Mail Adresse" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg mb-2" />
+                                 <input type="password" placeholder="Aktuelles Passwort zur Bestätigung" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg mb-2" />
+                                 <Button size="sm" variant="outline" className="w-full" onClick={() => alert("E-Mail Änderung erfordert Backend-Bestätigung (Simuliert)")}>Änderung anfordern</Button>
+                             </div>
+                         </div>
+                         
+                         <div className="space-y-4">
+                             <h4 className="text-sm font-semibold text-slate-700">Passwort ändern</h4>
+                             <input type="password" placeholder="Aktuelles Passwort" className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                             <input type="password" placeholder="Neues Passwort" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                             <input type="password" placeholder="Neues Passwort wiederholen" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                             <Button size="sm" variant="secondary" className="w-full bg-[#00305e] text-white" onClick={() => alert("Passwort geändert (Simuliert)")}>Passwort speichern</Button>
                          </div>
                      </div>
                  </div>
 
-                 {/* External Services */}
+                 {/* Shop Links */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                        <Link className="text-blue-600" size={20} />
+                        Europa-Park Shop Links
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-4">Diese Links werden in E-Mails und im Dashboard verwendet.</p>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Gold URL</label>
+                            <input 
+                                type="text" 
+                                value={productUrls.gold} 
+                                onChange={e => onUpdateProductUrls({...productUrls, gold: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Silver URL</label>
+                            <input 
+                                type="text" 
+                                value={productUrls.silver} 
+                                onChange={e => onUpdateProductUrls({...productUrls, silver: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                            />
+                        </div>
+                    </div>
+                 </div>
+
+                 {/* External Services Guide */}
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                         <Key className="text-blue-600" size={20} />
                         Externe Dienste (Vercel Configuration)
                     </h3>
-                    {/* ... (Content same as previous) ... */}
+                    
+                    <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-8">
+                        <h4 className="text-amber-800 font-bold flex items-center gap-2">
+                            <Lock size={16}/> Sicherheits-Hinweis
+                        </h4>
+                        <p className="text-sm text-amber-700 mt-1">
+                            API Schlüssel dürfen niemals im Code oder hier im Dashboard gespeichert werden. 
+                            Bitte trage diese Werte ausschließlich in deinem Vercel Dashboard unter 
+                            <strong> Settings &rarr; Environment Variables</strong> ein.
+                        </p>
+                    </div>
+
+                    <div className="space-y-6">
+                        <div className="border-b border-slate-100 pb-6">
+                            <h4 className="font-bold text-slate-900 mb-2 flex items-center justify-between">
+                                <span>Browse.ai (Web Scraping)</span>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('browse')}>
+                                    <Wifi size={14} className="mr-1"/> Verbindung testen
+                                </Button>
+                            </h4>
+                            <p className="text-sm text-slate-500 mb-3">Benötigt für die Überwachung der Ticket-Seite.</p>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">BROWSE_AI_API_KEY</code>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">BROWSE_AI_ROBOT_ID</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-b border-slate-100 pb-6">
+                            <h4 className="font-bold text-slate-900 mb-2 flex items-center justify-between">
+                                <span>Google Gemini (KI)</span>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('gemini')}>
+                                    <Sparkles size={14} className="mr-1"/> Verbindung testen
+                                </Button>
+                            </h4>
+                            <p className="text-sm text-slate-500 mb-3">Benötigt für Marketing-Texte und Admin Insights.</p>
+                            <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                <code className="text-sm text-blue-600">API_KEY</code>
+                            </div>
+                        </div>
+
+                        <div className="border-b border-slate-100 pb-6">
+                            <h4 className="font-bold text-slate-900 mb-2">Stripe (Zahlungen)</h4>
+                            <p className="text-sm text-slate-500 mb-3">Benötigt für Abo-Abwicklung.</p>
+                            <div className="grid md:grid-cols-3 gap-4">
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">STRIPE_SECRET_KEY</code>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">STRIPE_WEBHOOK_SECRET</code>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="border-b border-slate-100 pb-6">
+                            <h4 className="font-bold text-slate-900 mb-2">Resend (E-Mails)</h4>
+                            <p className="text-sm text-slate-500 mb-3">Benötigt für den Versand von Alarmen.</p>
+                            <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                <code className="text-sm text-blue-600">RESEND_API_KEY</code>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h4 className="font-bold text-slate-900 mb-2">Twilio (SMS)</h4>
+                            <p className="text-sm text-slate-500 mb-3">Benötigt für SMS Benachrichtigungen.</p>
+                            <div className="grid md:grid-cols-3 gap-4">
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">TWILIO_ACCOUNT_SID</code>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">TWILIO_AUTH_TOKEN</code>
+                                </div>
+                                <div className="bg-slate-50 p-3 rounded border border-slate-200">
+                                    <span className="text-xs font-bold text-slate-500 block">KEY NAME</span>
+                                    <code className="text-sm text-blue-600">TWILIO_PHONE_NUMBER</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                  </div>
              </div>
         )}

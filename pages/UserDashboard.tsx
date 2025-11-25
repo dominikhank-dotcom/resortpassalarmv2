@@ -101,11 +101,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             email: profile.email || user.email || '',
-            street: '', // Add these columns to DB if you want to persist address
-            houseNumber: '',
-            zip: '',
-            city: '',
-            country: 'Deutschland'
+            street: profile.street || '', 
+            houseNumber: profile.house_number || '',
+            zip: profile.zip || '',
+            city: profile.city || '',
+            country: profile.country || 'Deutschland'
           });
           
           // Use profile email for notifications default
@@ -141,6 +141,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         const query = new URLSearchParams(window.location.search);
         if (query.get('payment_success')) {
           setSubscriptionStatus('PAID');
+          // Clear referral code to prevent future attribution on re-sub
           localStorage.removeItem('resortpass_ref_data');
         }
 
@@ -170,15 +171,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     e.preventDefault();
     if (!userId) return;
 
-    // In a real app with address columns, you would update them here.
-    // For now we just update name/email in profiles.
     try {
         const { error } = await supabase
             .from('profiles')
             .update({
                 first_name: personalData.firstName,
                 last_name: personalData.lastName,
-                // Add address columns to your SQL table if you want to save them!
+                street: personalData.street,
+                house_number: personalData.houseNumber,
+                zip: personalData.zip,
+                city: personalData.city,
+                country: personalData.country,
+                email: personalData.email
             })
             .eq('id', userId);
 
@@ -641,7 +645,142 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Personal Data */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
               <div className="p-6 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                      <div className="bg-slate-100 p-2 rounded-lg text
+                      <div className="bg-slate-100 p-2 rounded-lg text-slate-600"><User size={20} /></div>
+                      <h3 className="font-semibold text-slate-900">Persönliche Angaben</h3>
+                  </div>
+              </div>
+              <div className="p-6">
+                  <form onSubmit={handleSavePersonalData} className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Vorname</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.firstName}
+                                  onChange={e => setPersonalData({...personalData, firstName: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Nachname</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.lastName}
+                                  onChange={e => setPersonalData({...personalData, lastName: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                          <div className="col-span-2">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Straße</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.street}
+                                  onChange={e => setPersonalData({...personalData, street: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Nr.</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.houseNumber}
+                                  onChange={e => setPersonalData({...personalData, houseNumber: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                          <div>
+                              <label className="block text-xs font-medium text-slate-500 mb-1">PLZ</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.zip}
+                                  onChange={e => setPersonalData({...personalData, zip: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                          <div className="col-span-2">
+                              <label className="block text-xs font-medium text-slate-500 mb-1">Ort</label>
+                              <input 
+                                  type="text" 
+                                  value={personalData.city}
+                                  onChange={e => setPersonalData({...personalData, city: e.target.value})}
+                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                              />
+                          </div>
+                      </div>
+                      <div>
+                          <label className="block text-xs font-medium text-slate-500 mb-1">Land</label>
+                          <select 
+                              value={personalData.country}
+                              onChange={e => setPersonalData({...personalData, country: e.target.value})}
+                              className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white"
+                          >
+                              <option>Deutschland</option>
+                              <option>Österreich</option>
+                              <option>Schweiz</option>
+                          </select>
+                      </div>
+                      
+                      <div className="pt-2">
+                          <label className="block text-xs font-medium text-slate-500 mb-1">E-Mail Adresse (Account)</label>
+                          <input 
+                              type="email" 
+                              value={personalData.email}
+                              onChange={e => setPersonalData({...personalData, email: e.target.value})}
+                              className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50"
+                          />
+                      </div>
+
+                      <div className="pt-2 flex justify-end">
+                          <Button type="submit" size="sm" className="bg-[#00305e]">
+                              <Save size={16} className="mr-2" /> Speichern
+                          </Button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+
+          {/* Alarm History */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full">
+              <div className="p-6 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                      <div className="bg-slate-100 p-2 rounded-lg text-slate-600"><History size={20} /></div>
+                      <h3 className="font-semibold text-slate-900">Versand-Protokoll</h3>
+                  </div>
+              </div>
+              <div className="p-6 flex-1 overflow-y-auto max-h-[400px]">
+                  {alarmHistory.length === 0 ? (
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 py-8">
+                          <FileText size={48} className="mb-4 opacity-20" />
+                          <p>Noch keine Alarme versendet.</p>
+                      </div>
+                  ) : (
+                      <div className="space-y-4">
+                          {alarmHistory.map((entry) => (
+                              <div key={entry.id} className="flex gap-4 items-start p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                  <div className={`mt-1 p-1.5 rounded-full ${entry.type === 'EMAIL' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                                      {entry.type === 'EMAIL' ? <Mail size={14} /> : <MessageSquare size={14} />}
+                                  </div>
+                                  <div>
+                                      <p className="text-sm font-medium text-slate-900">{entry.message}</p>
+                                      <p className="text-xs text-slate-500">{entry.date}</p>
+                                  </div>
+                              </div>
+                          ))}
+                      </div>
+                  )}
+              </div>
+          </div>
+        </div>
+      </div>
+      <Footer navigate={navigate} />
+    </div>
+  );
+};
