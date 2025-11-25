@@ -36,9 +36,16 @@ export default async function handler(req, res) {
       success_url: `${req.headers.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
       cancel_url: `${req.headers.origin}/dashboard?payment_cancelled=true`,
       customer_email: email,
+      // Metadata on the session (for immediate reference)
       metadata: {
         service: 'ResortPassAlarm',
-        referralCode: referralCode || '' // Persist referral code
+        referralCode: referralCode || ''
+      },
+      // CRITICAL: Metadata on the subscription (for recurring commissions in webhooks)
+      subscription_data: {
+        metadata: {
+          referralCode: referralCode || ''
+        }
       }
     });
 

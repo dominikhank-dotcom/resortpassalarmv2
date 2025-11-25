@@ -110,3 +110,43 @@ export const testGeminiConnection = async () => {
     throw error;
   }
 };
+
+// --- PAYOUT SERVICES ---
+
+export const requestPayout = async (partnerId: string, paypalEmail: string) => {
+  try {
+    const response = await fetch('/api/request-payout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ partnerId, paypalEmail })
+    });
+    return await handleResponse(response);
+  } catch (error: any) {
+    console.error("Payout Request Error:", error);
+    throw error;
+  }
+};
+
+export const fetchAdminPayouts = async () => {
+  try {
+     const response = await fetch('/api/admin-payouts');
+     return await handleResponse(response);
+  } catch (error: any) {
+     console.error("Fetch Payouts Error:", error);
+     throw error;
+  }
+};
+
+export const markPayoutPaid = async (payoutId: string) => {
+  try {
+    const response = await fetch('/api/admin-payouts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payoutId })
+    });
+    return await handleResponse(response);
+  } catch (error: any) {
+      console.error("Mark Paid Error:", error);
+      throw error;
+  }
+};

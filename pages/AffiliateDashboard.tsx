@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Loader2 } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Loader2, CheckCircle, Clock } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
 import { supabase } from '../lib/supabase';
+import { requestPayout } from '../services/backendService';
 
 export const AffiliateDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
@@ -12,8 +13,11 @@ export const AffiliateDashboard: React.FC = () => {
   // Real Data States
   const [isLoading, setIsLoading] = useState(true);
   const [refLink, setRefLink] = useState("");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [payouts, setPayouts] = useState<any[]>([]);
+  
   const [stats, setStats] = useState<AffiliateStats>({
-    clicks: 0, // We don't track raw clicks in DB yet, only conversions
+    clicks: 0, 
     conversions: 0,
     earnings: 0,
     history: []
@@ -52,6 +56,7 @@ export const AffiliateDashboard: React.FC = () => {
       // 1. Get Current User
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setUserId(user.id);
 
       // 2. Get Profile (for Ref Code & Personal Data)
       const { data: profile } = await supabase
@@ -71,31 +76,45 @@ export const AffiliateDashboard: React.FC = () => {
             firstName: profile.first_name || '',
             lastName: profile.last_name || '',
             email: profile.email || user.email || '',
-            // In a real app, you'd store address in DB too. For MVP, we keep it local or add columns to profiles.
         }));
       }
 
       // 3. Get Commissions (Real Earnings)
-      const { data: commissions, error: commError } = await supabase
+      // Only 'pending' commissions count towards available balance for payout
+      const { data: pendingCommissions } = await supabase
         .from('commissions')
-        .select('amount, created_at')
+        .select('amount')
+        .eq('partner_id', user.id)
+        .eq('status', 'pending');
+        
+      const { data: allCommissions } = await supabase
+        .from('commissions')
+        .select('created_at')
         .eq('partner_id', user.id);
 
-      if (commissions && !commError) {
-        const totalEarnings = commissions.reduce((sum, item) => sum + (item.amount || 0), 0);
-        const totalConversions = commissions.length;
+      // 4. Get Payout History
+      const { data: myPayouts } = await supabase
+        .from('payouts')
+        .select('*')
+        .eq('partner_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      setPayouts(myPayouts || []);
 
-        // Mock History for visual chart (since we just started)
-        // In real app, group commissions by date
+      if (pendingCommissions) {
+        const currentBalance = pendingCommissions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+        const totalConversions = allCommissions?.length || 0;
+
+        // Mock History for visual chart
         const mockHistory = [
              { date: 'Start', clicks: 0, conversions: 0 },
              { date: 'Heute', clicks: totalConversions * 5, conversions: totalConversions } 
         ];
 
         setStats({
-            clicks: totalConversions * 12 + 4, // Mocking clicks based on conversions for demo
+            clicks: totalConversions * 12 + 4, 
             conversions: totalConversions,
-            earnings: totalEarnings,
+            earnings: currentBalance, // Only pending balance available for payout
             history: mockHistory
         });
       }
@@ -132,23 +151,36 @@ export const AffiliateDashboard: React.FC = () => {
     }
   };
 
-  const handlePayout = () => {
+  const handlePayout = async () => {
     if (stats.earnings < 20) {
       alert("Auszahlung erst ab 20,00 € möglich.");
       return;
     }
     if (!areSettingsComplete) {
-      alert("Bitte vervollständige deine Stammdaten in den Einstellungen.");
+      alert("Bitte vervollständige deine Stammdaten in den Einstellungen (inkl. PayPal).");
       setActiveTab('settings');
       return;
     }
-    alert("Auszahlung angefordert! (Demo)");
+    
+    if (!userId) return;
+
+    if (confirm(`Auszahlung von ${stats.earnings.toFixed(2)} € jetzt anfordern?`)) {
+        try {
+            await requestPayout(userId, settings.paypalEmail);
+            alert("Auszahlung erfolgreich beantragt!");
+            fetchAffiliateData(); // Refresh data
+        } catch (e: any) {
+            alert("Fehler: " + e.message);
+        }
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Logic to save address to Supabase would go here
-    alert("Daten erfolgreich gespeichert (Simuliert für MVP).");
+    if (!userId) return;
+    
+    // In a real app, update profile table
+    alert("Daten gespeichert (Simuliert). PayPal Adresse wird für Auszahlung verwendet.");
   };
 
   if (isLoading) {
@@ -215,7 +247,7 @@ export const AffiliateDashboard: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
               <div className="bg-purple-50 p-3 rounded-xl text-purple-600"><TrendingUp size={24} /></div>
               <div>
-                <p className="text-slate-500 text-sm">Verkäufe (Aktiv)</p>
+                <p className="text-slate-500 text-sm">Verkäufe (Gesamt)</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.conversions}</p>
               </div>
             </div>
@@ -223,7 +255,7 @@ export const AffiliateDashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="bg-green-50 p-3 rounded-xl text-green-600"><DollarSign size={24} /></div>
                 <div>
-                  <p className="text-slate-500 text-sm">Verdienst (Offen)</p>
+                  <p className="text-slate-500 text-sm">Verdienst (Verfügbar)</p>
                   <p className="text-2xl font-bold text-slate-900">{stats.earnings.toFixed(2)} €</p>
                 </div>
               </div>
@@ -233,7 +265,7 @@ export const AffiliateDashboard: React.FC = () => {
                   size="sm" 
                   variant="outline" 
                   className="w-full text-green-700 border-green-200 hover:bg-green-50"
-                  disabled={stats.earnings < 20 || !areSettingsComplete}
+                  disabled={stats.earnings < 20}
                 >
                   <CreditCard size={16} /> Auszahlen
                 </Button>
@@ -243,9 +275,54 @@ export const AffiliateDashboard: React.FC = () => {
               </div>
             </div>
           </div>
+          
+          {/* Payout History Table */}
+          {payouts.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-6 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-900">Auszahlungshistorie</h3>
+                </div>
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                            <tr>
+                                <th className="px-6 py-4">Datum</th>
+                                <th className="px-6 py-4">Betrag</th>
+                                <th className="px-6 py-4">PayPal Konto</th>
+                                <th className="px-6 py-4 text-right">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {payouts.map((payout) => (
+                                <tr key={payout.id}>
+                                    <td className="px-6 py-4 text-sm text-slate-600">
+                                        {new Date(payout.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-6 py-4 font-bold text-slate-900">
+                                        {Number(payout.amount).toFixed(2)} €
+                                    </td>
+                                    <td className="px-6 py-4 text-sm text-slate-500">
+                                        {payout.paypal_email}
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium gap-1 ${
+                                            payout.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+                                        }`}>
+                                            {payout.status === 'paid' ? <CheckCircle size={12}/> : <Clock size={12} />}
+                                            {payout.status === 'paid' ? 'Bezahlt' : 'Bearbeitung'}
+                                        </span>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+          )}
 
           {/* Link Section */}
           <div className="bg-indigo-900 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
+            {/* ... link content (same as before) ... */}
             <div className="w-full md:w-1/2">
               <h3 className="text-lg font-semibold mb-2">Dein Affiliate Link</h3>
               <p className="text-indigo-200 text-sm mb-4">Teile diesen Link auf Social Media, deiner Webseite oder in Newslettern.</p>
@@ -265,7 +342,6 @@ export const AffiliateDashboard: React.FC = () => {
             <div className="w-full md:w-1/2">
               <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Sparkles size={18} className="text-yellow-400" /> KI Marketing Assistent</h3>
               <p className="text-indigo-200 text-sm mb-4">Lass unsere KI den perfekten Werbetext für dich schreiben.</p>
-              
               <div className="flex gap-2">
                 <select 
                     value={platform} 
@@ -329,13 +405,11 @@ export const AffiliateDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* TAB: SETTINGS & PAYOUT (Minimal Changes needed here for now, functionality added above) */}
+      {/* TAB: SETTINGS & PAYOUT */}
       {activeTab === 'settings' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
           <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-             {/* ... reusing existing form logic ... */}
              <div className="p-6 md:p-8 space-y-8">
-               {/* Only minor updates to bind values */}
                <section>
                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <User size={16} /> Persönliche Daten
@@ -350,11 +424,32 @@ export const AffiliateDashboard: React.FC = () => {
                       <input type="text" value={settings.lastName} onChange={e => setSettings({...settings, lastName: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
                     </div>
                   </div>
-                  <div>
+                  <div className="mb-4">
                     <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail</label>
                     <input type="email" value={settings.email} readOnly className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-slate-100 outline-none" />
                   </div>
                </section>
+               
+               <div className="border-t border-slate-100 pt-8">
+                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                       <CreditCard size={16} /> Auszahlung (PayPal)
+                   </h3>
+                   <p className="text-sm text-slate-500 mb-4">
+                       Bitte gib deine PayPal-E-Mail-Adresse an, damit wir deine Provisionen auszahlen können.
+                   </p>
+                   <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">PayPal E-Mail Adresse <span className="text-red-500">*</span></label>
+                        <input 
+                            type="email" 
+                            required
+                            value={settings.paypalEmail} 
+                            onChange={e => setSettings({...settings, paypalEmail: e.target.value})} 
+                            className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" 
+                            placeholder="name@example.com"
+                        />
+                   </div>
+               </div>
+
                <div className="flex justify-end pt-4">
                   <Button type="submit" variant="primary" size="lg" className="bg-[#00305e]">
                     <Save size={18} /> Einstellungen speichern

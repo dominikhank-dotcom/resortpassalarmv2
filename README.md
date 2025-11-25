@@ -34,29 +34,59 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 - `BROWSE_AI_API_KEY`
 - `BROWSE_AI_ROBOT_ID`
 - `API_KEY` (für Google Gemini)
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_URL` (oder `NEXT_PUBLIC_SUPABASE_URL`)
+- `VITE_SUPABASE_ANON_KEY` (oder `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 - `SUPABASE_SERVICE_ROLE_KEY`
 
-## Datenbank Setup (SQL)
+## Komplettes Datenbank Setup (SQL)
 
-Gehe in dein Supabase Dashboard -> SQL Editor und führe folgendes Skript aus, um die Datenbank zu initialisieren:
+Kopiere diesen gesamten Block in den Supabase SQL Editor und führe ihn aus ("Run"), um alle Tabellen korrekt zu erstellen.
 
 ```sql
--- 1. Profiles Table (Users & Partners)
-create table profiles (
-  id uuid references auth.users on delete cascade not null primary key default gen_random_uuid(),
+-- Tabellen zurücksetzen (Vorsicht: Löscht alle Daten!)
+-- drop table if exists commissions;
+-- drop table if exists subscriptions;
+-- drop table if exists payouts;
+-- drop table if exists profiles;
+
+-- 1. Profiles Table (Nutzer & Partner) -- MUSS ZUERST KOMMEN
+create table if not exists profiles (
+  id uuid references auth.users on delete cascade not null primary key,
   email text unique not null,
   first_name text,
   last_name text,
   role text default 'CUSTOMER', -- 'CUSTOMER', 'AFFILIATE', 'ADMIN'
   stripe_customer_id text,
-  referral_code text unique, -- For Partners
+  referral_code text unique, -- Für Partner
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- 2. Subscriptions Table
-create table subscriptions (
+-- 2. Payouts Table (Auszahlungsanträge) -- MUSS VOR COMMISSIONS KOMMEN
+create table if not exists payouts (
+  id uuid default gen_random_uuid() primary key,
+  partner_id uuid references profiles(id) on delete cascade not null,
+  amount numeric(10, 2) not null,
+  status text default 'pending', -- 'pending', 'paid', 'rejected'
+  paypal_email text,
+  created_at timestamp with time zone default timezone('utc'::text, now()),
+  paid_at timestamp with time zone
+);
+
+-- 3. Commissions Table (Provisionen) -- REFERENZIERT PAYOUTS
+create table if not exists commissions (
+  id uuid default gen_random_uuid() primary key,
+  partner_id uuid references profiles(id) on delete set null,
+  source_user_id uuid references profiles(id) on delete set null,
+  amount numeric(10, 2),
+  status text default 'pending', -- 'pending' (offen), 'requested' (in Auszahlung), 'paid' (ausbezahlt)
+  stripe_subscription_id text,
+  description text,
+  payout_id uuid references payouts(id), -- Verknüpfung zur Auszahlung
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- 4. Subscriptions Table (Abos)
+create table if not exists subscriptions (
   id uuid default gen_random_uuid() primary key,
   user_id uuid references profiles(id) on delete cascade not null,
   stripe_subscription_id text,
@@ -66,25 +96,22 @@ create table subscriptions (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- 3. Commissions Table
-create table commissions (
-  id uuid default gen_random_uuid() primary key,
-  partner_id uuid references profiles(id) on delete set null,
-  source_user_id uuid references profiles(id) on delete set null,
-  amount numeric(10, 2),
-  status text default 'pending', -- 'pending', 'paid'
-  stripe_subscription_id text,
-  description text,
-  created_at timestamp with time zone default timezone('utc'::text, now())
-);
-
--- Enable Row Level Security (RLS) is recommended for production!
+-- Row Level Security (RLS) aktivieren
 alter table profiles enable row level security;
 alter table subscriptions enable row level security;
 alter table commissions enable row level security;
+alter table payouts enable row level security;
 
--- Simple Policies (Modify for production security!)
+-- Policies (Berechtigungen)
 create policy "Public profiles are viewable by everyone" on profiles for select using (true);
-create policy "Users can insert their own profile" on profiles for insert with check (true);
-create policy "Users can update own profile" on profiles for update using (true);
+create policy "Users can insert their own profile" on profiles for insert with check (auth.uid() = id);
+create policy "Users can update own profile" on profiles for update using (auth.uid() = id);
+
+-- Partner dürfen ihre eigenen Provisionen sehen
+create policy "Partners see own commissions" on commissions for select using (auth.uid() = partner_id);
+
+-- Partner dürfen ihre eigenen Auszahlungen sehen
+create policy "Partners see own payouts" on payouts for select using (auth.uid() = partner_id);
+
+-- Admins brauchen Zugriff auf alles (dies wird im Backend über den SERVICE_ROLE_KEY geregelt, der RLS umgeht)
 ```
