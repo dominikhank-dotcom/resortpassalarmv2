@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { getServiceSupabase } from './_lib/supabase';
+import { getServiceSupabase } from './_lib/supabase.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
