@@ -1,4 +1,4 @@
-import { getServiceSupabase } from '../lib/supabase';
+import { getServiceSupabase } from './_lib/supabase';
 
 export default async function handler(req, res) {
   const supabase = getServiceSupabase();
