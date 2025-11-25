@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
+import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift, Loader2 } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { sendTestAlarm, createCheckoutSession } from '../services/backendService';
+import { supabase } from '../lib/supabase';
 
 interface LogEntry {
   id: string;
@@ -20,8 +21,11 @@ interface UserDashboardProps {
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls }) => {
-  // Simulation State
+  // Real Data State
+  const [isLoading, setIsLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
+  
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
 
@@ -47,75 +51,148 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   // Notification State
   const [notifications, setNotifications] = useState<NotificationConfig>({
-    email: "max.mustermann@example.com",
-    sms: "+49 170 1234567",
+    email: "",
+    sms: "",
     emailEnabled: true,
-    smsEnabled: true
+    smsEnabled: false
   });
 
   // Independent Edit States for Notification Card
   const [editMode, setEditMode] = useState({ email: false, sms: false });
-  const [tempData, setTempData] = useState({ email: notifications.email, sms: notifications.sms });
+  const [tempData, setTempData] = useState({ email: '', sms: '' });
   const [errors, setErrors] = useState({ email: '', sms: '' });
 
   // Personal Data State
   const [personalData, setPersonalData] = useState({
-    firstName: 'Max',
-    lastName: 'Mustermann',
+    firstName: '',
+    lastName: '',
     street: '',
     houseNumber: '',
     zip: '',
     city: '',
     country: 'Deutschland',
-    email: "max.mustermann@example.com"
+    email: ""
   });
 
   // Alarm History State
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
 
-  // Derived state for easy checking
-  const hasActiveSubscription = subscriptionStatus !== 'NONE';
-
-  // Simulation logic for auto-update time
+  // 1. LOAD REAL DATA ON MOUNT
   useEffect(() => {
+    const loadUserData = async () => {
+      setIsLoading(true);
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          navigate('login');
+          return;
+        }
+        setUserId(user.id);
+
+        // A) Load Profile (Personal Data)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile) {
+          setPersonalData({
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || user.email || '',
+            street: '', // Add these columns to DB if you want to persist address
+            houseNumber: '',
+            zip: '',
+            city: '',
+            country: 'Deutschland'
+          });
+          
+          // Use profile email for notifications default
+          setNotifications(prev => ({
+             ...prev, 
+             email: profile.email || user.email || '' 
+          }));
+          setTempData(prev => ({
+              ...prev,
+              email: profile.email || user.email || '' 
+          }));
+        }
+
+        // B) Check Subscription Status
+        const { data: sub } = await supabase
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (sub) {
+          if (sub.plan === 'free_admin') {
+            setSubscriptionStatus('FREE');
+          } else {
+            setSubscriptionStatus('PAID');
+          }
+        } else {
+          setSubscriptionStatus('NONE');
+        }
+
+        // C) Check for new payment in URL (Instant feedback before webhook processes)
+        const query = new URLSearchParams(window.location.search);
+        if (query.get('payment_success')) {
+          setSubscriptionStatus('PAID');
+          localStorage.removeItem('resortpass_ref_data');
+        }
+
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadUserData();
+
+    // Simulation logic for auto-update time
     const interval = setInterval(() => {
       const now = new Date().toLocaleTimeString();
       setMonitorGold(prev => ({ ...prev, lastChecked: now }));
       setMonitorSilver(prev => ({ ...prev, lastChecked: now }));
     }, 60000);
 
-    // Check for payment success query param
-    const query = new URLSearchParams(window.location.search);
-    if (query.get('payment_success')) {
-      setSubscriptionStatus('PAID');
-      
-      // -- PARTNER TRACKING CLEANUP --
-      // If purchase was successful, remove the referral code from browser.
-      // This ensures that if the user cancels and re-subscribes later (without a new link),
-      // the partner doesn't get commission again.
-      localStorage.removeItem('resortpass_ref_data');
-      localStorage.removeItem('resortpass_referral'); // legacy
-
-      alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
-    }
-
     return () => clearInterval(interval);
   }, []);
 
-  const handleSavePersonalData = (e: React.FormEvent) => {
+  // Derived state for easy checking
+  const hasActiveSubscription = subscriptionStatus !== 'NONE';
+
+  const handleSavePersonalData = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Persönliche Daten erfolgreich gespeichert.");
+    if (!userId) return;
+
+    // In a real app with address columns, you would update them here.
+    // For now we just update name/email in profiles.
+    try {
+        const { error } = await supabase
+            .from('profiles')
+            .update({
+                first_name: personalData.firstName,
+                last_name: personalData.lastName,
+                // Add address columns to your SQL table if you want to save them!
+            })
+            .eq('id', userId);
+
+        if (error) throw error;
+        alert("Daten erfolgreich gespeichert.");
+    } catch (e: any) {
+        alert("Fehler beim Speichern: " + e.message);
+    }
   };
 
   const toggleAvailability = (type: 'gold' | 'silver') => {
     if (type === 'gold') setMonitorGold(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
     if (type === 'silver') setMonitorSilver(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
   };
-
-  // Helper for dev testing
-  const toggleFreeSub = () => {
-    setSubscriptionStatus(prev => prev === 'FREE' ? 'NONE' : 'FREE');
-  }
 
   const handleManualCheck = (type: 'gold' | 'silver') => {
     setIsChecking(type);
@@ -201,14 +278,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       };
       setAlarmHistory(prev => [newEntry, ...prev]);
       alert("Test-Nachricht wurde verschickt!");
-    } catch (error) {
-      alert("Fehler beim Senden: " + error);
+    } catch (error: any) {
+      alert("Fehler beim Senden: " + error.message);
     } finally {
       setIsSendingAlarm(false);
     }
   };
 
   const handleSubscribe = async () => {
+    if (!personalData.email) {
+        alert("Fehler: Email fehlt.");
+        return;
+    }
     await createCheckoutSession(personalData.email);
   };
 
@@ -286,6 +367,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       </div>
     );
   };
+
+  if (isLoading) {
+      return (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50">
+              <div className="text-center">
+                  <Loader2 className="w-10 h-10 text-[#00305e] animate-spin mx-auto mb-4" />
+                  <p className="text-slate-500">Lade Dashboard...</p>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -489,7 +581,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
                         </div>
                         <div className="text-3xl font-bold text-slate-900 mb-1">1,99 € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
-                        <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
+                        <p className="text-sm text-slate-500">Nächste Abrechnung: (Via Stripe)</p>
                     </div>
                   )}
 
@@ -509,7 +601,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
-                            onClick={() => { if(confirm('Abo wirklich kündigen?')) setSubscriptionStatus('NONE'); }}
+                            onClick={() => { if(confirm('Abo wirklich kündigen?')) alert("Bitte nutze das Stripe Kundenportal in deiner Bestätigungsmail, um zu kündigen."); }}
                             >
                             Abo kündigen
                             </Button>
@@ -565,7 +657,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                                   type="text" 
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
                                   value={personalData.firstName}
-                                  readOnly
+                                  onChange={(e) => setPersonalData({...personalData, firstName: e.target.value})}
                               />
                           </div>
                           <div>
@@ -574,7 +666,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                                   type="text" 
                                   className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
                                   value={personalData.lastName}
-                                  readOnly
+                                  onChange={(e) => setPersonalData({...personalData, lastName: e.target.value})}
                               />
                           </div>
                       </div>
@@ -588,6 +680,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                                       className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
                                       value={personalData.street}
                                       onChange={(e) => setPersonalData({...personalData, street: e.target.value})}
+                                      placeholder="Nicht gespeichert"
                                   />
                               </div>
                               <div className="w-20">
@@ -641,9 +734,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                           <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail Adresse</label>
                           <input 
                               type="email" 
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none bg-slate-50"
                               value={personalData.email}
-                              onChange={(e) => setPersonalData({...personalData, email: e.target.value})}
+                              readOnly
+                              title="Email kann nur vom Admin geändert werden"
                           />
                       </div>
 
@@ -690,10 +784,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
               </div>
           </div>
         </div>
-      </div>
-      <div className="hidden">
-         {/* Hidden Dev Tool to simulate Free status for testing */}
-         <button onClick={toggleFreeSub}>Toggle Free</button>
       </div>
       <Footer navigate={navigate} />
     </div>

@@ -38,17 +38,16 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 - `VITE_SUPABASE_ANON_KEY` (oder `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
 - `SUPABASE_SERVICE_ROLE_KEY`
 
+### WICHTIG: Admin User erstellen
+Nach dem Deployment musst du einmalig folgende URL aufrufen, um den Admin-Account (`dominikhank@gmail.com`) zu erstellen und das Passwort zu setzen:
+
+`https://DEINE-APP-URL.vercel.app/api/setup-admin`
+
 ## Komplettes Datenbank Setup (SQL)
 
 Kopiere diesen gesamten Block in den Supabase SQL Editor und führe ihn aus ("Run"), um alle Tabellen korrekt zu erstellen.
 
 ```sql
--- Tabellen zurücksetzen (Vorsicht: Löscht alle Daten!)
--- drop table if exists commissions;
--- drop table if exists subscriptions;
--- drop table if exists payouts;
--- drop table if exists profiles;
-
 -- 1. Profiles Table (Nutzer & Partner) -- MUSS ZUERST KOMMEN
 create table if not exists profiles (
   id uuid references auth.users on delete cascade not null primary key,
@@ -110,8 +109,12 @@ create policy "Users can update own profile" on profiles for update using (auth.
 -- Partner dürfen ihre eigenen Provisionen sehen
 create policy "Partners see own commissions" on commissions for select using (auth.uid() = partner_id);
 
--- Partner dürfen ihre eigenen Auszahlungen sehen
+-- Partner dürfen ihre eigenen Auszahlungen sehen und beantragen
 create policy "Partners see own payouts" on payouts for select using (auth.uid() = partner_id);
+create policy "Partners can request payouts" on payouts for insert with check (auth.uid() = partner_id);
 
--- Admins brauchen Zugriff auf alles (dies wird im Backend über den SERVICE_ROLE_KEY geregelt, der RLS umgeht)
+-- Nutzer sehen ihre eigenen Abos
+create policy "Users see own subscriptions" on subscriptions for select using (auth.uid() = user_id);
+
+-- Admins: Haben Zugriff über den 'service_role' Key (Backend), daher hier keine Policy nötig.
 ```

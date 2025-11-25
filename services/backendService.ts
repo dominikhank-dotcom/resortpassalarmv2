@@ -1,4 +1,5 @@
 import { EmailTemplate } from '../types';
+import { supabase } from '../lib/supabase';
 
 // Helper to safely handle responses that might not be JSON (e.g. 404/500 HTML pages)
 const handleResponse = async (response: Response) => {
@@ -149,4 +150,35 @@ export const markPayoutPaid = async (payoutId: string) => {
       console.error("Mark Paid Error:", error);
       throw error;
   }
+};
+
+// --- CUSTOMER MANAGEMENT ---
+
+export const toggleFreeSubscription = async (userId: string, isFree: boolean) => {
+    // Note: Since we don't have a secure Admin Backend API for this specific task yet,
+    // and we are using client-side Supabase for Admin Dashboard (which is fine for MVP if RLS allows it),
+    // we perform this operation directly here.
+    // Ideally, this should be an API route to verify Admin status securely on server.
+    
+    if (isFree) {
+        // Activate Free Sub
+        const { error } = await supabase
+            .from('subscriptions')
+            .upsert({ 
+                user_id: userId,
+                status: 'active',
+                plan: 'free_admin',
+                current_period_end: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString() // 1 year
+            }, { onConflict: 'user_id' });
+        
+        if (error) throw new Error(error.message);
+    } else {
+        // Cancel Sub
+        const { error } = await supabase
+            .from('subscriptions')
+            .update({ status: 'cancelled', plan: 'cancelled' })
+            .eq('user_id', userId);
+            
+        if (error) throw new Error(error.message);
+    }
 };

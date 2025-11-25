@@ -14,10 +14,11 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, fetchAdminPayouts, markPayoutPaid } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, fetchAdminPayouts, markPayoutPaid, toggleFreeSubscription } from '../services/backendService';
 import { EmailTemplate } from '../types';
+import { supabase } from '../lib/supabase';
 
-// Mock Data for Charts
+// Mock Data for Dashboard Charts
 const DASHBOARD_DATA = [
   { date: '01.05', revenue: 450, growth: 12 },
   { date: '05.05', revenue: 680, growth: 25 },
@@ -26,12 +27,6 @@ const DASHBOARD_DATA = [
   { date: '20.05', revenue: 2400, growth: 120 },
   { date: '25.05', revenue: 3100, growth: 160 },
   { date: '30.05', revenue: 4200, growth: 210 },
-];
-
-const CUSTOMERS_LIST = [
-  { id: 'KD-1001', name: 'Max Mustermann', email: 'max@example.com', status: 'Aktiv', plan: 'Premium', since: '12.04.2024', referrer: 'TikTok-Thomas', street: 'Musterweg', nr: '1', zip: '12345', city: 'Berlin', country: 'Deutschland', payments: 3, total: 5.97, isFree: false },
-  { id: 'KD-1002', name: 'Lisa Müller', email: 'lisa@test.de', status: 'Inaktiv', plan: '-', since: '15.04.2024', referrer: 'Direct', street: 'Nebenstraße', nr: '5a', zip: '54321', city: 'München', country: 'Deutschland', payments: 1, total: 1.99, isFree: false },
-  { id: 'KD-1003', name: 'Jan Schmidt', email: 'jan@web.de', status: 'Aktiv', plan: 'Premium', since: '18.04.2024', referrer: 'ResortPassGuide', street: 'Hauptstr.', nr: '99', zip: '20095', city: 'Hamburg', country: 'Deutschland', payments: 2, total: 3.98, isFree: false },
 ];
 
 const PARTNER_DATA = [
@@ -95,12 +90,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [testEmail, setTestEmail] = useState("dominikhank@gmail.com");
   const [isSendingTest, setIsSendingTest] = useState(false);
 
-  // Customer Detail View State
+  // Customer Management
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<any | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
 
   // Admin Account Settings
-  const [adminEmail, setAdminEmail] = useState("admin@resortpassalarm.com");
+  const [adminEmail, setAdminEmail] = useState("dominikhank@gmail.com");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -114,6 +112,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     if (activeTab === 'finance') {
         loadPayouts();
     }
+    if (activeTab === 'customers') {
+        loadCustomers();
+    }
   }, [activeTab]);
 
   const loadPayouts = async () => {
@@ -125,6 +126,79 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           alert("Fehler beim Laden der Auszahlungen");
       } finally {
           setIsLoadingPayouts(false);
+      }
+  };
+
+  const loadCustomers = async () => {
+      setIsLoadingCustomers(true);
+      try {
+          // Fetch profiles joined with subscriptions
+          // Note: In a real Supabase app you might need a View or specific RPC for clean joins, 
+          // or just fetch both and map them client-side.
+          
+          const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select(`
+                *,
+                subscriptions (status, plan, current_period_end)
+            `)
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          
+          const mappedCustomers = profiles.map(p => {
+              const sub = p.subscriptions?.[0]; // Assuming 1 sub per user
+              const isFree = sub?.plan === 'free_admin';
+              return {
+                  id: p.id,
+                  name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || 'Unbekannt',
+                  email: p.email,
+                  status: sub?.status === 'active' ? 'Aktiv' : 'Inaktiv',
+                  plan: isFree ? 'Manuell (Gratis)' : sub?.plan || '-',
+                  isFree: isFree,
+                  since: new Date(p.created_at).toLocaleDateString(),
+                  referrer: '-', // Would need extra logic to fetch referrer name
+                  street: '',
+                  nr: '',
+                  zip: '',
+                  city: '',
+                  country: 'Deutschland',
+                  payments: 0 // Would need to count payments in Stripe
+              };
+          });
+
+          setCustomers(mappedCustomers);
+      } catch (e: any) {
+          console.error("Load Customers Error", e);
+      } finally {
+          setIsLoadingCustomers(false);
+      }
+  };
+
+  const handleToggleFreeSub = async (customerId: string, currentIsFree: boolean) => {
+      try {
+         await toggleFreeSubscription(customerId, !currentIsFree);
+         
+         // Update Local State
+         setCustomers(prev => prev.map(c => c.id === customerId ? {
+             ...c, 
+             isFree: !currentIsFree,
+             plan: !currentIsFree ? 'Manuell (Gratis)' : '-',
+             status: !currentIsFree ? 'Aktiv' : 'Inaktiv'
+         } : c));
+         
+         if (selectedCustomer?.id === customerId) {
+             setSelectedCustomer(prev => ({
+                 ...prev,
+                 isFree: !currentIsFree,
+                 plan: !currentIsFree ? 'Manuell (Gratis)' : '-',
+                 status: !currentIsFree ? 'Aktiv' : 'Inaktiv'
+             }));
+         }
+
+         alert(!currentIsFree ? "Kostenloses Abo aktiviert!" : "Kostenloses Abo deaktiviert.");
+      } catch (e: any) {
+          alert("Fehler: " + e.message);
       }
   };
 
@@ -213,6 +287,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       link.click();
       document.body.removeChild(link);
   };
+
+  const filteredCustomers = customers.filter(c => 
+      c.name.toLowerCase().includes(customerSearch.toLowerCase()) || 
+      c.email.toLowerCase().includes(customerSearch.toLowerCase())
+  );
 
   // Render Functions
   const renderSidebar = () => (
@@ -357,45 +436,57 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                     <div className="p-4 border-b border-slate-100 flex gap-4">
                         <div className="relative flex-1">
                         <Search className="absolute left-3 top-3 text-slate-400" size={20} />
-                        <input type="text" placeholder="Suchen..." className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input 
+                            type="text" 
+                            placeholder="Suchen..." 
+                            value={customerSearch}
+                            onChange={(e) => setCustomerSearch(e.target.value)}
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" 
+                        />
                         </div>
-                        <Button variant="outline"><Download size={20} /> Export</Button>
+                        <Button variant="outline" onClick={loadCustomers}><RotateCcw size={20} className={isLoadingCustomers ? "animate-spin" : ""}/></Button>
                     </div>
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-sm">
-                        <tr>
-                            <th className="px-6 py-4">Name</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Plan</th>
-                            <th className="px-6 py-4">Seit</th>
-                            <th className="px-6 py-4">Geworben von</th>
-                            <th className="px-6 py-4 text-right">Aktion</th>
-                        </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                        {CUSTOMERS_LIST.map((customer) => (
-                            <tr key={customer.id} className="hover:bg-slate-50">
-                            <td className="px-6 py-4">
-                                <div className="font-bold text-slate-900">{customer.name}</div>
-                                <div className="text-xs text-slate-500">{customer.email}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                                <span className={`px-2 py-1 rounded text-xs font-bold ${customer.status === 'Aktiv' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {customer.status}
-                                </span>
-                            </td>
-                            <td className="px-6 py-4 text-sm">{customer.plan}</td>
-                            <td className="px-6 py-4 text-sm text-slate-500">{customer.since}</td>
-                            <td className="px-6 py-4 text-sm">
-                                {customer.referrer !== '-' ? <span className="bg-blue-50 text-blue-600 px-2 py-1 rounded text-xs font-bold">{customer.referrer}</span> : '-'}
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                                <Button variant="secondary" size="sm" onClick={() => setSelectedCustomer(customer)}>Details</Button>
-                            </td>
+                    {isLoadingCustomers ? (
+                        <div className="p-12 text-center">
+                            <Loader2 className="w-8 h-8 text-slate-400 animate-spin mx-auto" />
+                        </div>
+                    ) : (
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 text-sm">
+                            <tr>
+                                <th className="px-6 py-4">Name</th>
+                                <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Plan</th>
+                                <th className="px-6 py-4">Seit</th>
+                                <th className="px-6 py-4 text-right">Aktion</th>
                             </tr>
-                        ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                            {filteredCustomers.length === 0 ? (
+                                <tr><td colSpan={5} className="px-6 py-4 text-center text-slate-500">Keine Kunden gefunden.</td></tr>
+                            ) : (
+                                filteredCustomers.map((customer) => (
+                                    <tr key={customer.id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4">
+                                        <div className="font-bold text-slate-900">{customer.name}</div>
+                                        <div className="text-xs text-slate-500">{customer.email}</div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${customer.status === 'Aktiv' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                        {customer.status}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-sm">{customer.plan}</td>
+                                    <td className="px-6 py-4 text-sm text-slate-500">{customer.since}</td>
+                                    <td className="px-6 py-4 text-right">
+                                        <Button variant="secondary" size="sm" onClick={() => setSelectedCustomer(customer)}>Details</Button>
+                                    </td>
+                                    </tr>
+                                ))
+                            )}
+                            </tbody>
+                        </table>
+                    )}
                     </div>
                 </>
              ) : (
@@ -414,11 +505,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                 <Button 
                                     variant={selectedCustomer.isFree ? "danger" : "secondary"} 
                                     size="sm"
-                                    onClick={() => {
-                                        const newVal = !selectedCustomer.isFree;
-                                        setSelectedCustomer({...selectedCustomer, isFree: newVal, plan: newVal ? 'Manuell (Gratis)' : '-', status: newVal ? 'Aktiv' : 'Inaktiv'});
-                                        alert(newVal ? "Kostenloses Abo aktiviert!" : "Kostenloses Abo deaktiviert.");
-                                    }}
+                                    onClick={() => handleToggleFreeSub(selectedCustomer.id, selectedCustomer.isFree)}
                                 >
                                     {selectedCustomer.isFree ? <Ban size={16} className="mr-2" /> : <Gift size={16} className="mr-2" />}
                                     {selectedCustomer.isFree ? "Gratis Abo beenden" : "Kostenloses Abo (Admin)"}
@@ -520,7 +607,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           </div>
         )}
 
-        {/* FINANCE TAB (NEW) */}
+        {/* FINANCE TAB */}
         {activeTab === 'finance' && (
             <div className="space-y-6 animate-in fade-in">
                 <div className="flex justify-between items-center">
@@ -591,7 +678,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         {activeTab === 'partners' && (
           <div className="space-y-6 animate-in fade-in">
             <h1 className="text-2xl font-bold text-slate-900">Partnerprogramm</h1>
-            
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <h3 className="font-bold mb-4">Globale Konfiguration</h3>
               <div className="flex items-center gap-4">
@@ -609,127 +695,107 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h3 className="font-bold mb-6">Top Partner (Umsatz)</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={PARTNER_DATA} layout="vertical">
-                     <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                     <XAxis type="number" hide />
-                     <YAxis dataKey="name" type="category" width={100} tick={{fontSize: 12}} />
-                     <Tooltip />
-                     <Bar dataKey="revenue" fill="#00305e" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="font-bold flex items-center gap-2">
-                       <Sparkles className="text-yellow-500" size={18} /> KI Insights
-                    </h3>
-                    <Button size="sm" variant="outline" onClick={handleGenerateInsights} disabled={isAnalyzing}>
-                       {isAnalyzing ? "Analysiere..." : "Neu generieren"}
-                    </Button>
-                 </div>
-                 <div className="flex-1 bg-slate-50 rounded-xl p-4 text-sm text-slate-600 leading-relaxed border border-slate-100">
-                    {aiAnalysis ? (
-                        <div className="whitespace-pre-line">{aiAnalysis}</div>
-                    ) : (
-                        <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                            <Sparkles size={32} className="mb-2 opacity-50" />
-                            <p>Klicke auf Generieren für eine Analyse.</p>
-                        </div>
-                    )}
-                 </div>
-              </div>
-            </div>
           </div>
         )}
-
-        {/* EMAIL MANAGEMENT TAB */}
+        
+        {/* EMAIL MANAGEMENT */}
         {activeTab === 'emails' && (
             <div className="space-y-6 animate-in fade-in">
                 <h1 className="text-2xl font-bold text-slate-900">E-Mail Management</h1>
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-                    {/* List */}
-                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-y-auto">
-                        <div className="p-4 border-b border-slate-100 font-bold text-slate-700">Vorlagen</div>
-                        {templates.map(t => (
-                            <div 
-                                key={t.id} 
-                                onClick={() => setEditingTemplate(t)}
-                                className={`p-4 border-b border-slate-100 cursor-pointer hover:bg-slate-50 transition ${editingTemplate?.id === t.id ? 'bg-blue-50 border-l-4 border-l-blue-600' : ''}`}
-                            >
-                                <div className="flex justify-between mb-1">
-                                    <span className="font-bold text-slate-800 text-sm">{t.name}</span>
-                                    <span className={`text-[10px] px-2 py-0.5 rounded ${t.category === 'CUSTOMER' ? 'bg-green-100 text-green-700' : 'bg-purple-100 text-purple-700'}`}>{t.category}</span>
-                                </div>
-                                <p className="text-xs text-slate-500 truncate">{t.subject}</p>
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+                        {/* List */}
+                        <div className="col-span-1 p-4 bg-slate-50">
+                            <h3 className="font-bold text-slate-700 mb-4 px-2">Vorlagen</h3>
+                            <div className="space-y-2">
+                                {templates.map(t => (
+                                    <button
+                                        key={t.id}
+                                        onClick={() => setEditingTemplate(t)}
+                                        className={`w-full text-left p-3 rounded-lg transition-all ${editingTemplate?.id === t.id ? 'bg-white shadow-sm ring-1 ring-blue-500' : 'hover:bg-slate-200/50'}`}
+                                    >
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-semibold text-slate-900 text-sm">{t.name}</span>
+                                            <span className={`w-2 h-2 rounded-full ${t.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}></span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 truncate">{t.description}</p>
+                                    </button>
+                                ))}
                             </div>
-                        ))}
-                    </div>
+                        </div>
 
-                    {/* Editor */}
-                    <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
-                        {editingTemplate ? (
-                            <>
-                                <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                    <span className="font-bold text-slate-700">Editor: {editingTemplate.name}</span>
-                                    <div className="flex gap-2">
-                                        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                                            <input type="checkbox" checked={editingTemplate.isEnabled} onChange={e => setEditingTemplate({...editingTemplate, isEnabled: e.target.checked})} />
-                                            Aktiv
-                                        </label>
+                        {/* Editor */}
+                        <div className="col-span-2 p-6">
+                            {editingTemplate ? (
+                                <div className="space-y-4 h-full flex flex-col">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="font-bold text-lg">Bearbeiten: {editingTemplate.name}</h3>
+                                        <div className="flex items-center gap-2">
+                                            <label className="text-sm font-medium text-slate-600 flex items-center gap-2 cursor-pointer">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={editingTemplate.isEnabled}
+                                                    onChange={(e) => setEditingTemplate({...editingTemplate, isEnabled: e.target.checked})}
+                                                    className="rounded text-blue-600 focus:ring-blue-500"
+                                                />
+                                                Aktiv
+                                            </label>
+                                            <Button size="sm" onClick={() => {
+                                                setTemplates(prev => prev.map(t => t.id === editingTemplate.id ? editingTemplate : t));
+                                                alert("Vorlage gespeichert (Simuliert)");
+                                            }}>
+                                                <Save size={16} className="mr-2" /> Speichern
+                                            </Button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="p-6 space-y-4 flex-1 overflow-y-auto">
+                                    
                                     <div>
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Betreff</label>
                                         <input 
-                                            className="w-full p-2 border border-slate-300 rounded font-medium" 
-                                            value={editingTemplate.subject} 
-                                            onChange={e => setEditingTemplate({...editingTemplate, subject: e.target.value})}
+                                            type="text" 
+                                            value={editingTemplate.subject}
+                                            onChange={(e) => setEditingTemplate({...editingTemplate, subject: e.target.value})}
+                                            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
                                         />
                                     </div>
-                                    <div className="flex-1 flex flex-col">
-                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">HTML Inhalt</label>
+
+                                    <div className="flex-1">
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">HTML Inhalt</label>
                                         <textarea 
-                                            className="w-full flex-1 p-3 border border-slate-300 rounded font-mono text-sm min-h-[200px]" 
-                                            value={editingTemplate.body} 
-                                            onChange={e => setEditingTemplate({...editingTemplate, body: e.target.value})}
+                                            value={editingTemplate.body}
+                                            onChange={(e) => setEditingTemplate({...editingTemplate, body: e.target.value})}
+                                            className="w-full h-64 px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
                                         />
                                     </div>
-                                    <div className="bg-blue-50 p-3 rounded text-xs text-blue-700">
-                                        <strong>Verfügbare Variablen:</strong> {editingTemplate.variables.join(', ')}
+
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs">
+                                        <span className="font-bold text-slate-600 block mb-1">Verfügbare Platzhalter:</span>
+                                        <div className="flex flex-wrap gap-2">
+                                            {editingTemplate.variables.map(v => (
+                                                <code key={v} className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-700 select-all">{v}</code>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 pt-4 flex items-center gap-3">
+                                        <input 
+                                            type="email" 
+                                            value={testEmail}
+                                            onChange={(e) => setTestEmail(e.target.value)}
+                                            className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                                            placeholder="Test Empfänger E-Mail"
+                                        />
+                                        <Button variant="secondary" size="sm" onClick={handleSendTestEmail} disabled={isSendingTest}>
+                                            <Send size={16} className="mr-2" /> {isSendingTest ? 'Sende...' : 'Vorschau senden'}
+                                        </Button>
                                     </div>
                                 </div>
-                                <div className="p-4 border-t border-slate-100 flex justify-between items-center bg-slate-50">
-                                     <div className="flex items-center gap-2">
-                                         <input 
-                                            type="email" 
-                                            value={testEmail} 
-                                            onChange={e => setTestEmail(e.target.value)}
-                                            className="text-sm p-1.5 border rounded w-48"
-                                         />
-                                         <Button size="sm" variant="outline" onClick={handleSendTestEmail} disabled={isSendingTest}>
-                                             {isSendingTest ? <Loader2 className="animate-spin" size={14} /> : <Send size={14} className="mr-1"/>} Testen
-                                         </Button>
-                                     </div>
-                                     <Button size="sm" onClick={() => {
-                                         setTemplates(templates.map(t => t.id === editingTemplate.id ? editingTemplate : t));
-                                         alert("Vorlage gespeichert (Lokal)");
-                                     }}>
-                                         <Save size={16} className="mr-2" /> Speichern
-                                     </Button>
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-slate-400">
+                                    <p>Wähle eine Vorlage aus, um sie zu bearbeiten.</p>
                                 </div>
-                            </>
-                        ) : (
-                            <div className="flex-1 flex items-center justify-center text-slate-400">
-                                Wähle eine Vorlage aus.
-                            </div>
-                        )}
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -737,153 +803,289 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
         {/* SETTINGS TAB */}
         {activeTab === 'settings' && (
-          <div className="space-y-8 animate-in fade-in">
-             <div className="flex justify-between items-center">
+             <div className="space-y-8 animate-in fade-in">
                  <h1 className="text-2xl font-bold text-slate-900">System Einstellungen</h1>
-             </div>
-             
-             {/* Admin Account Settings */}
-             <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-[#00305e] text-white">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <Key size={18} /> Admin Sicherheit & Login
-                    </h3>
-                </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-900 mb-4">E-Mail ändern</h4>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Aktuelle E-Mail</label>
-                                <input type="text" value={adminEmail} disabled className="w-full p-2 bg-slate-100 border rounded text-slate-600" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Neue E-Mail</label>
-                                <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} className="w-full p-2 border rounded" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Aktuelles Passwort (zur Bestätigung)</label>
-                                <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="w-full p-2 border rounded" />
-                            </div>
-                            <Button size="sm" onClick={() => alert("Bestätigungs-Link an neue E-Mail gesendet.")}>E-Mail ändern</Button>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 className="text-sm font-bold text-slate-900 mb-4">Passwort ändern</h4>
-                        <div className="space-y-3">
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Aktuelles Passwort</label>
-                                <input type="password" className="w-full p-2 border rounded" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Neues Passwort</label>
-                                <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-2 border rounded" />
-                            </div>
-                            <div>
-                                <label className="block text-xs text-slate-500 mb-1">Wiederholen</label>
-                                <input type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} className="w-full p-2 border rounded" />
-                            </div>
-                            <Button size="sm" onClick={() => alert("Passwort erfolgreich geändert.")}>Passwort speichern</Button>
-                        </div>
-                    </div>
-                </div>
-             </section>
 
-             <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                    <h3 className="font-bold flex items-center gap-2">
-                        <Link size={18} className="text-blue-600"/> Produkt Links
-                    </h3>
-                </div>
-                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Gold URL</label>
-                        <input 
-                            type="text" 
-                            value={productUrls.gold} 
-                            onChange={(e) => onUpdateProductUrls({...productUrls, gold: e.target.value})}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Silver URL</label>
-                        <input 
-                            type="text" 
-                            value={productUrls.silver} 
-                            onChange={(e) => onUpdateProductUrls({...productUrls, silver: e.target.value})}
-                            className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                    </div>
-                </div>
-             </section>
-             
-             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm text-amber-800">
-                <AlertCircle className="shrink-0" />
-                <div>
-                    <strong>Wichtig für Vercel:</strong> Die folgenden API-Schlüssel müssen in Vercel unter "Environment Variables" eingetragen werden. 
-                    Aus Sicherheitsgründen (Browser-Sicherheit) können diese hier nicht bearbeitet werden.
-                    <br/><br/>
-                    Bitte nutze das Präfix <code>VITE_</code> für Keys, die im Frontend sichtbar sein müssen (z.B. Supabase URL).
-                </div>
-             </div>
+                 {/* Admin Account Settings */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                     <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                         <Shield className="text-blue-600" size={20} />
+                         Admin Sicherheit & Login
+                     </h3>
+                     
+                     <div className="grid md:grid-cols-2 gap-8">
+                         {/* Email Change */}
+                         <div className="space-y-4">
+                             <h4 className="text-sm font-semibold text-slate-700">Admin E-Mail Adresse</h4>
+                             <div className="flex gap-2 mb-2">
+                                 <input 
+                                     type="email" 
+                                     value={adminEmail} 
+                                     readOnly 
+                                     className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-slate-500" 
+                                 />
+                                 <div className="px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm font-bold flex items-center">
+                                     <CheckCircle size={14} className="mr-1"/> Aktiv
+                                 </div>
+                             </div>
+                             
+                             <div className="pt-4 border-t border-slate-100">
+                                 <label className="block text-xs font-medium text-slate-500 mb-1">Neue E-Mail Adresse</label>
+                                 <input 
+                                     type="email" 
+                                     value={newEmail}
+                                     onChange={(e) => setNewEmail(e.target.value)}
+                                     placeholder="neue-admin@email.com"
+                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+                                 />
+                                 <label className="block text-xs font-medium text-slate-500 mb-1">Aktuelles Passwort zur Bestätigung</label>
+                                 <input 
+                                     type="password" 
+                                     value={currentPassword}
+                                     onChange={(e) => setCurrentPassword(e.target.value)}
+                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                                 />
+                                 <Button 
+                                     variant="outline" 
+                                     size="sm" 
+                                     className="w-full"
+                                     onClick={() => alert("Bestätigungs-Link an neue E-Mail gesendet.")}
+                                     disabled={!newEmail || !currentPassword}
+                                 >
+                                     <Mail size={14} className="mr-2" /> E-Mail ändern anfordern
+                                 </Button>
+                             </div>
+                         </div>
 
-             {/* Config Guides */}
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><Globe size={18} className="text-blue-500"/> Browse.ai (Crawler)</h3>
-                        <Button size="sm" variant="outline" onClick={() => handleTestConnection('browse')}>Verbindung testen</Button>
-                    </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">BROWSE_AI_API_KEY</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">BROWSE_AI_ROBOT_ID</code>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><CreditCard size={18} className="text-indigo-500"/> Stripe (Payments)</h3>
-                        <Button size="sm" variant="outline" onClick={() => handleTestConnection('stripe')}>Verbindung testen</Button>
-                    </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">STRIPE_SECRET_KEY</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">STRIPE_WEBHOOK_SECRET</code>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><Mail size={18} className="text-green-500"/> Resend (E-Mails)</h3>
-                        <Button size="sm" variant="outline" onClick={() => handleTestConnection('resend')}>Verbindung testen</Button>
-                    </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">RESEND_API_KEY</code>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><MessageSquare size={18} className="text-red-500"/> Twilio (SMS)</h3>
-                        <Button size="sm" variant="outline" onClick={() => handleTestConnection('twilio')}>Verbindung testen</Button>
-                    </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">TWILIO_ACCOUNT_SID</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">TWILIO_AUTH_TOKEN</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">TWILIO_PHONE_NUMBER</code>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><Sparkles size={18} className="text-purple-500"/> Google Gemini (KI)</h3>
-                        <Button size="sm" variant="outline" onClick={() => handleTestConnection('gemini')}>Verbindung testen</Button>
-                    </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">API_KEY</code>
-                </div>
+                         {/* Password Change */}
+                         <div className="space-y-4 border-l border-slate-100 pl-8">
+                             <h4 className="text-sm font-semibold text-slate-700">Passwort ändern</h4>
+                             
+                             <div>
+                                 <label className="block text-xs font-medium text-slate-500 mb-1">Aktuelles Passwort</label>
+                                 <input 
+                                     type="password" 
+                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                 />
+                             </div>
+                             <div>
+                                 <label className="block text-xs font-medium text-slate-500 mb-1">Neues Passwort</label>
+                                 <input 
+                                     type="password"
+                                     value={newPassword}
+                                     onChange={(e) => setNewPassword(e.target.value)}
+                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                                 />
+                             </div>
+                             <div>
+                                 <label className="block text-xs font-medium text-slate-500 mb-1">Neues Passwort wiederholen</label>
+                                 <input 
+                                     type="password"
+                                     value={confirmNewPassword}
+                                     onChange={(e) => setConfirmNewPassword(e.target.value)}
+                                     className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                                 />
+                             </div>
+                             <Button 
+                                 variant="primary" 
+                                 size="sm" 
+                                 className="w-full bg-[#00305e]"
+                                 onClick={() => alert("Passwort erfolgreich geändert.")}
+                                 disabled={!newPassword || newPassword !== confirmNewPassword}
+                             >
+                                 <Lock size={14} className="mr-2" /> Passwort aktualisieren
+                             </Button>
+                         </div>
+                     </div>
+                 </div>
 
                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold flex items-center gap-2"><Database size={18} className="text-teal-500"/> Supabase (DB)</h3>
-                        {/* No test button, connection is checked on app load */}
+                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                        <Link className="text-blue-600" size={20} />
+                        Produkt Links
+                    </h3>
+                    <p className="text-sm text-slate-500 mb-4">
+                        Diese Links werden in E-Mails und im Dashboard verwendet.
+                    </p>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Gold URL</label>
+                            <input 
+                                type="url" 
+                                value={productUrls.gold}
+                                onChange={(e) => onUpdateProductUrls({...productUrls, gold: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-1">ResortPass Silver URL</label>
+                            <input 
+                                type="url" 
+                                value={productUrls.silver}
+                                onChange={(e) => onUpdateProductUrls({...productUrls, silver: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                            />
+                        </div>
                     </div>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs mb-2">VITE_SUPABASE_URL</code>
-                    <code className="block bg-slate-900 text-slate-200 p-3 rounded text-xs">VITE_SUPABASE_ANON_KEY</code>
-                </div>
+                 </div>
+
+                 {/* External Services */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                        <Key className="text-blue-600" size={20} />
+                        Externe Dienste (Vercel Configuration)
+                    </h3>
+
+                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
+                        <div className="flex">
+                            <div className="flex-shrink-0">
+                                <AlertCircle className="h-5 w-5 text-blue-400" />
+                            </div>
+                            <div className="ml-3">
+                                <p className="text-sm text-blue-700">
+                                    Aus Sicherheitsgründen werden API-Keys <strong>nicht</strong> hier, sondern direkt in den Vercel Environment Variables verwaltet.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="space-y-8">
+                        {/* Browse.ai */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><Globe size={16}/> Web Scraper (Browse.ai)</h4>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('browse')}>Verbindung testen</Button>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>BROWSE_AI_API_KEY</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>BROWSE_AI_ROBOT_ID</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Gemini */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><Sparkles size={16}/> KI (Google Gemini)</h4>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('gemini')}>Verbindung testen</Button>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>API_KEY</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Stripe */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><CreditCard size={16}/> Zahlungen (Stripe)</h4>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('stripe')}>Verbindung testen (Simuliert)</Button>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</span>
+                                    <span className="text-slate-400">pk_live_........................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>STRIPE_SECRET_KEY</span>
+                                    <span className="text-slate-400">sk_live_........................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>STRIPE_WEBHOOK_SECRET</span>
+                                    <span className="text-slate-400">whsec_..........................</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Resend */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><Mail size={16}/> E-Mail Versand (Resend)</h4>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('resend')}>Verbindung testen (Simuliert)</Button>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>RESEND_API_KEY</span>
+                                    <span className="text-slate-400">re_.............................</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Twilio */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><MessageSquare size={16}/> SMS Versand (Twilio)</h4>
+                                <Button size="sm" variant="outline" onClick={() => handleTestConnection('twilio')}>Verbindung testen (Simuliert)</Button>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>TWILIO_ACCOUNT_SID</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>TWILIO_AUTH_TOKEN</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>TWILIO_PHONE_NUMBER</span>
+                                    <span className="text-slate-400">+1..............................</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Supabase */}
+                        <div>
+                            <div className="flex justify-between items-center mb-2">
+                                <h4 className="font-semibold text-slate-900 flex items-center gap-2"><Database size={16}/> Datenbank (Supabase)</h4>
+                            </div>
+                            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 font-mono text-xs text-slate-600 space-y-2">
+                                <div className="flex justify-between">
+                                    <span>VITE_SUPABASE_URL</span>
+                                    <span className="text-slate-400">https://................supabase.co</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>VITE_SUPABASE_ANON_KEY</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span>SUPABASE_SERVICE_ROLE_KEY</span>
+                                    <span className="text-slate-400">................................</span>
+                                </div>
+                                <p className="text-xs text-amber-600 mt-2">Hinweis: Falls Vercel Variablen NEXT_PUBLIC_... nutzt, werden diese automatisch übernommen.</p>
+                            </div>
+                        </div>
+
+                    </div>
+                 </div>
+
+                 {/* KI Insights Button */}
+                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold flex items-center gap-2"><Sparkles className="text-yellow-500" /> KI Insights generieren</h3>
+                      <p className="text-sm text-slate-500">Lass Gemini die aktuellen Partnerdaten analysieren.</p>
+                    </div>
+                    <Button 
+                        onClick={handleGenerateInsights} 
+                        disabled={isAnalyzing}
+                        className="bg-[#00305e] text-white hover:bg-[#002040]"
+                    >
+                      {isAnalyzing ? 'Analysiere...' : 'Analyse starten'}
+                    </Button>
+                 </div>
+                 {aiAnalysis && (
+                    <div className="bg-slate-800 text-slate-200 p-6 rounded-2xl animate-in fade-in">
+                      <h4 className="font-bold text-[#ffcc00] mb-2 uppercase tracking-wide text-xs">Gemini Analyse</h4>
+                      <p className="whitespace-pre-line">{aiAnalysis}</p>
+                    </div>
+                 )}
              </div>
-          </div>
         )}
       </div>
     </div>
