@@ -88,6 +88,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     const query = new URLSearchParams(window.location.search);
     if (query.get('payment_success')) {
       setSubscriptionStatus('PAID');
+      
+      // -- PARTNER TRACKING CLEANUP --
+      // If purchase was successful, remove the referral code from browser.
+      // This ensures that if the user cancels and re-subscribes later (without a new link),
+      // the partner doesn't get commission again.
+      localStorage.removeItem('resortpass_ref_data');
+      localStorage.removeItem('resortpass_referral'); // legacy
+
       alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
     }
 

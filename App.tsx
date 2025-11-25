@@ -181,13 +181,35 @@ const App: React.FC = () => {
     silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
   });
 
-  // Track Referral Link
+  // Track Referral Link (30 Days Validity)
   useEffect(() => {
+    // 1. Check if an existing code has expired
+    const storedData = localStorage.getItem('resortpass_ref_data');
+    if (storedData) {
+      try {
+        const parsed = JSON.parse(storedData);
+        if (Date.now() > parsed.expiry) {
+          console.log("Referral Code expired, removing.");
+          localStorage.removeItem('resortpass_ref_data');
+        }
+      } catch (e) {
+        // Fallback for old format or errors
+        localStorage.removeItem('resortpass_ref_data');
+      }
+    }
+
+    // 2. Check for NEW code in URL
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get('ref');
+    
     if (refCode) {
-      console.log("Partner Tracking active:", refCode);
-      localStorage.setItem('resortpass_referral', refCode);
+      console.log("New Partner Tracking active:", refCode);
+      const expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 Days
+      const data = { code: refCode, expiry };
+      localStorage.setItem('resortpass_ref_data', JSON.stringify(data));
+      
+      // Legacy cleanup if exists
+      localStorage.removeItem('resortpass_referral'); 
     }
   }, []);
 

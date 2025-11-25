@@ -34,7 +34,27 @@ export const sendTestAlarm = async (email: string, phone: string, sendEmail: boo
 export const createCheckoutSession = async (email: string) => {
   try {
     // Check for referral code in local storage
-    const referralCode = localStorage.getItem('resortpass_referral');
+    let referralCode = null;
+    
+    // Check new JSON format
+    const storedData = localStorage.getItem('resortpass_ref_data');
+    if (storedData) {
+      try {
+        const parsed = JSON.parse(storedData);
+        if (Date.now() <= parsed.expiry) {
+          referralCode = parsed.code;
+        } else {
+          localStorage.removeItem('resortpass_ref_data'); // Expired
+        }
+      } catch (e) {
+        // Ignored
+      }
+    }
+    
+    // Fallback Legacy
+    if (!referralCode) {
+       referralCode = localStorage.getItem('resortpass_referral');
+    }
 
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
