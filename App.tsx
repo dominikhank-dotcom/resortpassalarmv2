@@ -9,19 +9,60 @@ import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
+import { supabase } from './lib/supabase';
+import { Loader2 } from 'lucide-react';
 
-// Simple mock Login screen with Forgot Password flow
+// Login Screen with Supabase Integration
 const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () => void; onRegisterClick?: () => void }> = ({ role, onLogin, onCancel, onRegisterClick }) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleResetPassword = () => {
+  const handleLogin = async () => {
+    if (!email || !password) {
+      setError("Bitte E-Mail und Passwort eingeben.");
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      if (data.user) {
+        onLogin();
+      }
+    } catch (err: any) {
+      console.error("Login Error:", err);
+      setError(err.message || "Anmeldung fehlgeschlagen.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
     if (!email) {
       alert("Bitte gib deine E-Mail Adresse ein.");
       return;
     }
-    alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
-    setView('login');
+    setIsLoading(true);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+         redirectTo: window.location.origin + '/reset-password',
+      });
+      alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
+      setView('login');
+    } catch (e: any) {
+      alert("Fehler: " + e.message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -35,15 +76,25 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
             </h2>
             <p className="text-slate-500 mb-8">Bitte melde dich an, um fortzufahren.</p>
             
+            {error && (
+               <div className="bg-red-50 text-red-600 text-sm p-3 rounded mb-4 border border-red-200">
+                  {error}
+               </div>
+            )}
+
             <div className="space-y-3">
               <input 
                 type="email" 
                 placeholder="Email Adresse" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
               />
               <input 
                 type="password" 
                 placeholder="Passwort" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
               />
               
@@ -57,10 +108,11 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               </div>
 
               <button 
-                onClick={onLogin}
-                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition mt-2"
+                onClick={handleLogin}
+                disabled={isLoading}
+                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition mt-2 flex justify-center"
               >
-                Anmelden
+                {isLoading ? <Loader2 className="animate-spin" /> : 'Anmelden'}
               </button>
               <button onClick={onCancel} className="text-slate-400 text-sm hover:text-slate-600 block w-full py-2">Abbrechen</button>
             </div>
@@ -75,10 +127,6 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
                 </button>
               </div>
             )}
-            
-            <div className="mt-6 pt-6 border-t border-slate-100 text-xs text-slate-400">
-              (Demo Modus: Klicke einfach auf "Anmelden")
-            </div>
           </>
         ) : (
           <>
@@ -86,7 +134,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               Passwort vergessen?
             </h2>
             <p className="text-slate-500 mb-8 text-sm">
-              Kein Problem. Gib deine E-Mail Adresse ein und wir senden dir einen Link, um dein Passwort zurückzusetzen.
+              Kein Problem. Gib deine E-Mail Adresse ein und wir senden dir einen Link.
             </p>
 
             <div className="space-y-4">
@@ -100,9 +148,10 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               
               <button 
                 onClick={handleResetPassword}
-                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition"
+                disabled={isLoading}
+                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition flex justify-center"
               >
-                Link zum Zurücksetzen senden
+                 {isLoading ? <Loader2 className="animate-spin" /> : 'Link senden'}
               </button>
               
               <button 
@@ -123,7 +172,7 @@ const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [currentPage, setCurrentPage] = useState('landing');
   
-  // Global Commission State to sync between Admin and Affiliate Page
+  // Global Commission State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
 
   // Global Product URLs State
@@ -140,6 +189,23 @@ const App: React.FC = () => {
       console.log("Partner Tracking active:", refCode);
       localStorage.setItem('resortpass_referral', refCode);
     }
+  }, []);
+
+  // Check Auth State on Load
+  useEffect(() => {
+    const checkSession = async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+            // Ideally fetch user role from profile here
+            // For MVP, we assume user stays on the role they last navigated to, 
+            // or we could fetch the role from 'profiles' table.
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+            if (profile && profile.role) {
+                setRole(profile.role as UserRole);
+            }
+        }
+    };
+    checkSession();
   }, []);
 
   const navigate = (page: string) => {

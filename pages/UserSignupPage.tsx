@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 import { Button } from '../components/Button';
+import { supabase } from '../lib/supabase';
 
 interface UserSignupProps {
   onLoginClick: () => void;
@@ -17,6 +18,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
     confirmPassword: ''
   });
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   const validateEmail = (email: string) => {
     return String(email)
@@ -26,7 +28,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
       );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -50,8 +52,40 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
       return;
     }
 
-    // Proceed to next step
-    onRegister();
+    setIsLoading(true);
+    
+    try {
+        // 1. Create User in Supabase Auth
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: formData.email,
+            password: formData.password,
+        });
+
+        if (authError) throw authError;
+        if (!authData.user) throw new Error("Registrierung fehlgeschlagen.");
+
+        // 2. Create Profile
+        const { error: profileError } = await supabase
+            .from('profiles')
+            .insert([{
+                id: authData.user.id,
+                email: formData.email,
+                first_name: formData.firstName,
+                last_name: formData.lastName,
+                role: 'CUSTOMER'
+            }]);
+        
+        if (profileError) throw profileError;
+
+        // Success
+        onRegister();
+
+    } catch (err: any) {
+        console.error("Signup Error:", err);
+        setError(err.message || "Ein Fehler ist aufgetreten.");
+    } finally {
+        setIsLoading(false);
+    }
   };
 
   return (
@@ -183,10 +217,10 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
               <Button
                 type="submit"
                 size="lg"
+                disabled={isLoading}
                 className="w-full flex justify-center bg-[#00305e] text-white hover:bg-[#002040] shadow-md"
               >
-                Weiter zur Buchung
-                <ArrowRight size={18} />
+                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <><span className="mr-2">Weiter zur Buchung</span> <ArrowRight size={18} /></>}
               </Button>
             </div>
           </form>

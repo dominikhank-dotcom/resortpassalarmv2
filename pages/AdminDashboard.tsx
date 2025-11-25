@@ -1462,6 +1462,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 </div>
               </section>
 
+               {/* Supabase */}
+               <section className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                   <div className="flex items-center gap-2">
+                      <Database size={18} className="text-green-500" />
+                      <h4 className="font-bold text-slate-900">Supabase (Datenbank)</h4>
+                   </div>
+                   <div className="text-xs text-slate-500 italic">Verbindung wird bei Login getestet</div>
+                </div>
+                <div>
+                    <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-xs text-blue-800 mb-3">
+                        <strong className="block mb-1">Tipp für die Zukunft:</strong>
+                        Es wird empfohlen, für Frontend-Variablen den Präfix <code>VITE_</code> zu nutzen. Aktuell unterstützen wir aber auch <code>NEXT_PUBLIC_</code>.
+                    </div>
+                    <EnvVarRow name="NEXT_PUBLIC_SUPABASE_URL" description="oder VITE_SUPABASE_URL (Project URL)" />
+                    <EnvVarRow name="NEXT_PUBLIC_SUPABASE_ANON_KEY" description="oder VITE_SUPABASE_ANON_KEY (Public API Key)" />
+                    <EnvVarRow name="SUPABASE_SERVICE_ROLE_KEY" description="Secret Key (Nur für Backend/Admin)" />
+                </div>
+              </section>
+
             </div>
           </div>
         </div>
