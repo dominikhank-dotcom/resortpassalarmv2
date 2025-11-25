@@ -53,9 +53,15 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
     }
     setIsLoading(true);
     try {
-      await supabase.auth.resetPasswordForEmail(email, {
-         redirectTo: window.location.origin + '/reset-password',
+      // Use window.location.origin to ensure the link points to the deployed app, not localhost (unless running locally)
+      const redirectUrl = window.location.origin;
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+         redirectTo: redirectUrl,
       });
+      
+      if (error) throw error;
+      
       alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
       setView('login');
     } catch (e: any) {
@@ -168,9 +174,52 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   );
 };
 
+// Screen to enter new password after clicking the recovery link
+const UpdatePasswordScreen: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const handleUpdate = async () => {
+    if (password !== confirm) {
+      setMessage("Passwörter stimmen nicht überein.");
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: password });
+      if (error) throw error;
+      alert("Passwort erfolgreich geändert! Du bist jetzt eingeloggt.");
+      onComplete();
+    } catch (e: any) {
+      setMessage("Fehler: " + e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
+       <div className="bg-white p-8 rounded-2xl shadow-lg max-w-md w-full text-center border-t-4 border-green-500">
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Neues Passwort festlegen</h2>
+          {message && <p className="text-red-500 text-sm mb-4">{message}</p>}
+          <div className="space-y-3">
+             <input type="password" placeholder="Neues Passwort" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300" />
+             <input type="password" placeholder="Wiederholen" value={confirm} onChange={e => setConfirm(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300" />
+             <button onClick={handleUpdate} disabled={isLoading} className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700">
+                {isLoading ? 'Speichere...' : 'Passwort speichern'}
+             </button>
+          </div>
+       </div>
+    </div>
+  );
+};
+
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [currentPage, setCurrentPage] = useState('landing');
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
   
   // Global Commission State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
@@ -181,46 +230,49 @@ const App: React.FC = () => {
     silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
   });
 
-  // Track Referral Link (30 Days Validity)
+  // Track Referral Link
   useEffect(() => {
-    // 1. Check if an existing code has expired
     const storedData = localStorage.getItem('resortpass_ref_data');
     if (storedData) {
       try {
         const parsed = JSON.parse(storedData);
         if (Date.now() > parsed.expiry) {
-          console.log("Referral Code expired, removing.");
           localStorage.removeItem('resortpass_ref_data');
         }
       } catch (e) {
-        // Fallback for old format or errors
         localStorage.removeItem('resortpass_ref_data');
       }
     }
 
-    // 2. Check for NEW code in URL
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get('ref');
     
     if (refCode) {
-      console.log("New Partner Tracking active:", refCode);
-      const expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 Days
+      const expiry = Date.now() + (30 * 24 * 60 * 60 * 1000); 
       const data = { code: refCode, expiry };
       localStorage.setItem('resortpass_ref_data', JSON.stringify(data));
-      
-      // Legacy cleanup if exists
       localStorage.removeItem('resortpass_referral'); 
     }
   }, []);
 
-  // Check Auth State on Load
+  // Auth State Listener
   useEffect(() => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+            setIsRecoveryMode(true);
+        }
+
+        if (session) {
+            const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
+            if (profile && profile.role) {
+                setRole(profile.role as UserRole);
+            }
+        }
+    });
+
     const checkSession = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-            // Ideally fetch user role from profile here
-            // For MVP, we assume user stays on the role they last navigated to, 
-            // or we could fetch the role from 'profiles' table.
             const { data: profile } = await supabase.from('profiles').select('role').eq('id', session.user.id).single();
             if (profile && profile.role) {
                 setRole(profile.role as UserRole);
@@ -238,6 +290,11 @@ const App: React.FC = () => {
   const handleSetRole = (newRole: UserRole) => {
     setRole(newRole);
   };
+
+  // Render Password Reset Screen if triggered by email link
+  if (isRecoveryMode) {
+      return <UpdatePasswordScreen onComplete={() => { setIsRecoveryMode(false); navigate('dashboard'); }} />;
+  }
 
   const renderContent = () => {
     switch (currentPage) {
@@ -297,7 +354,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {!currentPage.includes('login') && !currentPage.includes('signup') && (
+      {!currentPage.includes('login') && !currentPage.includes('signup') && !isRecoveryMode && (
         <Navbar role={role} setRole={handleSetRole} navigate={navigate} currentPage={currentPage} />
       )}
       <main>
