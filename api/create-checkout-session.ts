@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { getServiceSupabase } from '../lib/supabase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
@@ -12,9 +13,7 @@ export default async function handler(req, res) {
   try {
     const { email, referralCode } = req.body;
 
-    // In a real app, create or get the Stripe Customer ID based on the email
-    // const customer = await stripe.customers.create({ email });
-
+    // Create checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
       line_items: [
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
       customer_email: email,
       metadata: {
         service: 'ResortPassAlarm',
-        referralCode: referralCode || '' // Store the partner code here!
+        referralCode: referralCode || '' // Persist referral code
       }
     });
 
