@@ -17,7 +17,6 @@ const getSupabaseConfig = () => {
   // 2. Try Runtime Variables (Development / Fallback)
   if (!url || !key) {
     try {
-      // Cast to any to avoid TypeScript errors with import.meta
       const meta = import.meta as any;
       const env = meta.env || {};
       
@@ -26,11 +25,12 @@ const getSupabaseConfig = () => {
     } catch (e) {}
   }
 
-  // Robust cleanup: Remove surrounding quotes if present (common Vercel env var mistake)
+  // Robust cleanup: Remove surrounding quotes and whitespace
   const clean = (str: string) => {
       if (!str) return '';
       let s = str.trim();
-      if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+      // Remove quotes recursively
+      while ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
           s = s.slice(1, -1);
       }
       return s;
@@ -38,6 +38,11 @@ const getSupabaseConfig = () => {
 
   url = clean(url);
   key = clean(key);
+
+  // Protocol check
+  if (url && !url.startsWith('http')) {
+      url = 'https://' + url;
+  }
 
   return { url, key };
 };
@@ -47,13 +52,17 @@ const config = getSupabaseConfig();
 // Check if config is missing or placeholder
 export const isSupabaseConfigured = !!config.url && !!config.key && !config.url.includes('placeholder');
 
+// Debug Output in Browser Console
+if (typeof window !== 'undefined') {
+    console.log(`[Supabase Init] URL: ${config.url ? config.url.substring(0, 15) + '...' : 'Missing'} (Valid: ${isSupabaseConfigured ? 'Yes' : 'No'})`);
+}
+
 const validUrl = config.url || 'https://placeholder.supabase.co';
 const validKey = config.key || 'placeholder';
 
 if (!isSupabaseConfigured) {
   console.warn("⚠️ Supabase Configuration missing in Client.");
   if (typeof window !== 'undefined') {
-    // Log to console for developer visibility
     console.log("Please check Vercel Settings -> Environment Variables. Ensure NEXT_PUBLIC_SUPABASE_URL is set and redeploy.");
   }
 }
