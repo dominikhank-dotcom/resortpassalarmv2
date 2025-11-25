@@ -67,4 +67,10 @@ if (!isSupabaseConfigured) {
   }
 }
 
-export const supabase = createClient(validUrl, validKey);
+export const supabase = createClient(validUrl, validKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});

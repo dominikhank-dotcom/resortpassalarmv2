@@ -35,10 +35,21 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
     setError(null);
 
     try {
-      // 2. Timeout Promise (60s) to prevent infinite spinning
-      // Increased to 60s to allow waking up paused Supabase instances
+      // 2. Connectivity Ping
+      // Try to fetch session status locally/fast to see if client is blocked
+      try {
+         const { error: pingError } = await supabase.auth.getSession();
+         if (pingError && pingError.message === 'Failed to fetch') {
+             throw new Error("Netzwerkfehler: Verbindung blockiert (z.B. durch AdBlocker).");
+         }
+      } catch(e: any) {
+         if (e.message && e.message.includes('Netzwerkfehler')) throw e;
+         // Ignore other errors here, proceed to login attempt
+      }
+
+      // 3. Timeout Promise (60s)
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Zeitüberschreitung (60s): Datenbank antwortet nicht. Prüfe Konsole (F12) auf Netzwerkfehler.")), 60000)
+        setTimeout(() => reject(new Error("Zeitüberschreitung (60s): Datenbank antwortet nicht. Prüfe Konsole (F12) auf Netzwerkfehler oder AdBlocker.")), 60000)
       );
 
       const loginPromise = supabase.auth.signInWithPassword({
@@ -56,7 +67,9 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
       }
     } catch (err: any) {
       console.error("Login Error:", err);
-      setError(err.message || "Anmeldung fehlgeschlagen.");
+      let msg = err.message || "Anmeldung fehlgeschlagen.";
+      if (msg === 'Failed to fetch') msg = "Verbindungsfehler. Bitte Internet prüfen oder AdBlocker deaktivieren.";
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
