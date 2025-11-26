@@ -10,9 +10,16 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
 import { supabase, getEnv } from './lib/supabase';
+import { CheckCircle } from 'lucide-react';
 
 // Simple mock Login screen with Forgot Password flow
-const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () => void; onRegisterClick?: () => void }> = ({ role, onLogin, onCancel, onRegisterClick }) => {
+const LoginScreen: React.FC<{ 
+  role: UserRole; 
+  onLogin: () => void; 
+  onCancel: () => void; 
+  onRegisterClick?: () => void;
+  notification?: string | null;
+}> = ({ role, onLogin, onCancel, onRegisterClick, notification }) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -47,8 +54,11 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
            .single();
          
          if (profile) {
-            // In a real app we might want to check if role matches requested role context
+            // Success! Trigger parent navigation
             onLogin(); 
+         } else {
+             // Fallback if profile missing (should not happen with trigger)
+             onLogin();
          }
       }
     } catch (err: any) {
@@ -114,6 +124,14 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
             <h2 className="text-2xl font-bold text-slate-900 mb-4">
               {role === UserRole.AFFILIATE ? 'Partner Login' : role === UserRole.ADMIN ? 'Admin Login' : 'Kunden Login'}
             </h2>
+            
+            {notification && (
+              <div className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 mb-4 flex items-center gap-2 text-sm text-left">
+                 <CheckCircle size={16} className="shrink-0" />
+                 {notification}
+              </div>
+            )}
+
             <p className="text-slate-500 mb-8">Bitte melde dich an, um fortzufahren.</p>
             
             <div className="space-y-3">
@@ -220,6 +238,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [currentPage, setCurrentPage] = useState('landing');
+  const [loginNotification, setLoginNotification] = useState<string | null>(null);
   
   // Global Commission State to sync between Admin and Affiliate Page
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
@@ -240,8 +259,23 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Check auth session on load
+  // INITIAL AUTH & ROUTING CHECK
   useEffect(() => {
+    // 1. Check for Hash (Email Confirmation / Password Reset)
+    const hash = window.location.hash;
+    const pathname = window.location.pathname;
+
+    if (hash && (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('type=signup'))) {
+        console.log("Auth redirect detected.");
+        if (hash.includes('type=signup') || hash.includes('access_token')) {
+            setLoginNotification("E-Mail erfolgreich bestätigt! Du kannst dich jetzt einloggen.");
+        }
+        setCurrentPage('login');
+    } else if (pathname === '/login') {
+        setCurrentPage('login');
+    }
+
+    // 2. Check Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
         // Fetch role
@@ -249,18 +283,34 @@ const App: React.FC = () => {
           .then(({ data }) => {
             if (data?.role) {
                 setRole(data.role as UserRole);
-                if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
-                else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
-                else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+                
+                // Only redirect if we are not already on a specific intended page
+                if (currentPage === 'landing' || currentPage === 'login') {
+                    if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                    else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
+                    else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+                }
             }
           });
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-        if (!session) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_OUT') {
             setRole(UserRole.GUEST);
             setCurrentPage('landing');
+        } else if (event === 'SIGNED_IN' && session) {
+            // Re-fetch role to be sure
+             supabase.from('profiles').select('role').eq('id', session.user.id).single()
+             .then(({ data }) => {
+                if (data?.role) {
+                    setRole(data.role as UserRole);
+                    // Force navigation to dashboard on successful login event
+                    if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                    else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
+                    else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+                }
+             });
         }
     });
 
@@ -270,6 +320,8 @@ const App: React.FC = () => {
   const navigate = (page: string) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
+    // Clear notification when navigating away
+    if (page !== 'login') setLoginNotification(null);
   };
 
   const handleSetRole = (newRole: UserRole) => {
@@ -291,11 +343,11 @@ const App: React.FC = () => {
       case 'affiliate-signup':
         return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { /* Wait for auth listener */ }} />;
       case 'affiliate-login':
-        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
+        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => navigate('affiliate')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       case 'user-signup':
         return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => { /* Wait for auth listener */ }} onNavigate={navigate} />;
       case 'admin-login':
-        return <LoginScreen role={UserRole.ADMIN} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} />;
+        return <LoginScreen role={UserRole.ADMIN} onLogin={() => navigate('admin-dashboard')} onCancel={() => navigate('landing')} notification={loginNotification} />;
       case 'admin-dashboard':
          return role === UserRole.ADMIN 
           ? <AdminDashboard 
@@ -304,7 +356,7 @@ const App: React.FC = () => {
               productUrls={productUrls}
               onUpdateProductUrls={setProductUrls}
             /> 
-          : <LoginScreen role={UserRole.ADMIN} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} />;
+          : <LoginScreen role={UserRole.ADMIN} onLogin={() => navigate('admin-dashboard')} onCancel={() => navigate('landing')} notification={loginNotification} />;
       
       // Legal Pages
       case 'imprint':
@@ -318,14 +370,14 @@ const App: React.FC = () => {
 
       case 'dashboard':
         if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} />;
-        return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
+        return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => navigate('dashboard')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
       
       case 'affiliate':
         if (role === UserRole.AFFILIATE) return <AffiliateDashboard />;
-        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
+        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => navigate('affiliate')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       
       case 'login':
-         return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
+         return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => navigate('dashboard')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
 
       default: // 'landing'
         return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} />;

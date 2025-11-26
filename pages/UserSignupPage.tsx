@@ -56,6 +56,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
     try {
       // Determine the redirect URL (Production vs Local)
       const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
+      // Force redirect to /login so App.tsx picks it up
       const redirectUrl = `${siteUrl}/login`;
 
       // 1. Sign up with Supabase
