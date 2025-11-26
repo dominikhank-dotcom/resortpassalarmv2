@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
   TrendingUp, DollarSign, Activity, Calendar, 
@@ -15,65 +15,7 @@ import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
 import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection } from '../services/backendService';
 import { EmailTemplate } from '../types';
-
-// --- Mock Data ---
-const DASHBOARD_DATA = [
-  { date: '01.05', revenue: 450, growth: 12 },
-  { date: '05.05', revenue: 680, growth: 25 },
-  { date: '10.05', revenue: 1200, growth: 45 },
-  { date: '15.05', revenue: 1800, growth: 80 },
-  { date: '20.05', revenue: 2400, growth: 120 },
-  { date: '25.05', revenue: 3100, growth: 160 },
-  { date: '30.05', revenue: 4200, growth: 210 },
-];
-
-const CUSTOMERS_LIST = [
-  { id: 'KD-1001', name: 'Max Mustermann', email: 'max@test.de', status: 'Active', joined: '12.05.2024' },
-  { id: 'KD-1002', name: 'Sarah Schmidt', email: 'sarah@web.de', status: 'Active', joined: '14.05.2024' },
-  { id: 'KD-1003', name: 'Michael Weber', email: 'm.weber@gmx.de', status: 'Inactive', joined: '01.04.2024' },
-  { id: 'KD-1004', name: 'Lisa Müller', email: 'lisa.m@gmail.com', status: 'Active', joined: '20.05.2024' },
-  { id: 'KD-1005', name: 'Tom Bauer', email: 'tom.b@yahoo.com', status: 'Inactive', joined: '10.02.2024' },
-];
-
-// Detailed Mock Data Generator
-const generateCustomerDetails = (summary: any) => {
-  return {
-    ...summary,
-    firstName: summary.name.split(' ')[0],
-    lastName: summary.name.split(' ')[1],
-    address: { street: 'Musterstraße', houseNumber: '1', zip: '12345', city: 'Berlin', country: 'Deutschland' },
-    subscription: {
-      status: summary.status,
-      startDate: summary.joined,
-      endDate: summary.status === 'Inactive' ? '20.06.2024' : null,
-      plan: 'Monatsabo (1,99 €)',
-      isFree: false, // New field for manual override
-      paymentMethod: 'PayPal (max...@test.de)'
-    },
-    referrer: summary.id === 'KD-1001' ? { name: 'Freizeitpark News DE', id: 'P-502', date: '12.05.2024' } : null,
-    transactions: [
-      { id: 'TX-901', date: '2024-06-12', amount: 1.99, status: 'Paid' },
-      { id: 'TX-804', date: '2024-05-12', amount: 1.99, status: 'Paid' },
-      { id: 'TX-702', date: '2024-04-12', amount: 1.99, status: 'Refunded' },
-    ]
-  };
-};
-
-const PARTNER_TOP_10 = [
-  { rank: 1, name: 'Freizeitpark News DE', revenue: 12400.50, conversions: 450 },
-  { rank: 2, name: 'RollerCoaster Girl', revenue: 8200.00, conversions: 310 },
-  { rank: 3, name: 'EP Fanclub Süd', revenue: 5100.25, conversions: 180 },
-  { rank: 4, name: 'ThemePark Traveller', revenue: 3200.00, conversions: 110 },
-  { rank: 5, name: 'Achterbahn Junkies', revenue: 1800.50, conversions: 65 },
-];
-
-const CONVERSION_QUALITY_DATA = [
-  { source: 'Instagram', clicks: 5000, conversions: 120 },
-  { source: 'TikTok', clicks: 8000, conversions: 80 },
-  { source: 'Blog/SEO', clicks: 2000, conversions: 150 },
-  { source: 'YouTube', clicks: 3000, conversions: 110 },
-  { source: 'Newsletter', clicks: 1000, conversions: 90 },
-];
+import { supabase } from '../lib/supabase';
 
 // --- EMAIL TEMPLATES DEFAULT DATA ---
 const DEFAULT_TEMPLATES: EmailTemplate[] = [
@@ -238,13 +180,18 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, onUpdateCommission, productUrls, onUpdateProductUrls }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'customers' | 'partners' | 'emails' | 'settings'>('dashboard');
   
+  // Real Data State
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [partners, setPartners] = useState<any[]>([]);
+  const [dashboardStats, setDashboardStats] = useState({ activeUsers: 0, revenue: 0, apiCalls: 142000, conversion: 4.2 });
+  const [isLoadingData, setIsLoadingData] = useState(false);
+  
   // Customer Detail State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any>(null);
   const [refundRange, setRefundRange] = useState({ start: '', end: '' });
 
   // Partner Settings
-  const [dateRange, setDateRange] = useState({ start: '2024-05-01', end: '2024-05-31' });
   const [aiInsights, setAiInsights] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -256,7 +203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
   // Admin Account Settings State
   const [adminAuth, setAdminAuth] = useState({
-      currentEmail: 'dominikhank@gmail.com', // Default updated to your email
+      currentEmail: '', // Will be loaded from session
       newEmail: '',
       emailPassword: '', 
       pwCurrent: '',
@@ -264,122 +211,178 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       pwConfirm: ''
   });
 
-  const handleSelectCustomer = (customer: any) => {
-    const details = generateCustomerDetails(customer);
+  // --- FETCH REAL DATA ---
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      try {
+        // 1. Get Current Admin Email
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && user.email) {
+           setAdminAuth(prev => ({ ...prev, currentEmail: user.email! }));
+        }
+
+        // 2. Fetch Customers
+        const { data: customerData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'CUSTOMER')
+          .order('created_at', { ascending: false });
+        
+        if (customerData) {
+            setCustomers(customerData);
+            setDashboardStats(prev => ({ ...prev, activeUsers: customerData.length }));
+        }
+
+        // 3. Fetch Partners
+        const { data: partnerData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'AFFILIATE')
+          .order('created_at', { ascending: false });
+        
+        if (partnerData) setPartners(partnerData);
+
+        // 4. Calculate Revenue (Estimation based on active subs if table exists)
+        // Since we don't have a payments table yet in the schema provided earlier (just payouts/commissions),
+        // we can assume active subs * 1.99 for monthly revenue estimation
+        const { count } = await supabase
+            .from('subscriptions')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'active');
+        
+        if (count !== null) {
+            setDashboardStats(prev => ({ ...prev, revenue: count * 1.99 }));
+        }
+
+      } catch (error) {
+        console.error("Error fetching admin data:", error);
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const handleSelectCustomer = async (customer: any) => {
+    // Fetch detailed subscription info for this customer
+    const { data: sub } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', customer.id)
+        .single();
+    
+    const details = {
+        id: customer.id,
+        firstName: customer.first_name || '',
+        lastName: customer.last_name || '',
+        email: customer.email || '',
+        address: { 
+            street: customer.street || '', 
+            houseNumber: customer.house_number || '', 
+            zip: customer.zip || '', 
+            city: customer.city || '', 
+            country: customer.country || 'Deutschland' 
+        },
+        subscription: {
+            status: sub ? (sub.status === 'active' ? 'Active' : 'Inactive') : 'Inactive',
+            startDate: sub ? new Date(sub.created_at).toLocaleDateString() : '–',
+            endDate: sub && sub.status !== 'active' ? new Date(sub.current_period_end).toLocaleDateString() : null,
+            plan: sub ? sub.plan_type : 'Kein Abo',
+            isFree: sub ? sub.plan_type === 'Manuell (Gratis)' : false,
+            paymentMethod: sub ? 'Stripe' : '–'
+        },
+        referrer: null, // Would need tracking table
+        transactions: [] // Would need payments table
+    };
+
     setCustomerDetail(details);
     setSelectedCustomerId(customer.id);
   };
 
-  const handleSaveCustomer = (e: React.FormEvent) => {
+  const handleSaveCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Kundendaten erfolgreich aktualisiert.");
+    if (!customerDetail) return;
+    
+    const { error } = await supabase.from('profiles').update({
+        first_name: customerDetail.firstName,
+        last_name: customerDetail.lastName,
+        street: customerDetail.address.street,
+        house_number: customerDetail.address.houseNumber,
+        zip: customerDetail.address.zip,
+        city: customerDetail.address.city,
+        country: customerDetail.address.country
+    }).eq('id', customerDetail.id);
+
+    if (error) alert("Fehler beim Speichern: " + error.message);
+    else alert("Kundendaten erfolgreich aktualisiert.");
   };
 
   const handleToggleSubscription = () => {
-    if (customerDetail.subscription.status === 'Active') {
-      if (confirm("Möchtest du das Abo dieses Kunden wirklich sofort beenden?")) {
-        setCustomerDetail({
-            ...customerDetail, 
-            subscription: {
-                ...customerDetail.subscription, 
-                status: 'Inactive', 
-                endDate: new Date().toLocaleDateString(),
-                isFree: false,
-                plan: 'Monatsabo (1,99 €)'
-            }
-        });
-      }
-    } else {
-       // Standard reactivation (Paid)
-       setCustomerDetail({
-           ...customerDetail, 
-           subscription: {
-               ...customerDetail.subscription, 
-               status: 'Active', 
-               endDate: null,
-               isFree: false
-           }
-       });
-    }
+    alert("Diese Funktion erfordert eine direkte Stripe-API-Anbindung für Stornierungen.");
   };
 
-  const handleToggleFreeSubscription = () => {
+  const handleToggleFreeSubscription = async () => {
+      if (!customerDetail) return;
+
       if (customerDetail.subscription.isFree) {
           if(confirm("Möchtest du das kostenlose Abo widerrufen? Der Nutzer verliert sofort den Zugriff.")) {
-            setCustomerDetail({
-                ...customerDetail,
-                subscription: {
-                    ...customerDetail.subscription,
-                    status: 'Inactive',
-                    isFree: false,
-                    plan: 'Monatsabo (1,99 €)',
-                    endDate: new Date().toLocaleDateString()
-                }
-            });
+            // Logic to update DB
+             const { error } = await supabase.from('subscriptions').update({
+                 status: 'inactive',
+                 plan_type: 'standard'
+             }).eq('user_id', customerDetail.id);
+
+            if (!error) {
+                setCustomerDetail({
+                    ...customerDetail,
+                    subscription: { ...customerDetail.subscription, status: 'Inactive', isFree: false, plan: 'Standard' }
+                });
+            }
           }
       } else {
           if(confirm("Diesen Nutzer manuell kostenlos freischalten? Er erhält alle Premium-Funktionen ohne Zahlung.")) {
-            setCustomerDetail({
-                ...customerDetail,
-                subscription: {
-                    ...customerDetail.subscription,
-                    status: 'Active',
-                    isFree: true,
-                    plan: 'Manuell (Gratis)',
-                    endDate: null
-                }
-            });
+             // Logic to update/insert DB
+             // Check if sub exists
+             const { data: sub } = await supabase.from('subscriptions').select('id').eq('user_id', customerDetail.id).single();
+             
+             let error;
+             if (sub) {
+                 const res = await supabase.from('subscriptions').update({
+                     status: 'active',
+                     plan_type: 'Manuell (Gratis)'
+                 }).eq('user_id', customerDetail.id);
+                 error = res.error;
+             } else {
+                 const res = await supabase.from('subscriptions').insert({
+                     user_id: customerDetail.id,
+                     status: 'active',
+                     plan_type: 'Manuell (Gratis)'
+                 });
+                 error = res.error;
+             }
+
+             if (!error) {
+                setCustomerDetail({
+                    ...customerDetail,
+                    subscription: { ...customerDetail.subscription, status: 'Active', isFree: true, plan: 'Manuell (Gratis)' }
+                });
+             }
           }
       }
   };
 
   const handleRefundSingle = (txId: string) => {
-    if(confirm(`Transaktion ${txId} wirklich erstatten?`)) {
-      const updatedTx = customerDetail.transactions.map((tx: any) => 
-        tx.id === txId ? {...tx, status: 'Refunded'} : tx
-      );
-      setCustomerDetail({...customerDetail, transactions: updatedTx});
-      alert("Rückzahlung eingeleitet.");
-    }
+    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
   };
 
   const handleRefundAll = () => {
-    if(confirm("WARNUNG: Möchtest du wirklich ALLE Zahlungen dieses Kunden erstatten? Dies kann nicht rückgängig gemacht werden.")) {
-      const updatedTx = customerDetail.transactions.map((tx: any) => ({...tx, status: 'Refunded'}));
-      setCustomerDetail({...customerDetail, transactions: updatedTx});
-      alert("Alle Zahlungen wurden erstattet.");
-    }
+    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
   };
 
   const handleRefundRange = () => {
-    if (!refundRange.start || !refundRange.end) {
-        alert("Bitte Start- und Enddatum wählen.");
-        return;
-    }
-    const start = new Date(refundRange.start);
-    const end = new Date(refundRange.end);
-    
-    const count = customerDetail.transactions.filter((tx: any) => {
-        const txDate = new Date(tx.date.split('.').reverse().join('-'));
-        return txDate >= start && txDate <= end && tx.status === 'Paid';
-    }).length;
-
-    if(count === 0) {
-        alert("Keine bezahlten Transaktionen im Zeitraum gefunden.");
-        return;
-    }
-
-    if(confirm(`${count} Zahlungen im Zeitraum erstatten?`)) {
-        const updatedTx = customerDetail.transactions.map((tx: any) => {
-            const txDate = new Date(tx.date.split('.').reverse().join('-'));
-            if (txDate >= start && txDate <= end && tx.status === 'Paid') {
-                return {...tx, status: 'Refunded'};
-            }
-            return tx;
-        });
-        setCustomerDetail({...customerDetail, transactions: updatedTx});
-        alert("Rückzahlungen für Zeitraum durchgeführt.");
-    }
+    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
   };
 
   const handleSaveCommission = () => {
@@ -389,7 +392,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      const insights = await generateAdminInsights({ topPartners: PARTNER_TOP_10, conversion: CONVERSION_QUALITY_DATA });
+      // Use real fetched data for analysis if available, else mock
+      const insights = await generateAdminInsights({ 
+          activePartners: partners.length, 
+          totalCustomers: customers.length,
+          revenue: dashboardStats.revenue
+      });
       setAiInsights(insights);
     } catch (error) {
       setAiInsights("Fehler bei der Analyse.");
@@ -435,7 +443,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleSendTestEmail = async (template: EmailTemplate) => {
     setIsSendingTestEmail(true);
     try {
-      // Pass the current admin email (dominikhank@gmail.com) and the current URLs to the backend service
       const result = await sendTemplateTest(template, adminAuth.currentEmail, productUrls);
       alert(`Test-E-Mail "${template.subject}" wurde an ${adminAuth.currentEmail} gesendet!`);
     } catch (error: any) {
@@ -448,35 +455,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   // --- ADMIN ACCOUNT HANDLERS ---
   const handleUpdateAdminPassword = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!adminAuth.pwCurrent) {
-          alert("Bitte aktuelles Passwort eingeben.");
-          return;
-      }
-      if (adminAuth.pwNew.length < 6) {
-          alert("Das neue Passwort muss mindestens 6 Zeichen lang sein.");
-          return;
-      }
-      if (adminAuth.pwNew !== adminAuth.pwConfirm) {
-          alert("Die neuen Passwörter stimmen nicht überein.");
-          return;
-      }
-      alert("Admin-Passwort erfolgreich geändert!");
-      setAdminAuth(prev => ({...prev, pwCurrent: '', pwNew: '', pwConfirm: ''}));
+      alert("Funktion in dieser Version deaktiviert (Auth via Supabase Dashboard empfohlen).");
   };
 
   const handleUpdateAdminEmail = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!adminAuth.newEmail) {
-          alert("Bitte neue E-Mail Adresse eingeben.");
-          return;
-      }
-      if (!adminAuth.emailPassword) {
-          alert("Bitte aktuelles Passwort zur Bestätigung eingeben.");
-          return;
-      }
-      // Simulation of verification
-      alert(`Bestätigungs-Link wurde an ${adminAuth.newEmail} gesendet. Bitte rufe die E-Mail ab und klicke auf den Link, um die Änderung abzuschließen.`);
-      setAdminAuth(prev => ({...prev, newEmail: '', emailPassword: ''}));
+      alert("Funktion in dieser Version deaktiviert (Auth via Supabase Dashboard empfohlen).");
   };
 
   const renderTabButton = (id: typeof activeTab, label: string, icon: React.ReactNode) => (
@@ -538,33 +522,24 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="text-slate-500 text-sm font-medium">Aktive Nutzer</p>
-                  <h3 className="text-3xl font-bold text-slate-900">1,284</h3>
+                  <h3 className="text-3xl font-bold text-slate-900">{isLoadingData ? '...' : dashboardStats.activeUsers}</h3>
                 </div>
                 <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Users size={20} /></div>
               </div>
               <div className="text-xs text-green-600 flex items-center gap-1 font-medium">
-                <TrendingUp size={12} /> +12% diese Woche
+                <TrendingUp size={12} /> Live aus DB
               </div>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-slate-500 text-sm font-medium">Reingewinn (Profit)</p>
-                  <h3 className="text-3xl font-bold text-slate-900">2,450 €</h3>
+                  <p className="text-slate-500 text-sm font-medium">Est. Umsatz / Monat</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{isLoadingData ? '...' : dashboardStats.revenue.toFixed(2)} €</h3>
                 </div>
                 <div className="bg-green-50 p-2 rounded-lg text-green-600"><DollarSign size={20} /></div>
               </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Gesamtumsatz</span>
-                  <span className="font-medium">4,900 €</span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Provisionen</span>
-                  <span className="font-medium text-red-400">-2,450 €</span>
-                </div>
-              </div>
+              <p className="text-xs text-slate-400">Basierend auf aktiven Abos</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -578,7 +553,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
                 <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: '65%' }}></div>
               </div>
-              <p className="text-xs text-slate-400 mt-1">65% des Tages-Limits</p>
+              <p className="text-xs text-slate-400 mt-1">Simulierter Wert</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -589,79 +564,46 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 </div>
                 <div className="bg-amber-50 p-2 rounded-lg text-amber-600"><Activity size={20} /></div>
               </div>
-              <div className="text-xs text-slate-400">Besucher zu Abo Abschluss</div>
+              <div className="text-xs text-slate-400">Simulierter Wert</div>
             </div>
           </div>
 
-          {/* Chart */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[400px]">
-            <h3 className="text-lg font-bold text-slate-900 mb-6">Wachstum & Umsatz</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={DASHBOARD_DATA}>
-                <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#00305e" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#00305e" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorGrowth" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ffcc00" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#ffcc00" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                <Area type="monotone" dataKey="revenue" stackId="1" stroke="#00305e" fill="url(#colorRevenue)" name="Umsatz (€)" />
-                <Area type="monotone" dataKey="growth" stackId="2" stroke="#eab308" fill="url(#colorGrowth)" name="Nutzer Wachstum" />
-              </AreaChart>
-            </ResponsiveContainer>
+          {/* Placeholder Chart */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[400px] flex items-center justify-center">
+            <div className="text-center">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">Wachstum & Umsatz</h3>
+                <p className="text-slate-500 max-w-md">Historische Daten werden gesammelt. Diagramm wird verfügbar sein, sobald genügend Datenpunkte vorhanden sind.</p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* TAB: CUSTOMERS, PARTNERS, EMAILS remain largely same, just Email Logic is updated via handleSendTestEmail */}
-      
-      {/* ... (Existing Customer & Partner Tabs Logic - no functional changes needed here) ... */}
-      
-      {/* TAB: CUSTOMERS (List & Details) */}
+      {/* TAB: CUSTOMERS */}
       {activeTab === 'customers' && (
-        /* ... customer implementation ... */
         <>
             {!selectedCustomerId ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
-                    {/* ... table ... */}
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                        <h3 className="text-lg font-bold text-slate-900">Kundenverzeichnis</h3>
-                        {/* ... search ... */}
+                        <h3 className="text-lg font-bold text-slate-900">Kundenverzeichnis ({customers.length})</h3>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                        {/* ... table content ... */}
                         <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
                             <tr>
                             <th className="px-6 py-4">Kunden ID</th>
                             <th className="px-6 py-4">Name</th>
                             <th className="px-6 py-4">Email</th>
-                            <th className="px-6 py-4">Status</th>
                             <th className="px-6 py-4">Beigetreten am</th>
                             <th className="px-6 py-4 text-right">Aktionen</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {CUSTOMERS_LIST.map((customer) => (
+                            {customers.map((customer) => (
                             <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
-                                <td className="px-6 py-4 font-mono text-xs text-slate-500">{customer.id}</td>
-                                <td className="px-6 py-4 font-medium text-slate-900">{customer.name}</td>
+                                <td className="px-6 py-4 font-mono text-xs text-slate-500">{customer.id.substring(0,8)}...</td>
+                                <td className="px-6 py-4 font-medium text-slate-900">{customer.first_name} {customer.last_name}</td>
                                 <td className="px-6 py-4 text-slate-600">{customer.email}</td>
-                                <td className="px-6 py-4">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    customer.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-800'
-                                }`}>
-                                    {customer.status === 'Active' ? 'Aktiv' : 'Inaktiv'}
-                                </span>
-                                </td>
-                                <td className="px-6 py-4 text-slate-500 text-sm">{customer.joined}</td>
+                                <td className="px-6 py-4 text-slate-500 text-sm">{new Date(customer.created_at).toLocaleDateString()}</td>
                                 <td className="px-6 py-4 text-right">
                                 <button 
                                     onClick={() => handleSelectCustomer(customer)}
@@ -672,6 +614,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                 </td>
                             </tr>
                             ))}
+                            {customers.length === 0 && !isLoadingData && (
+                                <tr>
+                                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Keine Kunden gefunden.</td>
+                                </tr>
+                            )}
                         </tbody>
                         </table>
                     </div>
@@ -679,343 +626,200 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             ) : (
                 /* ... customer details ... */
                 <div className="animate-in fade-in slide-in-from-right-4">
-                    <div className="flex items-center gap-4 mb-6">
-                        <Button variant="outline" size="sm" onClick={() => setSelectedCustomerId(null)}>
-                            <ArrowLeft size={16} className="mr-2" /> Zurück zur Liste
-                        </Button>
-                        <div className="flex-1">
-                            <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
-                                {customerDetail.name}
-                                <span className={`text-sm px-3 py-1 rounded-full border ${
-                                    customerDetail.subscription.status === 'Active' 
-                                    ? 'bg-green-50 border-green-200 text-green-700' 
-                                    : 'bg-slate-50 border-slate-200 text-slate-500'
-                                }`}>
-                                    {customerDetail.subscription.status === 'Active' ? 'Abo Aktiv' : 'Gekündigt'}
-                                </span>
-                                {customerDetail.subscription.isFree && (
-                                    <span className="text-sm px-3 py-1 rounded-full border bg-purple-50 border-purple-200 text-purple-700 flex items-center gap-1">
-                                        <Gift size={12} /> Kostenlos
+                    {customerDetail && (
+                        <>
+                        <div className="flex items-center gap-4 mb-6">
+                            <Button variant="outline" size="sm" onClick={() => setSelectedCustomerId(null)}>
+                                <ArrowLeft size={16} className="mr-2" /> Zurück zur Liste
+                            </Button>
+                            <div className="flex-1">
+                                <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
+                                    {customerDetail.firstName} {customerDetail.lastName}
+                                    <span className={`text-sm px-3 py-1 rounded-full border ${
+                                        customerDetail.subscription.status === 'Active' 
+                                        ? 'bg-green-50 border-green-200 text-green-700' 
+                                        : 'bg-slate-50 border-slate-200 text-slate-500'
+                                    }`}>
+                                        {customerDetail.subscription.status}
                                     </span>
-                                )}
-                            </h2>
-                            <p className="text-slate-500 text-sm font-mono">{customerDetail.id}</p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* LEFT COLUMN */}
-                        <div className="lg:col-span-2 space-y-6">
-                            {/* Personal Data Form */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                                    <Users size={20} className="text-blue-600" /> Stammdaten Bearbeiten
-                                </h3>
-                                <form onSubmit={handleSaveCustomer} className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Vorname</label>
-                                            <input 
-                                                type="text" 
-                                                value={customerDetail.firstName}
-                                                onChange={(e) => setCustomerDetail({...customerDetail, firstName: e.target.value})}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Nachname</label>
-                                            <input 
-                                                type="text" 
-                                                value={customerDetail.lastName}
-                                                onChange={(e) => setCustomerDetail({...customerDetail, lastName: e.target.value})}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase">E-Mail</label>
-                                        <input 
-                                            type="email" 
-                                            value={customerDetail.email}
-                                            onChange={(e) => setCustomerDetail({...customerDetail, email: e.target.value})}
-                                            className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="md:col-span-2 flex gap-4">
-                                             <div className="flex-1">
-                                                <label className="text-xs font-bold text-slate-500 uppercase">Straße</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={customerDetail.address.street}
-                                                    onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, street: e.target.value}})}
-                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                                />
-                                             </div>
-                                             <div className="w-24">
-                                                <label className="text-xs font-bold text-slate-500 uppercase">Nr.</label>
-                                                <input 
-                                                    type="text" 
-                                                    value={customerDetail.address.houseNumber}
-                                                    onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, houseNumber: e.target.value}})}
-                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                                />
-                                             </div>
-                                        </div>
-                                        
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Land</label>
-                                            <select 
-                                                value={customerDetail.address.country}
-                                                onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, country: e.target.value}})}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none bg-white"
-                                            >
-                                                <option>Deutschland</option>
-                                                <option>Österreich</option>
-                                                <option>Schweiz</option>
-                                                <option>Frankreich</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-500 uppercase">PLZ</label>
-                                            <input 
-                                                type="text" 
-                                                value={customerDetail.address.zip}
-                                                onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, zip: e.target.value}})}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                            />
-                                        </div>
-                                        <div className="col-span-1 md:col-span-2">
-                                            <label className="text-xs font-bold text-slate-500 uppercase">Ort</label>
-                                            <input 
-                                                type="text" 
-                                                value={customerDetail.address.city}
-                                                onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, city: e.target.value}})}
-                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end pt-2">
-                                        <Button type="submit" size="sm" variant="outline">
-                                            <Save size={14} className="mr-2" /> Änderungen speichern
-                                        </Button>
-                                    </div>
-                                </form>
+                                    {customerDetail.subscription.isFree && (
+                                        <span className="text-sm px-3 py-1 rounded-full border bg-purple-50 border-purple-200 text-purple-700 flex items-center gap-1">
+                                            <Gift size={12} /> Kostenlos
+                                        </span>
+                                    )}
+                                </h2>
+                                <p className="text-slate-500 text-sm font-mono">{customerDetail.id}</p>
                             </div>
+                        </div>
 
-                            {/* Transactions */}
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                <div className="p-6 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                                        <CreditCard size={20} className="text-slate-600" /> Zahlungen & Rückerstattungen
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* LEFT COLUMN */}
+                            <div className="lg:col-span-2 space-y-6">
+                                {/* Personal Data Form */}
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                        <Users size={20} className="text-blue-600" /> Stammdaten Bearbeiten
                                     </h3>
-                                </div>
-                                
-                                <div className="p-6 space-y-6">
-                                    {/* Transaction List */}
-                                    <div className="space-y-3">
-                                        {customerDetail.transactions.map((tx: any) => (
-                                            <div key={tx.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`p-2 rounded-full ${tx.status === 'Paid' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
-                                                        {tx.status === 'Paid' ? <CheckCircle size={16} /> : <RotateCcw size={16} />}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-slate-900">{tx.amount.toFixed(2)} €</p>
-                                                        <p className="text-xs text-slate-500">{tx.date} • {tx.id}</p>
-                                                    </div>
+                                    <form onSubmit={handleSaveCustomer} className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Vorname</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={customerDetail.firstName}
+                                                    onChange={(e) => setCustomerDetail({...customerDetail, firstName: e.target.value})}
+                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Nachname</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={customerDetail.lastName}
+                                                    onChange={(e) => setCustomerDetail({...customerDetail, lastName: e.target.value})}
+                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase">E-Mail</label>
+                                            <input 
+                                                type="email" 
+                                                value={customerDetail.email}
+                                                readOnly
+                                                className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 cursor-not-allowed" 
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            <div className="md:col-span-2 flex gap-4">
+                                                <div className="flex-1">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">Straße</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={customerDetail.address.street}
+                                                        onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, street: e.target.value}})}
+                                                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                    />
                                                 </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className={`text-xs font-bold uppercase ${tx.status === 'Paid' ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {tx.status === 'Paid' ? 'Bezahlt' : 'Erstattet'}
-                                                    </span>
-                                                    {tx.status === 'Paid' && (
-                                                        <button 
-                                                            onClick={() => handleRefundSingle(tx.id)}
-                                                            className="text-xs bg-white border border-slate-300 hover:bg-red-50 hover:text-red-600 hover:border-red-200 text-slate-600 px-3 py-1 rounded transition-colors"
-                                                        >
-                                                            Erstatten
-                                                        </button>
-                                                    )}
+                                                <div className="w-24">
+                                                    <label className="text-xs font-bold text-slate-500 uppercase">Nr.</label>
+                                                    <input 
+                                                        type="text" 
+                                                        value={customerDetail.address.houseNumber}
+                                                        onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, houseNumber: e.target.value}})}
+                                                        className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                    />
                                                 </div>
                                             </div>
-                                        ))}
-                                    </div>
+                                            
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Land</label>
+                                                <select 
+                                                    value={customerDetail.address.country}
+                                                    onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, country: e.target.value}})}
+                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none bg-white"
+                                                >
+                                                    <option>Deutschland</option>
+                                                    <option>Österreich</option>
+                                                    <option>Schweiz</option>
+                                                    <option>Frankreich</option>
+                                                </select>
+                                            </div>
+                                        </div>
 
-                                    {/* Bulk Refunds */}
-                                    <div className="border-t border-slate-200 pt-6">
-                                        <h4 className="text-sm font-bold text-slate-900 mb-3">Erweiterte Rückerstattungen</h4>
-                                        <div className="bg-red-50 rounded-xl p-4 border border-red-100">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div>
-                                                    <label className="block text-xs font-bold text-red-800 uppercase mb-2">Zeitraum Erstatten</label>
-                                                    <div className="flex gap-2 mb-2">
-                                                        <input type="date" className="w-full text-xs p-2 rounded border border-red-200 text-slate-600" value={refundRange.start} onChange={(e) => setRefundRange({...refundRange, start: e.target.value})} />
-                                                        <input type="date" className="w-full text-xs p-2 rounded border border-red-200 text-slate-600" value={refundRange.end} onChange={(e) => setRefundRange({...refundRange, end: e.target.value})} />
-                                                    </div>
-                                                    <button onClick={handleRefundRange} className="w-full bg-white border border-red-200 text-red-600 hover:bg-red-100 text-xs font-bold py-2 rounded transition">
-                                                        Zahlungen im Zeitraum erstatten
-                                                    </button>
-                                                </div>
-                                                <div className="flex flex-col justify-between">
-                                                    <label className="block text-xs font-bold text-red-800 uppercase mb-2">Notfall-Option</label>
-                                                    <button onClick={handleRefundAll} className="w-full h-full flex items-center justify-center gap-2 bg-red-600 text-white hover:bg-red-700 text-xs font-bold py-2 rounded transition shadow-sm">
-                                                        <AlertTriangle size={14} /> ALLE Zahlungen erstatten
-                                                    </button>
-                                                </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                            <div>
+                                                <label className="text-xs font-bold text-slate-500 uppercase">PLZ</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={customerDetail.address.zip}
+                                                    onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, zip: e.target.value}})}
+                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                />
                                             </div>
+                                            <div className="col-span-1 md:col-span-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Ort</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={customerDetail.address.city}
+                                                    onChange={(e) => setCustomerDetail({...customerDetail, address: {...customerDetail.address, city: e.target.value}})}
+                                                    className="w-full mt-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none" 
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-end pt-2">
+                                            <Button type="submit" size="sm" variant="outline">
+                                                <Save size={14} className="mr-2" /> Änderungen speichern
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+
+                            {/* RIGHT COLUMN */}
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                                    <h3 className="font-bold text-slate-900 mb-4">Abo Übersicht</h3>
+                                    <div className="space-y-4">
+                                        <div><p className="text-xs text-slate-500 uppercase">Aktueller Plan</p><p className="font-medium text-slate-900">{customerDetail.subscription.plan}</p></div>
+                                        <div><p className="text-xs text-slate-500 uppercase">Startdatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.startDate}</p></div>
+                                        <div><p className="text-xs text-slate-500 uppercase">Enddatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.endDate || '– (Laufend)'}</p></div>
+                                        
+                                        <div className="pt-4 border-t border-slate-100 space-y-2">
+                                            <Button 
+                                                onClick={handleToggleFreeSubscription}
+                                                variant="secondary"
+                                                className={`w-full justify-center border ${customerDetail.subscription.isFree ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
+                                            >
+                                                {customerDetail.subscription.isFree ? <><UserX size={16} className="mr-2" /> Kostenloses Abo entziehen</> : <><Gift size={16} className="mr-2" /> Kostenloses Abo geben</>}
+                                            </Button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        {/* RIGHT COLUMN */}
-                        <div className="space-y-6">
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                                <h3 className="font-bold text-slate-900 mb-4">Abo Übersicht</h3>
-                                <div className="space-y-4">
-                                    <div><p className="text-xs text-slate-500 uppercase">Aktueller Plan</p><p className="font-medium text-slate-900">{customerDetail.subscription.plan}</p></div>
-                                    <div><p className="text-xs text-slate-500 uppercase">Startdatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.startDate}</p></div>
-                                    <div><p className="text-xs text-slate-500 uppercase">Enddatum</p><p className="font-medium text-slate-900">{customerDetail.subscription.endDate || '– (Laufend)'}</p></div>
-                                    
-                                    <div className="pt-4 border-t border-slate-100 space-y-2">
-                                        <Button onClick={handleToggleSubscription} className={`w-full justify-center ${customerDetail.subscription.status === 'Active' && !customerDetail.subscription.isFree ? 'bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-none' : 'bg-green-600 text-white hover:bg-green-700'}`}>
-                                            {customerDetail.subscription.status === 'Active' && !customerDetail.subscription.isFree ? <><UserX size={16} className="mr-2" /> Abo regulär beenden</> : <><UserCheck size={16} className="mr-2" /> Abo regulär reaktivieren</>}
-                                        </Button>
-
-                                        <Button 
-                                            onClick={handleToggleFreeSubscription}
-                                            variant="secondary"
-                                            className={`w-full justify-center border ${customerDetail.subscription.isFree ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-white text-purple-600 border-purple-200 hover:bg-purple-50'}`}
-                                        >
-                                            {customerDetail.subscription.isFree ? <><UserX size={16} className="mr-2" /> Kostenloses Abo entziehen</> : <><Gift size={16} className="mr-2" /> Kostenloses Abo geben</>}
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-indigo-50 rounded-2xl border border-indigo-100 p-6">
-                                <h3 className="font-bold text-indigo-900 mb-4 flex items-center gap-2"><Briefcase size={20} /> Partner Info</h3>
-                                {customerDetail.referrer ? (
-                                    <div className="space-y-2">
-                                        <p className="text-sm text-indigo-800">Geworben von: <br/><span className="font-bold">{customerDetail.referrer.name}</span></p>
-                                        <p className="text-xs text-indigo-600">Partner-ID: {customerDetail.referrer.id}</p>
-                                        <p className="text-xs text-indigo-600">Datum: {customerDetail.referrer.date}</p>
-                                        <div className="mt-3 pt-3 border-t border-indigo-200/50"><span className="inline-block bg-indigo-100 text-indigo-700 text-xs px-2 py-1 rounded font-medium">Provision: 50%</span></div>
-                                    </div>
-                                ) : <p className="text-sm text-indigo-600 italic">Kein Partner zugeordnet (Organisch).</p>}
-                            </div>
-                            <div className="bg-slate-100 rounded-2xl p-6 border border-slate-200 opacity-75 hover:opacity-100 transition-opacity">
-                                <h3 className="font-bold text-slate-700 mb-2 flex items-center gap-2"><Ban size={16} /> Account Sperrung</h3>
-                                <p className="text-xs text-slate-500 mb-4">Sperrt den Zugang zum Dashboard dauerhaft.</p>
-                                <button className="text-xs text-red-500 font-bold hover:underline">Nutzer sperren & Daten archivieren</button>
-                            </div>
-                        </div>
-                    </div>
+                        </>
+                    )}
                 </div>
             )}
         </>
       )}
       
-      {/* PARTNER TAB Content (Same as previous, omitted for brevity as no changes required) */}
+      {/* PARTNER TAB */}
       {activeTab === 'partners' && !selectedCustomerId && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
-          <div className="bg-indigo-900 rounded-2xl p-8 text-white shadow-lg relative overflow-hidden">
-             <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-indigo-800 to-transparent pointer-events-none"></div>
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-              <div>
-                <h3 className="text-xl font-bold flex items-center gap-2 mb-2">
-                  <Settings size={24} className="text-[#ffcc00]" /> Programm Konfiguration
-                </h3>
-                <p className="text-indigo-200 max-w-xl">
-                  Änderungen hier wirken sich sofort auf die gesamte Plattform aus (Anzeigetexte, Rechenbeispiele, Provisionsabrechnung).
-                </p>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm p-6 rounded-xl border border-white/20 flex flex-col gap-4 min-w-[300px]">
-                <label className="text-sm font-bold uppercase tracking-wider text-indigo-200">Globale Provision (%)</label>
-                <div className="flex gap-4">
-                  <input 
-                    type="number" 
-                    min="0" max="100"
-                    value={commissionRate}
-                    onChange={(e) => onUpdateCommission(parseInt(e.target.value))}
-                    className="flex-1 bg-indigo-950 border border-indigo-700 rounded-lg px-4 py-2 text-white font-mono text-lg focus:outline-none focus:ring-2 focus:ring-[#ffcc00]"
-                  />
-                  <Button onClick={handleSaveCommission} size="sm" className="bg-[#ffcc00] text-[#00305e] hover:bg-yellow-400 border-0">
-                    Speichern
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-500 text-sm mb-1">Partner Gesamt</p>
-              <h3 className="text-2xl font-bold text-slate-900">842</h3>
-              <p className="text-xs text-green-600 mt-2">+24 diesen Monat</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-500 text-sm mb-1">Neue Partner</p>
-              <h3 className="text-2xl font-bold text-slate-900">12</h3>
-              <p className="text-xs text-slate-400 mt-2">Im ausgewählten Zeitraum</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-500 text-sm mb-1">Ausgezahlt</p>
-              <h3 className="text-2xl font-bold text-slate-900">8.450 €</h3>
-              <p className="text-xs text-slate-400 mt-2">Im ausgewählten Zeitraum</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-500 text-sm mb-1">Offene Auszahlungen</p>
-              <h3 className="text-2xl font-bold text-amber-600">1.240 €</h3>
-              <Button size="sm" variant="secondary" className="w-full mt-2 text-xs h-7">Prüfen</Button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-100">
-                <h3 className="font-bold text-slate-900">Top 10 Partner (Nach Umsatz)</h3>
+                <h3 className="font-bold text-slate-900">Partner Liste ({partners.length})</h3>
               </div>
               <table className="w-full text-left">
                 <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
                   <tr>
                     <th className="px-6 py-3">#</th>
                     <th className="px-6 py-3">Name</th>
-                    <th className="px-6 py-3 text-right">Umsatz</th>
+                    <th className="px-6 py-3">Email</th>
+                    <th className="px-6 py-3 text-right">Registriert</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {PARTNER_TOP_10.map((partner) => (
-                    <tr key={partner.rank}>
-                      <td className="px-6 py-3 text-slate-500 font-mono text-xs">{partner.rank}</td>
-                      <td className="px-6 py-3 font-medium text-slate-900">{partner.name}</td>
-                      <td className="px-6 py-3 text-right text-slate-700">{partner.revenue.toFixed(2)} €</td>
+                  {partners.map((partner, index) => (
+                    <tr key={partner.id}>
+                      <td className="px-6 py-3 text-slate-500 font-mono text-xs">{index + 1}</td>
+                      <td className="px-6 py-3 font-medium text-slate-900">{partner.first_name} {partner.last_name}</td>
+                      <td className="px-6 py-3 text-slate-600">{partner.email}</td>
+                      <td className="px-6 py-3 text-right text-slate-700">{new Date(partner.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
+                   {partners.length === 0 && !isLoadingData && (
+                        <tr>
+                            <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Keine Partner gefunden.</td>
+                        </tr>
+                    )}
                 </tbody>
               </table>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-              <h3 className="font-bold text-slate-900 mb-6">Conversion Qualität</h3>
-              <div className="h-[300px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={CONVERSION_QUALITY_DATA} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="source" type="category" width={80} tick={{fontSize: 12}} />
-                    <Tooltip />
-                    <Legend />
-                    <Bar dataKey="clicks" fill="#cbd5e1" name="Klicks" barSize={20} radius={[0, 4, 4, 0]} />
-                    <Bar dataKey="conversions" fill="#00305e" name="Abschlüsse" barSize={20} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
             </div>
           </div>
 
@@ -1233,7 +1037,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                      {/* ... form content ... */}
                      <h4 className="font-bold text-slate-800 flex items-center gap-2"><Mail size={16} /> E-Mail ändern</h4>
                      <div className="bg-blue-50 px-3 py-2 rounded text-xs text-blue-700 border border-blue-100">
-                         Aktuell: <strong>{adminAuth.currentEmail}</strong>
+                         Aktuell: <strong>{adminAuth.currentEmail || 'Lade...'}</strong>
                      </div>
                      <div>
                          <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Neue E-Mail Adresse</label>
