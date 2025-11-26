@@ -64,26 +64,28 @@ export const sendTemplateTest = async (template: EmailTemplate, toEmail: string,
     });
     return await handleResponse(response);
   } catch (error: any) {
-    console.error("Template Test Error:", error);
+    console.error("Send Template Error:", error);
     throw error;
   }
 };
 
-// Real connection test for Browse.AI
 export const testBrowseAiConnection = async () => {
   try {
-    const response = await fetch('/api/test-browse-ai');
+    const response = await fetch('/api/test-browse-ai', {
+      method: 'GET',
+    });
     return await handleResponse(response);
   } catch (error: any) {
-    console.error("Browse.ai Test Error:", error);
+    console.error("Browse AI Test Error:", error);
     throw error;
   }
 };
 
-// Real connection test for Gemini
 export const testGeminiConnection = async () => {
   try {
-    const response = await fetch('/api/test-gemini');
+    const response = await fetch('/api/test-gemini', {
+      method: 'GET',
+    });
     return await handleResponse(response);
   } catch (error: any) {
     console.error("Gemini Test Error:", error);

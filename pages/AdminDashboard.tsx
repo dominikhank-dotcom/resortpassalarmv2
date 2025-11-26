@@ -626,7 +626,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       
       {/* TAB: CUSTOMERS (List & Details) */}
       {activeTab === 'customers' && (
-        /* ... existing customer implementation ... */
+        /* ... customer implementation ... */
         <>
             {!selectedCustomerId ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
