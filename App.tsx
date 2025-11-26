@@ -18,10 +18,13 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showResend, setShowResend] = useState(false);
 
   const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
+    setShowResend(false);
+
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -44,7 +47,40 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
          }
       }
     } catch (err: any) {
-      setError(err.message || 'Login fehlgeschlagen');
+      console.error("Login Error:", err.message);
+      
+      // Error Translation & Handling
+      if (err.message.includes("Email not confirmed")) {
+        setError("E-Mail Adresse ist noch nicht bestätigt.");
+        setShowResend(true);
+      } else if (err.message.includes("Invalid login credentials")) {
+        setError("E-Mail Adresse oder Passwort falsch.");
+      } else {
+        setError("Ein Fehler ist aufgetreten. Bitte versuche es erneut.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!email) return;
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`
+        }
+      });
+      
+      if (error) throw error;
+      alert(`Bestätigungs-Link wurde erneut an ${email} gesendet. Bitte prüfe auch deinen Spam-Ordner.`);
+      setShowResend(false);
+      setError(null);
+    } catch (err: any) {
+      alert("Fehler beim Senden: " + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +127,20 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
               />
               
-              {error && <p className="text-red-500 text-sm">{error}</p>}
+              {error && (
+                <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg border border-red-100 mt-2">
+                  {error}
+                </div>
+              )}
+
+              {showResend && (
+                <button 
+                  onClick={handleResendConfirmation}
+                  className="text-sm text-[#00305e] font-bold underline hover:text-blue-700 block w-full py-2"
+                >
+                  Bestätigungs-Mail erneut senden
+                </button>
+              )}
 
               <div className="flex justify-end">
                 <button 
