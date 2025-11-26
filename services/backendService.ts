@@ -106,3 +106,17 @@ export const manageSubscription = async (userId: string, action: 'grant_free' | 
       throw error;
   }
 };
+
+export const getCustomerDetails = async (userId: string) => {
+  try {
+      const response = await fetch('/api/get-customer-details', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+      });
+      return await handleResponse(response);
+  } catch (error: any) {
+      console.error("Get Customer Details Error:", error);
+      throw error;
+  }
+};

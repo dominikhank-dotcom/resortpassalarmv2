@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -190,6 +190,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any>(null);
   const [refundRange, setRefundRange] = useState({ start: '', end: '' });
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Partner Settings
   const [aiInsights, setAiInsights] = useState<string>("");
@@ -266,39 +267,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   }, []);
 
   const handleSelectCustomer = async (customer: any) => {
-    // Fetch detailed subscription info for this customer
-    const { data: sub } = await supabase
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', customer.id)
-        .single();
-    
-    const details = {
-        id: customer.id,
-        firstName: customer.first_name || '',
-        lastName: customer.last_name || '',
-        email: customer.email || '',
-        address: { 
-            street: customer.street || '', 
-            houseNumber: customer.house_number || '', 
-            zip: customer.zip || '', 
-            city: customer.city || '', 
-            country: customer.country || 'Deutschland' 
-        },
-        subscription: {
-            status: sub ? (sub.status === 'active' ? 'Active' : 'Inactive') : 'Inactive',
-            startDate: sub ? new Date(sub.created_at).toLocaleDateString() : '–',
-            endDate: sub && sub.status !== 'active' ? new Date(sub.current_period_end).toLocaleDateString() : null,
-            plan: sub ? sub.plan_type : 'Kein Abo',
-            isFree: sub ? sub.plan_type === 'Manuell (Gratis)' : false,
-            paymentMethod: sub ? 'Stripe' : '–'
-        },
-        referrer: null, // Would need tracking table
-        transactions: [] // Would need payments table
-    };
-
-    setCustomerDetail(details);
+    setIsLoadingDetails(true);
     setSelectedCustomerId(customer.id);
+    
+    try {
+        // Use Backend Service to fetch details (Bypasses RLS)
+        const response = await getCustomerDetails(customer.id);
+        const sub = response.subscription;
+        const profile = response.profile || customer; // Fallback to passed customer object
+
+        const details = {
+            id: profile.id,
+            firstName: profile.first_name || '',
+            lastName: profile.last_name || '',
+            email: profile.email || '',
+            address: { 
+                street: profile.street || '', 
+                houseNumber: profile.house_number || '', 
+                zip: profile.zip || '', 
+                city: profile.city || '', 
+                country: profile.country || 'Deutschland' 
+            },
+            subscription: {
+                status: sub ? (sub.status === 'active' ? 'Active' : 'Inactive') : 'Inactive',
+                startDate: sub ? new Date(sub.created_at).toLocaleDateString() : '–',
+                endDate: sub && sub.status !== 'active' ? new Date(sub.current_period_end).toLocaleDateString() : null,
+                plan: sub ? sub.plan_type : 'Kein Abo',
+                isFree: sub ? sub.plan_type === 'Manuell (Gratis)' : false,
+                paymentMethod: sub ? 'Stripe' : '–'
+            },
+            referrer: null, // Would need tracking table
+            transactions: [] // Would need payments table
+        };
+        setCustomerDetail(details);
+    } catch (error: any) {
+        console.error("Error fetching customer details:", error);
+        alert("Fehler beim Laden der Kundendetails: " + error.message);
+    } finally {
+        setIsLoadingDetails(false);
+    }
   };
 
   const handleSaveCustomer = async (e: React.FormEvent) => {
@@ -604,7 +611,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             ) : (
                 /* ... customer details ... */
                 <div className="animate-in fade-in slide-in-from-right-4">
-                    {customerDetail && (
+                    {isLoadingDetails ? (
+                        <div className="flex justify-center py-12">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        </div>
+                    ) : (
+                        customerDetail && (
                         <>
                         <div className="flex items-center gap-4 mb-6">
                             <Button variant="outline" size="sm" onClick={() => setSelectedCustomerId(null)}>
@@ -758,6 +770,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                             </div>
                         </div>
                         </>
+                        )
                     )}
                 </div>
             )}
