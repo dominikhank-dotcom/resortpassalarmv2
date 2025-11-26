@@ -20,6 +20,12 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
   const [error, setError] = useState<string | null>(null);
   const [showResend, setShowResend] = useState(false);
 
+  // Helper to get site URL
+  const getSiteUrl = () => {
+      // @ts-ignore
+      return import.meta.env.VITE_SITE_URL ?? window.location.origin;
+  }
+
   const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
@@ -56,7 +62,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
       } else if (err.message.includes("Invalid login credentials")) {
         setError("E-Mail Adresse oder Passwort falsch.");
       } else {
-        setError("Ein Fehler ist aufgetreten. Bitte versuche es erneut.");
+        setError(err.message || "Ein Fehler ist aufgetreten. Bitte versuche es erneut.");
       }
     } finally {
       setIsLoading(false);
@@ -71,7 +77,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`
+          emailRedirectTo: `${getSiteUrl()}/login`
         }
       });
       
@@ -92,7 +98,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
       return;
     }
     supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/update-password`,
+      redirectTo: `${getSiteUrl()}/update-password`,
     }).then(({ error }) => {
       if (error) alert(error.message);
       else alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
@@ -136,7 +142,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               {showResend && (
                 <button 
                   onClick={handleResendConfirmation}
-                  className="text-sm text-[#00305e] font-bold underline hover:text-blue-700 block w-full py-2"
+                  className="bg-red-100 text-red-700 font-bold border border-red-200 rounded-lg p-3 text-sm hover:bg-red-200 block w-full transition-colors"
                 >
                   Bestätigungs-Mail erneut senden
                 </button>

@@ -54,12 +54,17 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
     setIsLoading(true);
 
     try {
+      // Determine the redirect URL (Production vs Local)
+      // @ts-ignore
+      const siteUrl = import.meta.env.VITE_SITE_URL ?? window.location.origin;
+      const redirectUrl = `${siteUrl}/login`;
+
       // 1. Sign up with Supabase
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/login`,
+          emailRedirectTo: redirectUrl,
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,

@@ -27,6 +27,7 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 **Frontend (Vite Prefix):**
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_SITE_URL` (Deine Vercel Domain, z.B. https://dein-projekt.vercel.app - ohne Slash am Ende)
 
 **Backend (Server):**
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
