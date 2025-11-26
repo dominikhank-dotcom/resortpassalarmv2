@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   try {
     const buf = await buffer(req);
     event = stripe.webhooks.constructEvent(buf, sig, webhookSecret);
-  } catch (err) {
+  } catch (err: any) {
     console.error(`Webhook Signature Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
@@ -137,9 +137,6 @@ async function handleRecurringPayment(invoice) {
      }).eq('stripe_subscription_id', subscriptionId);
 
      // 3. Check if we need to pay commission (Lifetime)
-     // Check if there was a previous commission for this user to find the partner
-     // Or ideally, store 'referred_by' on the subscription or profile.
-     
      // For this MVP, let's look for the FIRST commission for this user to find the partner
      const { data: firstComm } = await supabase
         .from('commissions')

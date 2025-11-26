@@ -1,58 +1,39 @@
-import { getServiceSupabase } from './_lib/supabase.js';
+import { createClient } from '@supabase/supabase-js';
+
+// Init Supabase with Service Role Key
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export default async function handler(req, res) {
-  const supabase = getServiceSupabase();
-  const email = 'dominikhank@gmail.com';
-  const password = '!w85!q3rkM^&';
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const { email, secret } = req.body;
+
+  // Simple protection
+  if (secret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
+     return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email required' });
+  }
 
   try {
-    // 1. Get or Create User
-    const { data: { users }, error: listError } = await supabase.auth.admin.listUsers();
-    if (listError) throw listError;
-
-    const existingUser = users.find(u => u.email === email);
-    let userId;
-
-    if (existingUser) {
-      userId = existingUser.id;
-      // Update Password
-      const { error: updateError } = await supabase.auth.admin.updateUserById(userId, { 
-        password: password 
-      });
-      if (updateError) throw updateError;
-      console.log("Admin password updated.");
-    } else {
-      // Create User
-      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true
-      });
-      if (createError) throw createError;
-      userId = newUser.user.id;
-      console.log("Admin created.");
-    }
-
-    // 2. Set Admin Role in Profiles
-    const { error: profileError } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
-      .upsert({
-        id: userId,
-        email,
-        role: 'ADMIN',
-        first_name: 'Dominik',
-        last_name: 'Hank'
-      });
+      .update({ role: 'ADMIN' })
+      .eq('email', email)
+      .select();
 
-    if (profileError) throw profileError;
+    if (error) throw error;
 
-    return res.status(200).json({ 
-      success: true, 
-      message: "Admin Setup erfolgreich! Du kannst dich jetzt einloggen." 
-    });
+    return res.status(200).json({ success: true, message: `User ${email} promoted to ADMIN`, data });
 
   } catch (error: any) {
-    console.error("Admin Setup Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
