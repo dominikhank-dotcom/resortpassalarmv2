@@ -7,9 +7,10 @@ interface NavbarProps {
   setRole: (role: UserRole) => void;
   navigate: (page: string) => void;
   currentPage: string;
+  userName?: string;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, currentPage }) => {
+export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, currentPage, userName }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   const handleNav = (page: string) => {
@@ -71,7 +72,7 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
                     <User size={16} />
                   </div>
                   <span className="text-sm font-medium text-blue-100">
-                    {role === UserRole.AFFILIATE ? 'Partner Account' : 'Max Mustermann'}
+                    {userName || (role === UserRole.AFFILIATE ? 'Partner Account' : 'Kunde')}
                   </span>
                 </div>
                 <button onClick={handleLogout} className="text-blue-300 hover:text-red-400 p-2">

@@ -4,6 +4,7 @@ import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { sendTestAlarm, createCheckoutSession } from '../services/backendService';
+import { supabase } from '../lib/supabase';
 
 interface LogEntry {
   id: string;
@@ -45,29 +46,29 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     setMonitorSilver(prev => ({...prev, url: productUrls.silver}));
   }, [productUrls]);
 
-  // Notification State
+  // Notification State - Init empty
   const [notifications, setNotifications] = useState<NotificationConfig>({
-    email: "max.mustermann@example.com",
-    sms: "+49 170 1234567",
+    email: "",
+    sms: "",
     emailEnabled: true,
     smsEnabled: true
   });
 
   // Independent Edit States for Notification Card
   const [editMode, setEditMode] = useState({ email: false, sms: false });
-  const [tempData, setTempData] = useState({ email: notifications.email, sms: notifications.sms });
+  const [tempData, setTempData] = useState({ email: "", sms: "" });
   const [errors, setErrors] = useState({ email: '', sms: '' });
 
-  // Personal Data State
+  // Personal Data State - Init empty
   const [personalData, setPersonalData] = useState({
-    firstName: 'Max',
-    lastName: 'Mustermann',
+    firstName: '',
+    lastName: '',
     street: '',
     houseNumber: '',
     zip: '',
     city: '',
     country: 'Deutschland',
-    email: "max.mustermann@example.com"
+    email: ""
   });
 
   // Alarm History State
@@ -75,6 +76,63 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   // Derived state for easy checking
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
+
+  // Load Real User Data on Mount
+  useEffect(() => {
+    const fetchProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            
+            if (profile) {
+                // Populate Personal Data
+                setPersonalData({
+                    firstName: profile.first_name || '',
+                    lastName: profile.last_name || '',
+                    street: profile.street || '',
+                    houseNumber: profile.house_number || '',
+                    zip: profile.zip || '',
+                    city: profile.city || '',
+                    country: profile.country || 'Deutschland',
+                    email: profile.email || user.email || ''
+                });
+
+                // Populate Notifications (default email to profile email, sms empty)
+                setNotifications({
+                    email: profile.email || user.email || '',
+                    sms: "", 
+                    emailEnabled: true,
+                    smsEnabled: false
+                });
+
+                // Init temp data for editing
+                setTempData({
+                    email: profile.email || user.email || '',
+                    sms: ""
+                });
+            }
+
+            // Fetch Subscription Status
+            const { data: sub } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .single();
+            
+            if (sub) {
+                if (sub.plan_type === 'premium') setSubscriptionStatus('PAID');
+                else if (sub.plan_type === 'Manuell (Gratis)') setSubscriptionStatus('FREE');
+                else setSubscriptionStatus('PAID');
+            }
+        }
+    };
+    fetchProfile();
+  }, []);
 
   // Simulation logic for auto-update time
   useEffect(() => {
@@ -94,9 +152,27 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     return () => clearInterval(interval);
   }, []);
 
-  const handleSavePersonalData = (e: React.FormEvent) => {
+  const handleSavePersonalData = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Persönliche Daten erfolgreich gespeichert.");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { error } = await supabase.from('profiles').update({
+            street: personalData.street,
+            house_number: personalData.houseNumber,
+            zip: personalData.zip,
+            city: personalData.city,
+            country: personalData.country,
+            email: personalData.email
+        }).eq('id', user.id);
+
+        if (error) {
+            alert("Fehler beim Speichern: " + error.message);
+        } else {
+            alert("Persönliche Daten erfolgreich gespeichert.");
+            // Also update notification email if it was the same
+            setNotifications(prev => ({ ...prev, email: personalData.email }));
+        }
+    }
   };
 
   const toggleAvailability = (type: 'gold' | 'silver') => {
@@ -377,7 +453,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                           {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 truncate">{notifications.email}</p>
+                      <p className="text-sm text-slate-500 truncate">{notifications.email || 'Nicht konfiguriert'}</p>
                     )}
                 </div>
               </div>
@@ -431,7 +507,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                           )}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-500 truncate">{notifications.sms}</p>
+                      <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p>
                     )}
                 </div>
               </div>

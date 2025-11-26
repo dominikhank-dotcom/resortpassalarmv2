@@ -237,6 +237,7 @@ const LoginScreen: React.FC<{
 
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
+  const [userName, setUserName] = useState<string>(''); // Added state for User Name
   const [currentPage, setCurrentPage] = useState('landing');
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
   
@@ -278,11 +279,12 @@ const App: React.FC = () => {
     // 2. Check Session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        // Fetch role
-        supabase.from('profiles').select('role').eq('id', session.user.id).single()
+        // Fetch role AND Name
+        supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
           .then(({ data }) => {
-            if (data?.role) {
-                setRole(data.role as UserRole);
+            if (data) {
+                if (data.role) setRole(data.role as UserRole);
+                if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
                 
                 // Only redirect if we are not already on a specific intended page
                 if (currentPage === 'landing' || currentPage === 'login') {
@@ -298,13 +300,15 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
             setRole(UserRole.GUEST);
+            setUserName('');
             setCurrentPage('landing');
         } else if (event === 'SIGNED_IN' && session) {
-            // Re-fetch role to be sure
-             supabase.from('profiles').select('role').eq('id', session.user.id).single()
+            // Re-fetch role and name to be sure
+             supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
              .then(({ data }) => {
-                if (data?.role) {
-                    setRole(data.role as UserRole);
+                if (data) {
+                    if (data.role) setRole(data.role as UserRole);
+                    if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
                     // Force navigation to dashboard on successful login event
                     if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
                     else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
@@ -387,7 +391,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {!currentPage.includes('login') && !currentPage.includes('signup') && (
-        <Navbar role={role} setRole={handleSetRole} navigate={navigate} currentPage={currentPage} />
+        <Navbar role={role} setRole={handleSetRole} navigate={navigate} currentPage={currentPage} userName={userName} />
       )}
       <main>
         {renderContent()}
