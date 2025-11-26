@@ -19,12 +19,19 @@ export default async function handler(req, res) {
   try {
     const { email, referralCode } = req.body;
 
-    // 1. Get or Create User in Supabase to link Stripe ID
-    // We assume user already signed up via frontend and exists in Auth
-    // But for metadata, we just pass the email.
-    
-    // In a full implementation, you'd lookup the user UUID from Supabase Auth
-    // const { data: users } = await supabase.from('profiles').select('id').eq('email', email).single();
+    // 1. Get User ID from Supabase
+    // Since the user is logged in, their email exists in 'profiles'
+    let userId = null;
+    if (email) {
+        const { data: user } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('email', email)
+            .single();
+        if (user) {
+            userId = user.id;
+        }
+    }
     
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
@@ -48,10 +55,13 @@ export default async function handler(req, res) {
       success_url: `${req.headers.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
       cancel_url: `${req.headers.origin}/dashboard?payment_cancelled=true`,
       customer_email: email,
+      // Metadata is KEY for the webhook to know who referred this user
       metadata: {
         service: 'ResortPassAlarm',
-        referralCode: referralCode || ''
-      }
+        referralCode: referralCode || '',
+        userId: userId || ''
+      },
+      client_reference_id: userId // Standard way to link stripe session to internal user
     });
 
     res.status(200).json({ url: session.url });

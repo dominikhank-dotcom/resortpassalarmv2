@@ -9,19 +9,59 @@ import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
+import { supabase } from './lib/supabase';
 
 // Simple mock Login screen with Forgot Password flow
 const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () => void; onRegisterClick?: () => void }> = ({ role, onLogin, onCancel, onRegisterClick }) => {
   const [view, setView] = useState<'login' | 'forgot'>('login');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      // Check role in profiles
+      if (data.user) {
+         const { data: profile } = await supabase
+           .from('profiles')
+           .select('role')
+           .eq('id', data.user.id)
+           .single();
+         
+         if (profile) {
+            // In a real app we might want to check if role matches requested role context
+            onLogin(); 
+         }
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login fehlgeschlagen');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleResetPassword = () => {
     if (!email) {
       alert("Bitte gib deine E-Mail Adresse ein.");
       return;
     }
-    alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
-    setView('login');
+    supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    }).then(({ error }) => {
+      if (error) alert(error.message);
+      else alert(`Ein Link zum Zurücksetzen des Passworts wurde an ${email} gesendet.`);
+      setView('login');
+    });
   };
 
   return (
@@ -39,14 +79,20 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               <input 
                 type="email" 
                 placeholder="Email Adresse" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
               />
               <input 
                 type="password" 
                 placeholder="Passwort" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
               />
               
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+
               <div className="flex justify-end">
                 <button 
                   onClick={() => setView('forgot')}
@@ -57,10 +103,11 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               </div>
 
               <button 
-                onClick={onLogin}
-                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition mt-2"
+                onClick={handleLogin}
+                disabled={isLoading}
+                className="w-full bg-[#00305e] text-white py-3 rounded-lg font-semibold hover:bg-blue-900 transition mt-2 disabled:opacity-50"
               >
-                Anmelden
+                {isLoading ? 'Lade...' : 'Anmelden'}
               </button>
               <button onClick={onCancel} className="text-slate-400 text-sm hover:text-slate-600 block w-full py-2">Abbrechen</button>
             </div>
@@ -76,9 +123,6 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
               </div>
             )}
             
-            <div className="mt-6 pt-6 border-t border-slate-100 text-xs text-slate-400">
-              (Demo Modus: Klicke einfach auf "Anmelden")
-            </div>
           </>
         ) : (
           <>
@@ -142,6 +186,33 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Check auth session on load
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        // Fetch role
+        supabase.from('profiles').select('role').eq('id', session.user.id).single()
+          .then(({ data }) => {
+            if (data?.role) {
+                setRole(data.role as UserRole);
+                if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
+                else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+            }
+          });
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (!session) {
+            setRole(UserRole.GUEST);
+            setCurrentPage('landing');
+        }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const navigate = (page: string) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
@@ -164,13 +235,13 @@ const App: React.FC = () => {
           />
         );
       case 'affiliate-signup':
-        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} />;
+        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { /* Wait for auth listener */ }} />;
       case 'affiliate-login':
-        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
+        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
       case 'user-signup':
-        return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => { setRole(UserRole.CUSTOMER); navigate('dashboard'); }} onNavigate={navigate} />;
+        return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => { /* Wait for auth listener */ }} onNavigate={navigate} />;
       case 'admin-login':
-        return <LoginScreen role={UserRole.ADMIN} onLogin={() => { setRole(UserRole.ADMIN); navigate('admin-dashboard'); }} onCancel={() => navigate('landing')} />;
+        return <LoginScreen role={UserRole.ADMIN} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} />;
       case 'admin-dashboard':
          return role === UserRole.ADMIN 
           ? <AdminDashboard 
@@ -179,7 +250,7 @@ const App: React.FC = () => {
               productUrls={productUrls}
               onUpdateProductUrls={setProductUrls}
             /> 
-          : <LoginScreen role={UserRole.ADMIN} onLogin={() => { setRole(UserRole.ADMIN); navigate('admin-dashboard'); }} onCancel={() => navigate('landing')} />;
+          : <LoginScreen role={UserRole.ADMIN} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} />;
       
       // Legal Pages
       case 'imprint':
@@ -193,14 +264,14 @@ const App: React.FC = () => {
 
       case 'dashboard':
         if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} />;
-        return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { setRole(UserRole.CUSTOMER); navigate('dashboard'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
+        return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
       
       case 'affiliate':
         if (role === UserRole.AFFILIATE) return <AffiliateDashboard />;
-        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { setRole(UserRole.AFFILIATE); navigate('affiliate'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
+        return <LoginScreen role={UserRole.AFFILIATE} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} />;
       
       case 'login':
-         return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { setRole(UserRole.CUSTOMER); navigate('dashboard'); }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
+         return <LoginScreen role={UserRole.CUSTOMER} onLogin={() => { /* Handled by internal login logic */ }} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} />;
 
       default: // 'landing'
         return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} />;

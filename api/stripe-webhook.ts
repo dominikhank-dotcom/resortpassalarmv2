@@ -12,7 +12,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
 });
 
-// Init Supabase for Backend with Service Role (Admin access)
+// Init Supabase for Backend with Service Role (Admin access to write commissions etc)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -62,24 +62,102 @@ export default async function handler(req, res) {
 
 async function handleNewSubscription(session) {
   const customerEmail = session.customer_email;
+  const stripeCustomerId = session.customer;
+  const subscriptionId = session.subscription;
   const referralCode = session.metadata?.referralCode;
-  
-  // Update user subscription status in Supabase
-  // Note: This requires a 'profiles' or 'subscriptions' table in Supabase
-  // await supabase.from('subscriptions').insert({ email: customerEmail, status: 'active', ... });
+  const clientRefId = session.client_reference_id; // Should match UUID from supabase
 
   console.log(`New Subscription: ${customerEmail}`);
 
-  if (referralCode) {
-    // Save Commission
-    // await supabase.from('commissions').insert({ referral_code: referralCode, amount: 0.99, ... });
-    console.log(`Commission tracked for ${referralCode}`);
+  // 1. Identify User
+  let userId = clientRefId;
+  
+  if (!userId && customerEmail) {
+      // Fallback: Try to find by email
+      const { data: user } = await supabase.from('profiles').select('id').eq('email', customerEmail).single();
+      if (user) userId = user.id;
+  }
+
+  if (userId) {
+      // 2. Create/Update Subscription in DB
+      const { error } = await supabase.from('subscriptions').insert({
+          user_id: userId,
+          stripe_customer_id: stripeCustomerId,
+          stripe_subscription_id: subscriptionId,
+          status: 'active',
+          plan_type: 'premium',
+          current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Approx 1 month
+      });
+      if (error) console.error("Error creating subscription:", error);
+  } else {
+      console.warn(`User not found for subscription: ${customerEmail}`);
+  }
+
+  // 3. Handle Affiliate Commission (Lifetime Link)
+  if (referralCode && userId) {
+      // Find Partner
+      const { data: partner } = await supabase.from('profiles').select('id').eq('referral_code', referralCode).single();
+      
+      if (partner) {
+          // Link this user to the partner in a 'commissions' table or update user profile 'referred_by'
+          // Here we create the first commission entry
+          
+          // Assume 1.99 EUR price, 50% commission = 0.99
+          const commissionAmount = 0.99;
+          
+          await supabase.from('commissions').insert({
+              partner_id: partner.id,
+              source_user_id: userId,
+              amount: commissionAmount,
+              status: 'pending' // Paid out later
+          });
+          console.log(`Commission of ${commissionAmount} tracked for partner ${partner.id} (Ref: ${referralCode})`);
+      }
   }
 }
 
 async function handleRecurringPayment(invoice) {
-  if (invoice.subscription) {
-     // Handle renewal logic
-     console.log(`Recurring Payment: ${invoice.customer_email}`);
+  // Logic for monthly renewals
+  if (!invoice.subscription) return;
+
+  const subscriptionId = invoice.subscription;
+  
+  // 1. Find subscription in our DB
+  const { data: sub } = await supabase
+    .from('subscriptions')
+    .select('user_id')
+    .eq('stripe_subscription_id', subscriptionId)
+    .single();
+
+  if (sub && sub.user_id) {
+     // 2. Extend subscription
+     await supabase.from('subscriptions').update({
+         status: 'active',
+         current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+     }).eq('stripe_subscription_id', subscriptionId);
+
+     // 3. Check if we need to pay commission (Lifetime)
+     // Check if there was a previous commission for this user to find the partner
+     // Or ideally, store 'referred_by' on the subscription or profile.
+     
+     // For this MVP, let's look for the FIRST commission for this user to find the partner
+     const { data: firstComm } = await supabase
+        .from('commissions')
+        .select('partner_id')
+        .eq('source_user_id', sub.user_id)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .single();
+        
+     if (firstComm && firstComm.partner_id) {
+         const commissionAmount = 0.99;
+         await supabase.from('commissions').insert({
+              partner_id: firstComm.partner_id,
+              source_user_id: sub.user_id,
+              amount: commissionAmount,
+              status: 'pending'
+          });
+          console.log(`Recurring Commission tracked for partner ${firstComm.partner_id}`);
+     }
   }
 }
