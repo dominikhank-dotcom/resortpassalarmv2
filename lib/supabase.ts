@@ -1,76 +1,31 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Global variables defined in vite.config.ts
-declare const __SUPABASE_URL__: string;
-declare const __SUPABASE_ANON_KEY__: string;
-
-const getSupabaseConfig = () => {
-  let url = '';
-  let key = '';
-
-  // 1. Try injected build variables (Best for Vercel)
+// Safe access to environment variables handling different environments
+// This prevents "Cannot read properties of undefined" if import.meta.env is not available
+const getEnv = (key: string) => {
   try {
-    if (typeof __SUPABASE_URL__ !== 'undefined') url = __SUPABASE_URL__;
-    if (typeof __SUPABASE_ANON_KEY__ !== 'undefined') key = __SUPABASE_ANON_KEY__;
-  } catch (e) {}
-
-  // 2. Try Runtime Variables (Development / Fallback)
-  if (!url || !key) {
-    try {
-      const meta = import.meta as any;
-      const env = meta.env || {};
-      
-      if (!url) url = env.VITE_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || '';
-      if (!key) key = env.VITE_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-    } catch (e) {}
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      return import.meta.env[key];
+    }
+  } catch (e) {
+    console.warn('Error reading env var:', key, e);
   }
-
-  // Robust cleanup: Remove surrounding quotes and whitespace
-  const clean = (str: string) => {
-      if (!str) return '';
-      let s = str.trim();
-      // Remove quotes recursively
-      while ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-          s = s.slice(1, -1);
-      }
-      return s;
-  }
-
-  url = clean(url);
-  key = clean(key);
-
-  // Protocol check
-  if (url && !url.startsWith('http')) {
-      url = 'https://' + url;
-  }
-
-  return { url, key };
+  return undefined;
 };
 
-const config = getSupabaseConfig();
+// Nutzt VITE_ Prefix für Frontend-Variablen
+const supabaseUrl = getEnv('VITE_SUPABASE_URL');
+const supabaseAnonKey = getEnv('VITE_SUPABASE_ANON_KEY');
 
-// Check if config is missing or placeholder
-export const isSupabaseConfigured = !!config.url && !!config.key && !config.url.includes('placeholder');
-
-// Debug Output in Browser Console
-if (typeof window !== 'undefined') {
-    console.log(`[Supabase Init] URL: ${config.url ? config.url.substring(0, 15) + '...' : 'Missing'} (Valid: ${isSupabaseConfigured ? 'Yes' : 'No'})`);
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.warn('Supabase credentials missing. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in Vercel Environment Variables.');
 }
 
-const validUrl = config.url || 'https://placeholder.supabase.co';
-const validKey = config.key || 'placeholder';
-
-if (!isSupabaseConfigured) {
-  console.warn("⚠️ Supabase Configuration missing in Client.");
-  if (typeof window !== 'undefined') {
-    console.log("Please check Vercel Settings -> Environment Variables. Ensure NEXT_PUBLIC_SUPABASE_URL is set and redeploy.");
-  }
-}
-
-export const supabase = createClient(validUrl, validKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
+// Initialize with placeholders if keys are missing to prevent immediate crash,
+// operations will fail gracefully later.
+export const supabase = createClient(
+    supabaseUrl || 'https://placeholder.supabase.co', 
+    supabaseAnonKey || 'placeholder'
+);

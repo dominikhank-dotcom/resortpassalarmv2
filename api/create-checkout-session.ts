@@ -1,9 +1,15 @@
 import Stripe from 'stripe';
-import { getServiceSupabase } from './_lib/supabase.js';
+import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
   apiVersion: '2023-10-16',
 });
+
+// Init Supabase for Backend (using env vars directly)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+  process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -12,13 +18,14 @@ export default async function handler(req, res) {
 
   try {
     const { email, referralCode } = req.body;
-    const supabase = getServiceSupabase();
 
-    // Ensure User exists in DB before creating session
-    // This allows us to link Stripe Customer ID correctly later
-    const { data: user } = await supabase.from('profiles').select('id, stripe_customer_id').eq('email', email).single();
+    // 1. Get or Create User in Supabase to link Stripe ID
+    // We assume user already signed up via frontend and exists in Auth
+    // But for metadata, we just pass the email.
     
-    // Create checkout session
+    // In a full implementation, you'd lookup the user UUID from Supabase Auth
+    // const { data: users } = await supabase.from('profiles').select('id').eq('email', email).single();
+    
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
       line_items: [
@@ -44,11 +51,6 @@ export default async function handler(req, res) {
       metadata: {
         service: 'ResortPassAlarm',
         referralCode: referralCode || ''
-      },
-      subscription_data: {
-        metadata: {
-          referralCode: referralCode || ''
-        }
       }
     });
 

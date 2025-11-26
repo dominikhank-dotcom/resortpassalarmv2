@@ -22,12 +22,6 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
     handleNav('landing');
   };
 
-  const getDisplayName = () => {
-    if (role === UserRole.ADMIN) return 'Admin';
-    if (role === UserRole.AFFILIATE) return 'Partner Account';
-    return 'Kunde';
-  };
-
   // Europa Park Blue approx #00305e, Yellow approx #ffcc00
   return (
     <nav className="bg-[#00305e] border-b border-blue-900 sticky top-0 z-50 shadow-md">
@@ -77,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
                     <User size={16} />
                   </div>
                   <span className="text-sm font-medium text-blue-100">
-                    {getDisplayName()}
+                    {role === UserRole.AFFILIATE ? 'Partner Account' : 'Max Mustermann'}
                   </span>
                 </div>
                 <button onClick={handleLogout} className="text-blue-300 hover:text-red-400 p-2">

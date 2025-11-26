@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { supabase } from '../lib/supabase';
 
@@ -19,6 +19,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
   });
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
 
   const validateEmail = (email: string) => {
     return String(email)
@@ -32,61 +33,77 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
     e.preventDefault();
     setError(null);
 
+    // Validation
     if (!formData.firstName || !formData.lastName || !formData.email || !formData.password) {
       setError("Bitte fülle alle Pflichtfelder aus.");
       return;
     }
-
     if (!validateEmail(formData.email)) {
       setError("Bitte gib eine gültige E-Mail Adresse ein.");
       return;
     }
-
     if (formData.password.length < 6) {
       setError("Das Passwort muss mindestens 6 Zeichen lang sein.");
       return;
     }
-
     if (formData.password !== formData.confirmPassword) {
       setError("Die Passwörter stimmen nicht überein.");
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
-        // 1. Create User in Supabase Auth
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: formData.email,
-            password: formData.password,
-        });
+      // 1. Sign up with Supabase
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/login`,
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            role: 'CUSTOMER'
+          }
+        }
+      });
 
-        if (authError) throw authError;
-        if (!authData.user) throw new Error("Registrierung fehlgeschlagen.");
+      if (signUpError) throw signUpError;
 
-        // 2. Create Profile
-        const { error: profileError } = await supabase
-            .from('profiles')
-            .insert([{
-                id: authData.user.id,
-                email: formData.email,
-                first_name: formData.firstName,
-                last_name: formData.lastName,
-                role: 'CUSTOMER'
-            }]);
-        
-        if (profileError) throw profileError;
-
-        // Success
-        onRegister();
+      setIsSuccess(true);
 
     } catch (err: any) {
-        console.error("Signup Error:", err);
-        setError(err.message || "Ein Fehler ist aufgetreten.");
+      console.error("Signup Error:", err);
+      setError(err.message || "Ein Fehler ist aufgetreten. Bitte versuche es später erneut.");
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+        <div className="sm:mx-auto sm:w-full sm:max-w-md">
+           <div className="bg-white py-12 px-6 shadow-xl sm:rounded-2xl sm:px-10 border border-slate-200 text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 text-green-600 animate-in zoom-in duration-300">
+                <CheckCircle size={40} />
+              </div>
+              <h2 className="text-2xl font-bold text-[#00305e] mb-4">Fast geschafft!</h2>
+              <p className="text-slate-600 mb-6">
+                Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
+              </p>
+              <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-8 text-sm text-blue-800 text-left">
+                <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Danach kannst du dich einloggen.
+              </div>
+              
+              <Button onClick={onLoginClick} className="w-full justify-center bg-[#00305e]">
+                Zum Login
+              </Button>
+           </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
@@ -220,7 +237,17 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
                 disabled={isLoading}
                 className="w-full flex justify-center bg-[#00305e] text-white hover:bg-[#002040] shadow-md"
               >
-                {isLoading ? <Loader2 className="animate-spin mr-2" /> : <><span className="mr-2">Weiter zur Buchung</span> <ArrowRight size={18} /></>}
+                {isLoading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin mr-2" />
+                    Wird erstellt...
+                  </>
+                ) : (
+                  <>
+                    Weiter zur Buchung
+                    <ArrowRight size={18} />
+                  </>
+                )}
               </Button>
             </div>
           </form>

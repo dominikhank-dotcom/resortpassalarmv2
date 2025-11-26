@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrowRight, Check, DollarSign, TrendingUp, Users, Shield, Calculator, ArrowLeft, HelpCircle } from 'lucide-react';
+import { ArrowRight, Check, DollarSign, TrendingUp, Users, Shield, Calculator, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 
@@ -17,9 +17,6 @@ export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBa
   const commissionDecimal = commissionRate / 100;
   
   const monthlyEarnings = (activeUsers * pricePerMonth * commissionDecimal).toFixed(2).replace('.', ',');
-
-  // Dynamic calculation for FAQ example (100 users)
-  const faqExampleEarnings = (100 * pricePerMonth * commissionDecimal).toFixed(0);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -231,61 +228,6 @@ export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBa
                 </button>
             </div>
             <p className="mt-6 text-sm text-slate-400">Dauert nur 3 Minuten.</p>
-            </div>
-        </section>
-
-        {/* FAQ Section */}
-        <section className="py-20 bg-slate-50 border-t border-slate-200">
-            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-slate-900">Häufige Fragen (FAQ)</h2>
-                    <p className="mt-4 text-slate-500">Alles Wichtige zum Partnerprogramm auf einen Blick.</p>
-                </div>
-                
-                <div className="grid md:grid-cols-2 gap-6">
-                    {[
-                        {
-                            q: "Kostet das Partnerprogramm etwas?",
-                            a: "Nein, die Teilnahme ist zu 100% kostenlos. Es gibt keine versteckten Gebühren oder Mindestumsätze."
-                        },
-                        {
-                            q: "Wie viel kann ich verdienen?",
-                            a: `Es gibt kein Limit. Du erhältst ${commissionRate}% Provision auf jeden Umsatz. Bei 100 geworbenen Nutzern verdienst du ca. ${faqExampleEarnings} € pro Monat – passiv.`
-                        },
-                        {
-                            q: "Verdiene ich wirklich dauerhaft?",
-                            a: "Ja, absolut. Wir bieten eine Lifetime-Vergütung. Solange der Kunde sein Abo aktiv hält, erhältst du jeden Monat deinen Anteil."
-                        },
-                        {
-                            q: "Wie und wann kann ich auszahlen?",
-                            a: "Sobald du 20,00 € Guthaben erreicht hast, kannst du im Dashboard eine Auszahlung anfordern. Wir überweisen in der Regel innerhalb von 2-3 Werktagen auf dein PayPal-Konto oder Bankkonto."
-                        },
-                        {
-                            q: "Was muss ich genau tun um mitzumachen?",
-                            a: "Erstelle dir in 2 Minuten einen Partner-Account. Du erhältst sofort deinen persönlichen Tracking-Link. Diesen teilst du auf Social Media, WhatsApp oder deiner Webseite."
-                        },
-                        {
-                            q: "Kann ich jederzeit aufhören / kündigen?",
-                            a: "Ja, du gehst keine Verpflichtungen ein. Du kannst das Bewerben jederzeit einstellen. Dein Account bleibt bestehen, falls noch Restguthaben ausgezahlt werden muss."
-                        },
-                        {
-                            q: "Wie lange ist ein Cookie gültig?",
-                            a: "Das Cookie ist 30 Tage gültig. Wenn ein Nutzer auf deinen Link klickt und innerhalb von 30 Tagen ein Abo abschließt, wird dir die Provision zugewiesen."
-                        },
-                        {
-                            q: "Welcher Cookie zählt (Last Cookie Wins)?",
-                            a: "Ja, es gilt das 'Last Cookie Wins'-Prinzip. Klickt ein Nutzer auf mehrere Partnerlinks, wird die Provision dem Partner zugerechnet, dessen Link zuletzt vor dem Kauf geklickt wurde."
-                        }
-                    ].map((faq, i) => (
-                        <div key={i} className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-                            <h3 className="font-bold text-lg text-slate-900 mb-2 flex items-start gap-3">
-                                <HelpCircle className="text-blue-600 shrink-0 mt-1" size={20} />
-                                {faq.q}
-                            </h3>
-                            <p className="text-slate-600 text-sm leading-relaxed pl-8">{faq.a}</p>
-                        </div>
-                    ))}
-                </div>
             </div>
         </section>
       </div>

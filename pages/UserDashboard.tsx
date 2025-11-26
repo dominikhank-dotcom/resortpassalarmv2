@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift, Loader2 } from 'lucide-react';
+import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { sendTestAlarm, createCheckoutSession } from '../services/backendService';
-import { supabase } from '../lib/supabase';
 
 interface LogEntry {
   id: string;
@@ -21,11 +20,8 @@ interface UserDashboardProps {
 }
 
 export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls }) => {
-  // Real Data State
-  const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
+  // Simulation State
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
-  
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
 
@@ -51,152 +47,67 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   // Notification State
   const [notifications, setNotifications] = useState<NotificationConfig>({
-    email: "",
-    sms: "",
+    email: "max.mustermann@example.com",
+    sms: "+49 170 1234567",
     emailEnabled: true,
-    smsEnabled: false
+    smsEnabled: true
   });
 
   // Independent Edit States for Notification Card
   const [editMode, setEditMode] = useState({ email: false, sms: false });
-  const [tempData, setTempData] = useState({ email: '', sms: '' });
+  const [tempData, setTempData] = useState({ email: notifications.email, sms: notifications.sms });
   const [errors, setErrors] = useState({ email: '', sms: '' });
 
   // Personal Data State
   const [personalData, setPersonalData] = useState({
-    firstName: '',
-    lastName: '',
+    firstName: 'Max',
+    lastName: 'Mustermann',
     street: '',
     houseNumber: '',
     zip: '',
     city: '',
     country: 'Deutschland',
-    email: ""
+    email: "max.mustermann@example.com"
   });
 
   // Alarm History State
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
 
-  // 1. LOAD REAL DATA ON MOUNT
+  // Derived state for easy checking
+  const hasActiveSubscription = subscriptionStatus !== 'NONE';
+
+  // Simulation logic for auto-update time
   useEffect(() => {
-    const loadUserData = async () => {
-      setIsLoading(true);
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          navigate('login');
-          return;
-        }
-        setUserId(user.id);
-
-        // A) Load Profile (Personal Data)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-        
-        if (profile) {
-          setPersonalData({
-            firstName: profile.first_name || '',
-            lastName: profile.last_name || '',
-            email: profile.email || user.email || '',
-            street: profile.street || '', 
-            houseNumber: profile.house_number || '',
-            zip: profile.zip || '',
-            city: profile.city || '',
-            country: profile.country || 'Deutschland'
-          });
-          
-          // Use profile email for notifications default
-          setNotifications(prev => ({
-             ...prev, 
-             email: profile.email || user.email || '' 
-          }));
-          setTempData(prev => ({
-              ...prev,
-              email: profile.email || user.email || '' 
-          }));
-        }
-
-        // B) Check Subscription Status
-        const { data: sub } = await supabase
-          .from('subscriptions')
-          .select('*')
-          .eq('user_id', user.id)
-          .eq('status', 'active')
-          .maybeSingle();
-
-        if (sub) {
-          if (sub.plan === 'free_admin') {
-            setSubscriptionStatus('FREE');
-          } else {
-            setSubscriptionStatus('PAID');
-          }
-        } else {
-          setSubscriptionStatus('NONE');
-        }
-
-        // C) Check for new payment in URL (Instant feedback before webhook processes)
-        const query = new URLSearchParams(window.location.search);
-        if (query.get('payment_success')) {
-          setSubscriptionStatus('PAID');
-          // Clear referral code to prevent future attribution on re-sub
-          localStorage.removeItem('resortpass_ref_data');
-        }
-
-      } catch (error) {
-        console.error("Error loading user data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadUserData();
-
-    // Simulation logic for auto-update time
     const interval = setInterval(() => {
       const now = new Date().toLocaleTimeString();
       setMonitorGold(prev => ({ ...prev, lastChecked: now }));
       setMonitorSilver(prev => ({ ...prev, lastChecked: now }));
     }, 60000);
 
+    // Check for payment success query param
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('payment_success')) {
+      setSubscriptionStatus('PAID');
+      alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+    }
+
     return () => clearInterval(interval);
   }, []);
 
-  // Derived state for easy checking
-  const hasActiveSubscription = subscriptionStatus !== 'NONE';
-
-  const handleSavePersonalData = async (e: React.FormEvent) => {
+  const handleSavePersonalData = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
-
-    try {
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                first_name: personalData.firstName,
-                last_name: personalData.lastName,
-                street: personalData.street,
-                house_number: personalData.houseNumber,
-                zip: personalData.zip,
-                city: personalData.city,
-                country: personalData.country,
-                email: personalData.email
-            })
-            .eq('id', userId);
-
-        if (error) throw error;
-        alert("Daten erfolgreich gespeichert.");
-    } catch (e: any) {
-        alert("Fehler beim Speichern: " + e.message);
-    }
+    alert("Persönliche Daten erfolgreich gespeichert.");
   };
 
   const toggleAvailability = (type: 'gold' | 'silver') => {
     if (type === 'gold') setMonitorGold(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
     if (type === 'silver') setMonitorSilver(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
   };
+
+  // Helper for dev testing
+  const toggleFreeSub = () => {
+    setSubscriptionStatus(prev => prev === 'FREE' ? 'NONE' : 'FREE');
+  }
 
   const handleManualCheck = (type: 'gold' | 'silver') => {
     setIsChecking(type);
@@ -282,18 +193,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       };
       setAlarmHistory(prev => [newEntry, ...prev]);
       alert("Test-Nachricht wurde verschickt!");
-    } catch (error: any) {
-      alert("Fehler beim Senden: " + error.message);
+    } catch (error) {
+      alert("Fehler beim Senden: " + error);
     } finally {
       setIsSendingAlarm(false);
     }
   };
 
   const handleSubscribe = async () => {
-    if (!personalData.email) {
-        alert("Fehler: Email fehlt.");
-        return;
-    }
     await createCheckoutSession(personalData.email);
   };
 
@@ -371,17 +278,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       </div>
     );
   };
-
-  if (isLoading) {
-      return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-50">
-              <div className="text-center">
-                  <Loader2 className="w-10 h-10 text-[#00305e] animate-spin mx-auto mb-4" />
-                  <p className="text-slate-500">Lade Dashboard...</p>
-              </div>
-          </div>
-      );
-  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -585,7 +481,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
                         </div>
                         <div className="text-3xl font-bold text-slate-900 mb-1">1,99 € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
-                        <p className="text-sm text-slate-500">Nächste Abrechnung: (Via Stripe)</p>
+                        <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
                     </div>
                   )}
 
@@ -605,7 +501,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
-                            onClick={() => { if(confirm('Abo wirklich kündigen?')) alert("Bitte nutze das Stripe Kundenportal in deiner Bestätigungsmail, um zu kündigen."); }}
+                            onClick={() => { if(confirm('Abo wirklich kündigen?')) setSubscriptionStatus('NONE'); }}
                             >
                             Abo kündigen
                             </Button>
@@ -645,7 +541,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Personal Data */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
               <div className="p-6 border-b border-slate-100">
                   <div className="flex items-center gap-3">
@@ -657,120 +552,128 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                   <form onSubmit={handleSavePersonalData} className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                           <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Vorname</label>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Vorname</label>
                               <input 
                                   type="text" 
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
                                   value={personalData.firstName}
-                                  onChange={e => setPersonalData({...personalData, firstName: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                                  readOnly
                               />
                           </div>
                           <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Nachname</label>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Nachname</label>
                               <input 
                                   type="text" 
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
                                   value={personalData.lastName}
-                                  onChange={e => setPersonalData({...personalData, lastName: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                                  readOnly
                               />
                           </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
-                          <div className="col-span-2">
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Straße</label>
-                              <input 
-                                  type="text" 
-                                  value={personalData.street}
-                                  onChange={e => setPersonalData({...personalData, street: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
-                              />
-                          </div>
-                          <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Nr.</label>
-                              <input 
-                                  type="text" 
-                                  value={personalData.houseNumber}
-                                  onChange={e => setPersonalData({...personalData, houseNumber: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
-                              />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2 flex gap-4">
+                              <div className="flex-1">
+                                  <label className="block text-sm font-medium text-slate-700 mb-1">Straße</label>
+                                  <input 
+                                      type="text" 
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
+                                      value={personalData.street}
+                                      onChange={(e) => setPersonalData({...personalData, street: e.target.value})}
+                                  />
+                              </div>
+                              <div className="w-20">
+                                  <label className="block text-sm font-medium text-slate-700 mb-1">Nr.</label>
+                                  <input 
+                                      type="text" 
+                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
+                                      value={personalData.houseNumber}
+                                      onChange={(e) => setPersonalData({...personalData, houseNumber: e.target.value})}
+                                  />
+                              </div>
                           </div>
                       </div>
-                      <div className="grid grid-cols-3 gap-4">
-                          <div>
-                              <label className="block text-xs font-medium text-slate-500 mb-1">PLZ</label>
+
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div className="col-span-1">
+                              <label className="block text-sm font-medium text-slate-700 mb-1">PLZ</label>
                               <input 
                                   type="text" 
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
                                   value={personalData.zip}
-                                  onChange={e => setPersonalData({...personalData, zip: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                                  onChange={(e) => setPersonalData({...personalData, zip: e.target.value})}
                               />
                           </div>
-                          <div className="col-span-2">
-                              <label className="block text-xs font-medium text-slate-500 mb-1">Ort</label>
+                          <div className="col-span-1 md:col-span-2">
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Ort</label>
                               <input 
                                   type="text" 
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
                                   value={personalData.city}
-                                  onChange={e => setPersonalData({...personalData, city: e.target.value})}
-                                  className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500"
+                                  onChange={(e) => setPersonalData({...personalData, city: e.target.value})}
                               />
                           </div>
                       </div>
+                      
                       <div>
-                          <label className="block text-xs font-medium text-slate-500 mb-1">Land</label>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">Land</label>
                           <select 
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none bg-white"
                               value={personalData.country}
-                              onChange={e => setPersonalData({...personalData, country: e.target.value})}
-                              className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-white"
+                              onChange={(e) => setPersonalData({...personalData, country: e.target.value})}
                           >
                               <option>Deutschland</option>
                               <option>Österreich</option>
                               <option>Schweiz</option>
+                              <option>Frankreich</option>
                           </select>
                       </div>
-                      
-                      <div className="pt-2">
-                          <label className="block text-xs font-medium text-slate-500 mb-1">E-Mail Adresse (Account)</label>
+
+                      <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail Adresse</label>
                           <input 
                               type="email" 
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
                               value={personalData.email}
-                              onChange={e => setPersonalData({...personalData, email: e.target.value})}
-                              className="w-full p-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-blue-500 bg-slate-50"
+                              onChange={(e) => setPersonalData({...personalData, email: e.target.value})}
                           />
                       </div>
 
                       <div className="pt-2 flex justify-end">
-                          <Button type="submit" size="sm" className="bg-[#00305e]">
-                              <Save size={16} className="mr-2" /> Speichern
+                          <Button type="submit" size="sm">
+                              <Save size={16} />
+                              Daten speichern
                           </Button>
                       </div>
                   </form>
               </div>
           </div>
 
-          {/* Alarm History */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full">
               <div className="p-6 border-b border-slate-100">
                   <div className="flex items-center gap-3">
-                      <div className="bg-slate-100 p-2 rounded-lg text-slate-600"><History size={20} /></div>
+                      <div className="bg-orange-50 p-2 rounded-lg text-orange-600"><History size={20} /></div>
                       <h3 className="font-semibold text-slate-900">Versand-Protokoll</h3>
                   </div>
               </div>
-              <div className="p-6 flex-1 overflow-y-auto max-h-[400px]">
+              <div className="p-6 flex-1">
                   {alarmHistory.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-slate-400 py-8">
-                          <FileText size={48} className="mb-4 opacity-20" />
-                          <p>Noch keine Alarme versendet.</p>
+                      <div className="h-full flex flex-col items-center justify-center text-slate-400 py-12">
+                          <div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3">
+                              <FileText size={24} />
+                          </div>
+                          <p className="text-sm">Noch keine Alarme versendet.</p>
                       </div>
                   ) : (
                       <div className="space-y-4">
-                          {alarmHistory.map((entry) => (
-                              <div key={entry.id} className="flex gap-4 items-start p-3 bg-slate-50 rounded-lg border border-slate-100">
-                                  <div className={`mt-1 p-1.5 rounded-full ${entry.type === 'EMAIL' ? 'bg-blue-100 text-blue-600' : 'bg-green-100 text-green-600'}`}>
+                          {alarmHistory.map(entry => (
+                              <div key={entry.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100">
+                                  <div className={`p-2 rounded-full shrink-0 ${entry.type === 'EMAIL' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>
                                       {entry.type === 'EMAIL' ? <Mail size={14} /> : <MessageSquare size={14} />}
                                   </div>
                                   <div>
                                       <p className="text-sm font-medium text-slate-900">{entry.message}</p>
-                                      <p className="text-xs text-slate-500">{entry.date}</p>
+                                      <p className="text-xs text-slate-500 mt-0.5">{entry.date}</p>
                                   </div>
                               </div>
                           ))}
@@ -779,6 +682,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
               </div>
           </div>
         </div>
+      </div>
+      <div className="hidden">
+         {/* Hidden Dev Tool to simulate Free status for testing */}
+         <button onClick={toggleFreeSub}>Toggle Free</button>
       </div>
       <Footer navigate={navigate} />
     </div>

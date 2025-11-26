@@ -1,38 +1,39 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Loader2, CheckCircle, Clock } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
-import { supabase } from '../lib/supabase';
-import { requestPayout } from '../services/backendService';
+
+// Mock Data
+const INITIAL_STATS: AffiliateStats = {
+  clicks: 1243,
+  conversions: 89,
+  earnings: 267.00,
+  history: [
+    { date: '01.05', clicks: 45, conversions: 2 },
+    { date: '05.05', clicks: 80, conversions: 5 },
+    { date: '10.05', clicks: 120, conversions: 8 },
+    { date: '15.05', clicks: 160, conversions: 12 },
+    { date: '20.05', clicks: 210, conversions: 18 },
+    { date: '25.05', clicks: 190, conversions: 15 },
+    { date: '30.05', clicks: 240, conversions: 25 },
+  ]
+};
 
 export const AffiliateDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
-  
-  // Real Data States
-  const [isLoading, setIsLoading] = useState(true);
-  const [refLink, setRefLink] = useState("");
-  const [userId, setUserId] = useState<string | null>(null);
-  const [payouts, setPayouts] = useState<any[]>([]);
-  
-  const [stats, setStats] = useState<AffiliateStats>({
-    clicks: 0, 
-    conversions: 0,
-    earnings: 0,
-    history: []
-  });
-
-  // AI States
+  const [stats] = useState<AffiliateStats>(INITIAL_STATS);
+  const [refLink] = useState("https://resortpassalarm.com/ref/ep-fan-24");
   const [aiText, setAiText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [platform, setPlatform] = useState<'twitter' | 'email' | 'instagram'>('twitter');
 
   // Settings Form State
   const [settings, setSettings] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
+    firstName: 'Max',
+    lastName: 'Mustermann',
+    email: 'max.partner@example.com',
     street: '',
     houseNumber: '',
     zip: '',
@@ -46,99 +47,15 @@ export const AffiliateDashboard: React.FC = () => {
     confirmNewPassword: ''
   });
 
-  useEffect(() => {
-    fetchAffiliateData();
-  }, []);
-
-  const fetchAffiliateData = async () => {
-    setIsLoading(true);
-    try {
-      // 1. Get Current User
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      setUserId(user.id);
-
-      // 2. Get Profile (for Ref Code & Personal Data)
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (profile) {
-        // Set Ref Link
-        const origin = window.location.origin;
-        setRefLink(`${origin}?ref=${profile.referral_code}`);
-
-        // Pre-fill settings
-        setSettings(prev => ({
-            ...prev,
-            firstName: profile.first_name || '',
-            lastName: profile.last_name || '',
-            email: profile.email || user.email || '',
-            street: profile.street || '',
-            houseNumber: profile.house_number || '',
-            zip: profile.zip || '',
-            city: profile.city || '',
-            country: profile.country || 'Deutschland',
-            company: profile.company || '',
-            vatId: profile.vat_id || '',
-            paypalEmail: '' // Usually stored in a separate payments table or profile if added
-        }));
-      }
-
-      // 3. Get Commissions (Real Earnings)
-      // Only 'pending' commissions count towards available balance for payout
-      const { data: pendingCommissions } = await supabase
-        .from('commissions')
-        .select('amount')
-        .eq('partner_id', user.id)
-        .eq('status', 'pending');
-        
-      const { data: allCommissions } = await supabase
-        .from('commissions')
-        .select('created_at')
-        .eq('partner_id', user.id);
-
-      // 4. Get Payout History
-      const { data: myPayouts } = await supabase
-        .from('payouts')
-        .select('*')
-        .eq('partner_id', user.id)
-        .order('created_at', { ascending: false });
-        
-      setPayouts(myPayouts || []);
-
-      if (pendingCommissions) {
-        const currentBalance = pendingCommissions.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
-        const totalConversions = allCommissions?.length || 0;
-
-        // Mock History for visual chart
-        const mockHistory = [
-             { date: 'Start', clicks: 0, conversions: 0 },
-             { date: 'Heute', clicks: totalConversions * 5, conversions: totalConversions } 
-        ];
-
-        setStats({
-            clicks: totalConversions * 12 + 4, 
-            conversions: totalConversions,
-            earnings: currentBalance, // Only pending balance available for payout
-            history: mockHistory
-        });
-      }
-
-    } catch (error) {
-      console.error("Error fetching affiliate data:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // Check if mandatory fields are filled
   const areSettingsComplete = 
     settings.firstName.trim() !== '' &&
     settings.lastName.trim() !== '' &&
     settings.email.trim() !== '' &&
+    settings.street.trim() !== '' &&
+    settings.houseNumber.trim() !== '' &&
+    settings.zip.trim() !== '' &&
+    settings.city.trim() !== '' &&
     settings.paypalEmail.trim() !== '';
 
   const handleCopy = () => {
@@ -159,82 +76,34 @@ export const AffiliateDashboard: React.FC = () => {
     }
   };
 
-  const handlePayout = async () => {
+  const handlePayout = () => {
+    // Double check logic, though button should be disabled
     if (stats.earnings < 20) {
       alert("Auszahlung erst ab 20,00 € möglich.");
       return;
     }
     if (!areSettingsComplete) {
-      alert("Bitte vervollständige deine Stammdaten in den Einstellungen (inkl. PayPal).");
+      alert("Bitte vervollständige deine Stammdaten in den Einstellungen.");
       setActiveTab('settings');
       return;
     }
-    
-    if (!userId) return;
-
-    if (confirm(`Auszahlung von ${stats.earnings.toFixed(2)} € jetzt anfordern?`)) {
-        try {
-            await requestPayout(userId, settings.paypalEmail);
-            alert("Auszahlung erfolgreich beantragt!");
-            fetchAffiliateData(); // Refresh data
-        } catch (e: any) {
-            alert("Fehler: " + e.message);
-        }
-    }
+    alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
   };
 
-  const handleSaveSettings = async (e: React.FormEvent) => {
+  const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
-    
-    try {
-        // Update Profile
-        const { error } = await supabase
-            .from('profiles')
-            .update({
-                first_name: settings.firstName,
-                last_name: settings.lastName,
-                street: settings.street,
-                house_number: settings.houseNumber,
-                zip: settings.zip,
-                city: settings.city,
-                country: settings.country,
-                company: settings.company,
-                vat_id: settings.vatId
-            })
-            .eq('id', userId);
-
-        if (error) throw error;
-
-        // Change Password if requested
-        if (settings.newPassword) {
-            if (settings.newPassword !== settings.confirmNewPassword) {
-                alert("Passwörter stimmen nicht überein!");
-                return;
-            }
-            const { error: pwdError } = await supabase.auth.updateUser({ password: settings.newPassword });
-            if (pwdError) throw pwdError;
-            alert("Daten und Passwort erfolgreich gespeichert.");
-            setSettings(prev => ({...prev, newPassword: '', confirmNewPassword: '', currentPassword: ''}));
-        } else {
-            alert("Daten erfolgreich gespeichert.");
-        }
-
-    } catch (e: any) {
-        alert("Fehler beim Speichern: " + e.message);
+    if (settings.newPassword && settings.newPassword !== settings.confirmNewPassword) {
+      alert("Die neuen Passwörter stimmen nicht überein.");
+      return;
     }
+    if (settings.newPassword && !settings.currentPassword) {
+      alert("Bitte gib dein aktuelles Passwort ein, um es zu ändern.");
+      return;
+    }
+    alert("Daten erfolgreich gespeichert.");
+    // Clear password fields after save
+    setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
   };
-
-  if (isLoading) {
-      return (
-          <div className="min-h-screen flex items-center justify-center bg-slate-50">
-              <div className="text-center">
-                  <Loader2 className="w-10 h-10 text-[#00305e] animate-spin mx-auto mb-4" />
-                  <p className="text-slate-500">Lade Partner-Daten...</p>
-              </div>
-          </div>
-      );
-  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -245,6 +114,7 @@ export const AffiliateDashboard: React.FC = () => {
             <h1 className="text-2xl font-bold text-slate-900">Partner Dashboard</h1>
             <p className="text-slate-500">Verdiene 50% Provision für jeden vermittelten ResortPass-Jäger.</p>
           </div>
+          {/* Top right balance block removed as requested */}
         </div>
 
         {/* Tabs */}
@@ -282,14 +152,14 @@ export const AffiliateDashboard: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
               <div className="bg-blue-50 p-3 rounded-xl text-blue-600"><Users size={24} /></div>
               <div>
-                <p className="text-slate-500 text-sm">Klicks (Geschätzt)</p>
+                <p className="text-slate-500 text-sm">Klicks (Total)</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.clicks}</p>
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
               <div className="bg-purple-50 p-3 rounded-xl text-purple-600"><TrendingUp size={24} /></div>
               <div>
-                <p className="text-slate-500 text-sm">Verkäufe (Gesamt)</p>
+                <p className="text-slate-500 text-sm">Conversions</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.conversions}</p>
               </div>
             </div>
@@ -297,7 +167,7 @@ export const AffiliateDashboard: React.FC = () => {
               <div className="flex items-center gap-4">
                 <div className="bg-green-50 p-3 rounded-xl text-green-600"><DollarSign size={24} /></div>
                 <div>
-                  <p className="text-slate-500 text-sm">Verdienst (Verfügbar)</p>
+                  <p className="text-slate-500 text-sm">Verdienst (Offen)</p>
                   <p className="text-2xl font-bold text-slate-900">{stats.earnings.toFixed(2)} €</p>
                 </div>
               </div>
@@ -307,7 +177,7 @@ export const AffiliateDashboard: React.FC = () => {
                   size="sm" 
                   variant="outline" 
                   className="w-full text-green-700 border-green-200 hover:bg-green-50"
-                  disabled={stats.earnings < 20}
+                  disabled={stats.earnings < 20 || !areSettingsComplete}
                 >
                   <CreditCard size={16} /> Auszahlen
                 </Button>
@@ -317,50 +187,6 @@ export const AffiliateDashboard: React.FC = () => {
               </div>
             </div>
           </div>
-          
-          {/* Payout History Table */}
-          {payouts.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-6 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-900">Auszahlungshistorie</h3>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
-                            <tr>
-                                <th className="px-6 py-4">Datum</th>
-                                <th className="px-6 py-4">Betrag</th>
-                                <th className="px-6 py-4">PayPal Konto</th>
-                                <th className="px-6 py-4 text-right">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {payouts.map((payout) => (
-                                <tr key={payout.id}>
-                                    <td className="px-6 py-4 text-sm text-slate-600">
-                                        {new Date(payout.created_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 font-bold text-slate-900">
-                                        {Number(payout.amount).toFixed(2)} €
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-500">
-                                        {payout.paypal_email}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium gap-1 ${
-                                            payout.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
-                                        }`}>
-                                            {payout.status === 'paid' ? <CheckCircle size={12}/> : <Clock size={12} />}
-                                            {payout.status === 'paid' ? 'Bezahlt' : 'Bearbeitung'}
-                                        </span>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-          )}
 
           {/* Link Section */}
           <div className="bg-indigo-900 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
@@ -383,6 +209,7 @@ export const AffiliateDashboard: React.FC = () => {
             <div className="w-full md:w-1/2">
               <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Sparkles size={18} className="text-yellow-400" /> KI Marketing Assistent</h3>
               <p className="text-indigo-200 text-sm mb-4">Lass unsere KI den perfekten Werbetext für dich schreiben.</p>
+              
               <div className="flex gap-2">
                 <select 
                     value={platform} 
@@ -450,100 +277,231 @@ export const AffiliateDashboard: React.FC = () => {
       {activeTab === 'settings' && (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-300">
           <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-             <div className="p-6 md:p-8 space-y-8">
-               <section>
-                  <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <User size={16} /> Persönliche Daten
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Vorname</label>
-                      <input type="text" value={settings.firstName} onChange={e => setSettings({...settings, firstName: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">Nachname</label>
-                      <input type="text" value={settings.lastName} onChange={e => setSettings({...settings, lastName: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail</label>
-                    <input type="email" value={settings.email} readOnly className="w-full px-4 py-2 rounded-lg border border-slate-300 bg-slate-100 outline-none" />
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                     <div className="col-span-2">
-                         <label className="block text-sm font-medium text-slate-700 mb-1">Straße</label>
-                         <input type="text" value={settings.street} onChange={e => setSettings({...settings, street: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                     </div>
-                     <div>
-                         <label className="block text-sm font-medium text-slate-700 mb-1">Nr.</label>
-                         <input type="text" value={settings.houseNumber} onChange={e => setSettings({...settings, houseNumber: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                     </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-3 gap-4 mb-4">
-                     <div>
-                         <label className="block text-sm font-medium text-slate-700 mb-1">PLZ</label>
-                         <input type="text" value={settings.zip} onChange={e => setSettings({...settings, zip: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                     </div>
-                     <div className="col-span-2">
-                         <label className="block text-sm font-medium text-slate-700 mb-1">Ort</label>
-                         <input type="text" value={settings.city} onChange={e => setSettings({...settings, city: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                     </div>
-                  </div>
-                  
-                  <div className="mb-4">
-                       <label className="block text-sm font-medium text-slate-700 mb-1">Land</label>
-                       <select value={settings.country} onChange={e => setSettings({...settings, country: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none bg-white">
-                           <option>Deutschland</option>
-                           <option>Österreich</option>
-                           <option>Schweiz</option>
-                       </select>
-                  </div>
-               </section>
+            <div className="p-6 md:p-8 border-b border-slate-100">
+              <div className="flex items-center gap-3 mb-2">
+                 <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Settings size={20} /></div>
+                 <h2 className="text-xl font-bold text-slate-900">Stammdaten & Auszahlung</h2>
+              </div>
+              <p className="text-slate-500 max-w-2xl">
+                Diese Daten sind notwendig, um deine Provisionen steuerrechtlich korrekt auszuzahlen.
+              </p>
+            </div>
 
-               <div className="border-t border-slate-100 pt-8">
-                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                       <CreditCard size={16} /> Auszahlung (PayPal)
-                   </h3>
-                   <p className="text-sm text-slate-500 mb-4">
-                       Bitte gib deine PayPal-E-Mail-Adresse an, damit wir deine Provisionen auszahlen können.
-                   </p>
-                   <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-1">PayPal E-Mail Adresse <span className="text-red-500">*</span></label>
+            <div className="p-6 md:p-8 space-y-8">
+              
+              {/* Personal Info Section */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <User size={16} /> Persönliche Daten
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Vorname <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      required
+                      value={settings.firstName}
+                      onChange={(e) => setSettings({...settings, firstName: e.target.value})}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nachname <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      required
+                      value={settings.lastName}
+                      onChange={(e) => setSettings({...settings, lastName: e.target.value})}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail Adresse <span className="text-red-500">*</span></label>
+                  <input 
+                    type="email" 
+                    required
+                    value={settings.email}
+                    onChange={(e) => setSettings({...settings, email: e.target.value})}
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                  />
+                </div>
+              </section>
+
+              <hr className="border-slate-100" />
+
+              {/* Address Section */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Anschrift</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                   <div className="col-span-1 md:col-span-2 flex gap-4">
+                     <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Straße <span className="text-red-500">*</span></label>
                         <input 
-                            type="email" 
-                            required
-                            value={settings.paypalEmail} 
-                            onChange={e => setSettings({...settings, paypalEmail: e.target.value})} 
-                            className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none focus:ring-2 focus:ring-blue-500" 
-                            placeholder="name@example.com"
+                          type="text" 
+                          required
+                          value={settings.street}
+                          onChange={(e) => setSettings({...settings, street: e.target.value})}
+                          className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                          placeholder="Musterstraße"
                         />
+                     </div>
+                     <div className="w-24">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nr. <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          required
+                          value={settings.houseNumber}
+                          onChange={(e) => setSettings({...settings, houseNumber: e.target.value})}
+                          className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                          placeholder="123"
+                        />
+                     </div>
                    </div>
-               </div>
-
-               <div className="border-t border-slate-100 pt-8">
-                   <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                       <Lock size={16} /> Sicherheit
-                   </h3>
-                   <div className="space-y-4">
-                       <div>
-                           <label className="block text-sm font-medium text-slate-700 mb-1">Neues Passwort</label>
-                           <input type="password" value={settings.newPassword} onChange={e => setSettings({...settings, newPassword: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                       </div>
-                       <div>
-                           <label className="block text-sm font-medium text-slate-700 mb-1">Passwort wiederholen</label>
-                           <input type="password" value={settings.confirmNewPassword} onChange={e => setSettings({...settings, confirmNewPassword: e.target.value})} className="w-full px-4 py-2 rounded-lg border border-slate-300 outline-none" />
-                       </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                   <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">PLZ <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        required
+                        value={settings.zip}
+                        onChange={(e) => setSettings({...settings, zip: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                        placeholder="12345"
+                      />
                    </div>
-               </div>
+                   <div className="col-span-1 md:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Ort <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        required
+                        value={settings.city}
+                        onChange={(e) => setSettings({...settings, city: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                        placeholder="Musterstadt"
+                      />
+                   </div>
+                   <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Land <span className="text-red-500">*</span></label>
+                      <select 
+                        value={settings.country}
+                        onChange={(e) => setSettings({...settings, country: e.target.value})}
+                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                      >
+                        <option>Deutschland</option>
+                        <option>Österreich</option>
+                        <option>Schweiz</option>
+                      </select>
+                   </div>
+                </div>
+              </section>
 
-               <div className="flex justify-end pt-4">
-                  <Button type="submit" variant="primary" size="lg" className="bg-[#00305e]">
-                    <Save size={18} /> Einstellungen speichern
-                  </Button>
-               </div>
-             </div>
+              <hr className="border-slate-100" />
+
+              {/* Commercial Section */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Gewerbliche Angaben <span className="text-slate-400 font-normal normal-case">(Optional)</span></h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Firma / Unternehmensname</label>
+                    <input 
+                      type="text" 
+                      value={settings.company}
+                      onChange={(e) => setSettings({...settings, company: e.target.value})}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                      placeholder=""
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">USt-ID (VAT ID)</label>
+                    <input 
+                      type="text" 
+                      value={settings.vatId}
+                      onChange={(e) => setSettings({...settings, vatId: e.target.value})}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                      placeholder="DE123456789"
+                    />
+                  </div>
+                </div>
+              </section>
+
+              <hr className="border-slate-100" />
+
+              {/* Payout Section */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Auszahlungsmethode</h3>
+                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
+                   <div className="flex flex-col md:flex-row gap-6 md:items-end">
+                      <div className="flex-1">
+                        <label className="block text-sm font-bold text-blue-900 mb-2">PayPal E-Mail Adresse <span className="text-red-500">*</span></label>
+                        <input 
+                          type="email" 
+                          required
+                          value={settings.paypalEmail}
+                          onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
+                          className="w-full px-4 py-3 rounded-lg border border-blue-200 focus:ring-2 focus:ring-blue-500 outline-none" 
+                          placeholder="deine-email@paypal.com"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2 text-blue-700 text-sm bg-blue-100/50 px-4 py-2 rounded-lg h-fit mb-1">
+                        <AlertCircle size={16} />
+                        Auszahlung kann manuell angefordert werden, sobald das Guthaben 20,00 € erreicht.
+                      </div>
+                   </div>
+                </div>
+              </section>
+
+              <hr className="border-slate-100" />
+
+              {/* Security Section */}
+              <section>
+                <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                   <Lock size={16} /> Sicherheit
+                </h3>
+                <div className="bg-slate-50 rounded-xl p-6 border border-slate-100">
+                   <p className="text-sm text-slate-500 mb-4">
+                     Hier kannst du dein Passwort ändern. Lasse die Felder leer, wenn du es nicht ändern möchtest.
+                   </p>
+                   <div className="space-y-4 max-w-md">
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Aktuelles Passwort</label>
+                         <input 
+                           type="password" 
+                           value={settings.currentPassword}
+                           onChange={(e) => setSettings({...settings, currentPassword: e.target.value})}
+                           className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                         />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Neues Passwort</label>
+                         <input 
+                           type="password" 
+                           value={settings.newPassword}
+                           onChange={(e) => setSettings({...settings, newPassword: e.target.value})}
+                           className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                         />
+                      </div>
+                      <div>
+                         <label className="block text-sm font-medium text-slate-700 mb-1">Neues Passwort wiederholen</label>
+                         <input 
+                           type="password" 
+                           value={settings.confirmNewPassword}
+                           onChange={(e) => setSettings({...settings, confirmNewPassword: e.target.value})}
+                           className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                         />
+                      </div>
+                   </div>
+                </div>
+              </section>
+
+              <div className="flex justify-end pt-4">
+                <Button type="submit" variant="primary" size="lg" className="bg-[#00305e] hover:bg-[#002040]">
+                  <Save size={18} />
+                  Einstellungen speichern
+                </Button>
+              </div>
+            </div>
           </form>
         </div>
       )}
