@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -326,50 +326,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleToggleFreeSubscription = async () => {
       if (!customerDetail) return;
 
-      if (customerDetail.subscription.isFree) {
-          if(confirm("Möchtest du das kostenlose Abo widerrufen? Der Nutzer verliert sofort den Zugriff.")) {
-            // Logic to update DB
-             const { error } = await supabase.from('subscriptions').update({
-                 status: 'inactive',
-                 plan_type: 'standard'
-             }).eq('user_id', customerDetail.id);
-
-            if (!error) {
+      try {
+        if (customerDetail.subscription.isFree) {
+            if(confirm("Möchtest du das kostenlose Abo widerrufen? Der Nutzer verliert sofort den Zugriff.")) {
+                await manageSubscription(customerDetail.id, 'revoke_free');
                 setCustomerDetail({
                     ...customerDetail,
                     subscription: { ...customerDetail.subscription, status: 'Inactive', isFree: false, plan: 'Standard' }
                 });
+                alert("Kostenloses Abo widerrufen.");
             }
-          }
-      } else {
-          if(confirm("Diesen Nutzer manuell kostenlos freischalten? Er erhält alle Premium-Funktionen ohne Zahlung.")) {
-             // Logic to update/insert DB
-             // Check if sub exists
-             const { data: sub } = await supabase.from('subscriptions').select('id').eq('user_id', customerDetail.id).single();
-             
-             let error;
-             if (sub) {
-                 const res = await supabase.from('subscriptions').update({
-                     status: 'active',
-                     plan_type: 'Manuell (Gratis)'
-                 }).eq('user_id', customerDetail.id);
-                 error = res.error;
-             } else {
-                 const res = await supabase.from('subscriptions').insert({
-                     user_id: customerDetail.id,
-                     status: 'active',
-                     plan_type: 'Manuell (Gratis)'
-                 });
-                 error = res.error;
-             }
-
-             if (!error) {
+        } else {
+            if(confirm("Diesen Nutzer manuell kostenlos freischalten? Er erhält alle Premium-Funktionen ohne Zahlung.")) {
+                await manageSubscription(customerDetail.id, 'grant_free');
                 setCustomerDetail({
                     ...customerDetail,
                     subscription: { ...customerDetail.subscription, status: 'Active', isFree: true, plan: 'Manuell (Gratis)' }
                 });
-             }
-          }
+                alert("Kostenloses Abo gewährt.");
+            }
+        }
+      } catch (error: any) {
+          alert("Fehler bei der Abo-Änderung: " + error.message);
       }
   };
 

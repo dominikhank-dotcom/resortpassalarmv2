@@ -92,3 +92,17 @@ export const testGeminiConnection = async () => {
     throw error;
   }
 };
+
+export const manageSubscription = async (userId: string, action: 'grant_free' | 'revoke_free') => {
+  try {
+    const response = await fetch('/api/manage-subscription', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, action })
+    });
+    return await handleResponse(response);
+  } catch (error: any) {
+      console.error("Manage Subscription Error:", error);
+      throw error;
+  }
+};
