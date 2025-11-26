@@ -9,7 +9,7 @@ import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
-import { supabase } from './lib/supabase';
+import { supabase, getEnv } from './lib/supabase';
 
 // Simple mock Login screen with Forgot Password flow
 const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () => void; onRegisterClick?: () => void }> = ({ role, onLogin, onCancel, onRegisterClick }) => {
@@ -22,8 +22,7 @@ const LoginScreen: React.FC<{ role: UserRole; onLogin: () => void; onCancel: () 
 
   // Helper to get site URL
   const getSiteUrl = () => {
-      // @ts-ignore
-      return import.meta.env.VITE_SITE_URL ?? window.location.origin;
+      return getEnv('VITE_SITE_URL') ?? window.location.origin;
   }
 
   const handleLogin = async () => {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
 import { Button } from '../components/Button';
-import { supabase } from '../lib/supabase';
+import { supabase, getEnv } from '../lib/supabase';
 
 interface UserSignupProps {
   onLoginClick: () => void;
@@ -55,8 +55,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
 
     try {
       // Determine the redirect URL (Production vs Local)
-      // @ts-ignore
-      const siteUrl = import.meta.env.VITE_SITE_URL ?? window.location.origin;
+      const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
       const redirectUrl = `${siteUrl}/login`;
 
       // 1. Sign up with Supabase

@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 
 // Safe access to environment variables handling different environments
 // This prevents "Cannot read properties of undefined" if import.meta.env is not available
-const getEnv = (key: string) => {
+export const getEnv = (key: string) => {
   try {
     // @ts-ignore
     if (typeof import.meta !== 'undefined' && import.meta.env) {
