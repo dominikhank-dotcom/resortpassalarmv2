@@ -70,7 +70,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           </h1>
           
           <p className="text-lg md:text-xl text-slate-300 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Der Europa-Park ResortPass ist ständig ausverkauft. Unser Tool prüft die Verfügbarkeit rund um die Uhr und benachrichtigt dich in Sekunden.
+            Der Europa-Park ResortPass ist ständig ausverkauft. Unser Tool prüft die Verfügbarkeit in kurzen Abständen und benachrichtigt dich sofort.
           </p>
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -150,7 +150,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
               <ul className="space-y-4">
                 {[
                   'Überwachung: Gold & Silver',
-                  '5-Minuten Intervalle',
+                  'Prüfung in kurzen Abständen',
                   'Sofortige E-Mail Alert',
                   'Sofortige SMS Alert',
                   'Direktlink zum Warenkorb',
@@ -213,7 +213,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
             {[
               {
                 q: "Was bringt mir ResortPassAlarm?",
-                a: "Du sparst dir das ständige, nervige Neuladen der Ticket-Seite. Unser System prüft rund um die Uhr im Minutentakt die Verfügbarkeit und benachrichtigt dich sofort, wenn Gold oder Silver Pässe freigeschaltet werden."
+                a: "Du sparst dir das ständige, nervige Neuladen der Ticket-Seite. Unser System prüft rund um die Uhr in kurzen Abständen die Verfügbarkeit und benachrichtigt dich sofort, wenn Gold oder Silver Pässe freigeschaltet werden."
               },
               {
                 q: "Was kostet der Service?",
