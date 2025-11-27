@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -370,8 +370,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     alert("Rückerstattungs-Logik erfordert Stripe API Key.");
   };
 
-  const handleSaveCommission = () => {
-    alert(`Globale Provision erfolgreich auf ${commissionRate}% geändert. Alle Anzeigetexte und Abrechnungen wurden aktualisiert.`);
+  const handleSaveCommission = async () => {
+    try {
+        await updateSystemSettings('global_commission_rate', commissionRate.toString());
+        alert(`Globale Provision erfolgreich auf ${commissionRate}% gespeichert. Alle Anzeigetexte und Abrechnungen wurden aktualisiert.`);
+    } catch (error: any) {
+        alert("Fehler beim Speichern der Provision: " + error.message);
+    }
   };
 
   const handleAnalyze = async () => {
@@ -802,7 +807,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                      Änderungen wirken sich sofort auf alle Anzeigetexte, Rechenbeispiele und zukünftige Abrechnungen aus.
                    </p>
                 </div>
-                <Button onClick={() => alert(`Provision auf ${commissionRate}% aktualisiert.`)}>
+                <Button onClick={handleSaveCommission}>
                    <Save size={16} className="mr-2" /> Speichern
                 </Button>
              </div>
