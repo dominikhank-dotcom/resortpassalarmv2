@@ -93,7 +93,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
                 <Loader2 size={14} className="animate-spin" /> Lade Live-Status...
              </div>
           ) : (
-            <div className="flex gap-6 font-mono">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 font-mono items-center w-full sm:w-auto">
                 <div className="flex items-center gap-2 text-slate-300">
                 <span className={`h-2 w-2 rounded-full ${status.gold === 'available' ? 'bg-green-500' : 'bg-red-500'} ${status.lastChecked ? 'animate-pulse' : ''}`}></span>
                 ResortPass Gold: 
@@ -111,7 +111,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
             </div>
           )}
           
-          <div className="text-slate-500 text-xs flex items-center gap-1">
+          <div className="text-slate-500 text-xs flex items-center gap-1 mt-2 sm:mt-0">
             <Clock size={12} /> Zuletzt geprüft: {loadingStatus ? '...' : getTimeAgo(status.lastChecked)}
           </div>
         </div>

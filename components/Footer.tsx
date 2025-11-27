@@ -25,7 +25,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
           <button onClick={() => navigate('revocation')} className="hover:text-white transition">Widerrufsrecht</button>
           <button onClick={() => navigate('affiliate-info')} className="hover:text-white transition">Partnerprogramm Infos</button>
           <button onClick={() => navigate('affiliate-login')} className="hover:text-white transition">Partner Login</button>
-          <button onClick={() => navigate('admin-login')} className="hover:text-white transition">Admin Login</button>
+          <button onClick={() => navigate('admin-login')} className="text-[#002a52] hover:text-blue-500 transition text-xs">Admin Login</button>
         </div>
       </div>
       <div className="max-w-7xl mx-auto px-4 text-center mt-12 pt-8 border-t border-blue-800/50">
