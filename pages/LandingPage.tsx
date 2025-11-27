@@ -27,7 +27,8 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           setStatus({
             gold: settings.status_gold || 'sold_out',
             silver: settings.status_silver || 'sold_out',
-            lastChecked: settings.last_checked || new Date().toISOString()
+            // WICHTIG: Kein new Date() Fallback mehr! Wir wollen die Wahrheit aus der DB.
+            lastChecked: settings.last_checked || null
           });
         }
       } catch (e) {
@@ -40,7 +41,8 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
   }, []);
 
   const getTimeAgo = (isoString: string | null) => {
-    if (!isoString) return "Vor kurzem";
+    if (!isoString) return "Warte auf Daten..."; // Ehrliche Anzeige
+    
     const diff = Math.floor((new Date().getTime() - new Date(isoString).getTime()) / 60000);
     if (diff < 1) return "Gerade eben";
     if (diff === 1) return "Vor 1 Minute";
@@ -93,14 +95,14 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           ) : (
             <div className="flex gap-6 font-mono">
                 <div className="flex items-center gap-2 text-slate-300">
-                <span className={`h-2 w-2 rounded-full ${status.gold === 'available' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
+                <span className={`h-2 w-2 rounded-full ${status.gold === 'available' ? 'bg-green-500' : 'bg-red-500'} ${status.lastChecked ? 'animate-pulse' : ''}`}></span>
                 ResortPass Gold: 
                 <span className={`${status.gold === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>
                     {status.gold === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}
                 </span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-300">
-                <span className={`h-2 w-2 rounded-full ${status.silver === 'available' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
+                <span className={`h-2 w-2 rounded-full ${status.silver === 'available' ? 'bg-green-500' : 'bg-red-500'} ${status.lastChecked ? 'animate-pulse' : ''}`}></span>
                 ResortPass Silver: 
                 <span className={`${status.silver === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>
                     {status.silver === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}
