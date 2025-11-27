@@ -55,6 +55,7 @@ DROP TABLE IF EXISTS public.payouts CASCADE;
 DROP TABLE IF EXISTS public.commissions CASCADE;
 DROP TABLE IF EXISTS public.subscriptions CASCADE;
 DROP TABLE IF EXISTS public.profiles CASCADE;
+DROP TABLE IF EXISTS public.system_settings CASCADE;
 
 -- 2. Tabelle: Profile (Nutzer & Partner)
 CREATE TABLE public.profiles (
@@ -68,7 +69,8 @@ CREATE TABLE public.profiles (
   zip text,
   city text,
   country text DEFAULT 'Deutschland',
-  referral_code text, -- Für Partner: Ihr eigener Code
+  referral_code text UNIQUE, -- Für Partner: Ihr eigener Code
+  website text, -- Partner Webseite
   paypal_email text, -- Für Partner Auszahlungen
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -106,13 +108,21 @@ CREATE TABLE public.payouts (
   completed_at timestamp with time zone
 );
 
--- 6. Sicherheit aktivieren (Row Level Security)
+-- 6. Tabelle: Systemeinstellungen (Global)
+CREATE TABLE public.system_settings (
+  key text PRIMARY KEY,
+  value text NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
+);
+
+-- 7. Sicherheit aktivieren (Row Level Security)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payouts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
--- 7. Zugriffsregeln (Policies)
+-- 8. Zugriffsregeln (Policies)
 -- Profiles: Öffentlich lesbar (für System), schreibbar nur durch Inhaber
 CREATE POLICY "Public profiles are viewable by everyone." ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Users can insert their own profile." ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
@@ -127,17 +137,29 @@ CREATE POLICY "Partners see own commissions" ON public.commissions FOR SELECT US
 -- Payouts: Partner sehen nur ihre eigenen Auszahlungen
 CREATE POLICY "Partners see own payouts" ON public.payouts FOR SELECT USING (auth.uid() = partner_id);
 
--- 8. Automatik: Profil erstellen bei Registrierung
+-- System Settings: Jeder darf lesen, Admin darf schreiben
+CREATE POLICY "Public read settings" ON public.system_settings FOR SELECT USING (true);
+CREATE POLICY "Admin update settings" ON public.system_settings FOR UPDATE USING (
+  auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
+);
+CREATE POLICY "Admin insert settings" ON public.system_settings FOR INSERT WITH CHECK (
+  auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
+);
+
+-- 9. Automatik: Profil erstellen bei Registrierung
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, first_name, last_name, role)
+  INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code)
   VALUES (
     new.id, 
     new.email, 
     new.raw_user_meta_data->>'first_name', 
     new.raw_user_meta_data->>'last_name', 
-    COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER')
+    COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'),
+    new.raw_user_meta_data->>'website',
+    -- Generiere einen kurzen Standard-Code aus dem Vornamen + Zufallszahl, falls keiner da ist
+    LOWER(REGEXP_REPLACE(new.raw_user_meta_data->>'first_name', '\W+', '', 'g')) || '-' || FLOOR(RANDOM() * 1000)::text
   );
   RETURN new;
 END;
@@ -146,4 +168,59 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- Standardwert für Provision
+INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate', '50') ON CONFLICT DO NOTHING;
+```
+
+## E-Mail Templates
+
+Füge diesen HTML-Code in Supabase unter **Email Templates -> Confirm signup** ein:
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; margin-top: 40px; border: 1px solid #e2e8f0; }
+    .header { text-align: center; margin-bottom: 30px; }
+    .logo { font-size: 24px; font-weight: bold; color: #00305e; text-decoration: none; }
+    .logo span { color: #ffcc00; }
+    .button { display: inline-block; background-color: #00305e; color: #ffffff !important; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 20px; }
+    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="{{ .SiteURL }}" class="logo">ResortPass<span>Alarm</span></a>
+    </div>
+    
+    <!-- INTELLIGENTE UNTERSCHEIDUNG: PARTNER ODER KUNDE -->
+    {{ if eq .Data.role "AFFILIATE" }}
+        <h2>Willkommen beim Partnerprogramm!</h2>
+        <p>Hallo {{ .Data.first_name }},</p>
+        <p>Du bist nur noch einen Klick davon entfernt, Provisionen zu verdienen.</p>
+        <p>Bitte bestätige deine E-Mail Adresse, um deinen Partner-Account zu aktivieren und Zugriff auf dein Dashboard und deinen Tracking-Link zu erhalten.</p>
+    {{ else }}
+        <h2>Willkommen an Bord!</h2>
+        <p>Hallo {{ .Data.first_name }},</p>
+        <p>Du hast dich gerade für den ResortPassAlarm registriert.</p>
+        <p>Um deinen Account zu aktivieren und mit der Überwachung zu starten, bestätige bitte deine E-Mail Adresse.</p>
+    {{ end }}
+    
+    <div style="text-align: center;">
+      <a href="{{ .ConfirmationURL }}" class="button">E-Mail bestätigen</a>
+    </div>
+    
+    <p style="margin-top: 30px; font-size: 12px; color: #64748b;">Falls du dich nicht registriert hast, kannst du diese E-Mail ignorieren.</p>
+    
+    <div class="footer">
+      &copy; ResortPassAlarm. Keine offizielle Seite des Europa-Park Resorts.
+    </div>
+  </div>
+</body>
+</html>
 ```

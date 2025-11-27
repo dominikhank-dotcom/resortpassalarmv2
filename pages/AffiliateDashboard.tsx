@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
@@ -32,6 +32,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     firstName: '',
     lastName: '',
     email: '',
+    website: '', // New field
+    referralCode: '', // New field
     street: '',
     houseNumber: '',
     zip: '',
@@ -61,6 +63,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     firstName: profile.first_name || '',
                     lastName: profile.last_name || '',
                     email: profile.email || user.email || '',
+                    website: profile.website || '',
+                    referralCode: profile.referral_code || profile.id, // Use custom code or fallback to ID
                     street: profile.street || '',
                     houseNumber: profile.house_number || '',
                     zip: profile.zip || '',
@@ -74,10 +78,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     confirmNewPassword: ''
                 });
 
-                // Generate Referral Link based on ID or Code
-                const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
-                const code = profile.referral_code || profile.id;
-                setRefLink(`${siteUrl}?ref=${code}`);
+                // Generate Referral Link based on Code or ID
+                updateRefLinkDisplay(profile.referral_code || profile.id);
             }
 
             // Fetch Commissions Stats
@@ -100,6 +102,13 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     };
     loadProfile();
   }, []);
+
+  const updateRefLinkDisplay = (code: string) => {
+      const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
+      // Remove trailing slash if present
+      const cleanUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
+      setRefLink(`${cleanUrl}?ref=${code}`);
+  }
 
 
   // Check if mandatory fields are filled
@@ -152,13 +161,27 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       return;
     }
 
+    // Validate Referral Code (Simple regex: letters, numbers, hyphens)
+    if (settings.referralCode && !/^[a-zA-Z0-9-_]+$/.test(settings.referralCode)) {
+        alert("Der Partner Code darf nur Buchstaben, Zahlen und Bindestriche enthalten.");
+        return;
+    }
+
     try {
         await updateAffiliateProfile(settings);
+        
+        // Update the link display immediately
+        updateRefLinkDisplay(settings.referralCode);
+        
         alert("Daten erfolgreich gespeichert.");
         // Clear password fields after save
         setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
     } catch (error: any) {
-        alert("Fehler beim Speichern: " + error.message);
+        if (error.message.includes('unique_referral_code')) {
+            alert("Dieser Partner Code ist leider schon vergeben. Bitte wähle einen anderen.");
+        } else {
+            alert("Fehler beim Speichern: " + error.message);
+        }
     }
   };
 
@@ -364,6 +387,43 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
                   />
                 </div>
+                <div className="mt-4">
+                  <label className="block text-sm font-medium text-slate-700 mb-1 flex items-center gap-2">
+                     <Globe size={16} /> Webseite / Kanal
+                  </label>
+                  <input 
+                    type="text" 
+                    value={settings.website}
+                    onChange={(e) => setSettings({...settings, website: e.target.value})}
+                    placeholder="z.B. https://instagram.com/mein_kanal"
+                    className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                  />
+                </div>
+              </section>
+
+              <hr className="border-slate-100" />
+
+              {/* Partner Code Section (New) */}
+              <section className="bg-indigo-50 rounded-xl p-6 border border-indigo-100">
+                 <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Hash size={16} /> Partner Code (Ref-ID)
+                 </h3>
+                 <p className="text-sm text-indigo-700 mb-3">
+                    Definiere hier deinen persönlichen Code, der am Ende deines Links steht. Mache ihn kurz und merkbar.
+                 </p>
+                 <div className="flex gap-2 items-center">
+                    <span className="text-slate-500 text-sm font-mono whitespace-nowrap hidden md:block">
+                        resortpassalarm.com?ref=
+                    </span>
+                    <input 
+                        type="text" 
+                        value={settings.referralCode}
+                        onChange={(e) => setSettings({...settings, referralCode: e.target.value})}
+                        className="flex-1 px-4 py-2 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" 
+                        placeholder="dein-name"
+                    />
+                 </div>
+                 <p className="text-xs text-indigo-400 mt-2">Erlaubt: Buchstaben, Zahlen, Bindestrich. Keine Leerzeichen.</p>
               </section>
 
               <hr className="border-slate-100" />
