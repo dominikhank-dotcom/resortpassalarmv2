@@ -3,7 +3,7 @@ import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSqua
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
-import { sendTestAlarm, createCheckoutSession } from '../services/backendService';
+import { sendTestAlarm, createCheckoutSession, getSystemSettings } from '../services/backendService';
 import { supabase } from '../lib/supabase';
 
 interface LogEntry {
@@ -28,14 +28,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   const [monitorGold, setMonitorGold] = useState<MonitorStatus>({
     isActive: true,
-    lastChecked: new Date().toLocaleTimeString(),
+    lastChecked: "Lade...",
     isAvailable: false,
     url: productUrls.gold
   });
 
   const [monitorSilver, setMonitorSilver] = useState<MonitorStatus>({
     isActive: true,
-    lastChecked: new Date().toLocaleTimeString(),
+    lastChecked: "Lade...",
     isAvailable: false,
     url: productUrls.silver
   });
@@ -134,13 +134,35 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     fetchProfile();
   }, []);
 
-  // Simulation logic for auto-update time
+  // Fetch REAL System Status (Sync with Admin/LandingPage)
+  const fetchSystemStatus = async () => {
+      try {
+          const settings = await getSystemSettings();
+          if (settings) {
+              const lastCheckedTime = settings.last_checked 
+                  ? new Date(settings.last_checked).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+                  : "Warte auf Daten...";
+
+              setMonitorGold(prev => ({
+                  ...prev,
+                  isAvailable: settings.status_gold === 'available',
+                  lastChecked: lastCheckedTime
+              }));
+              setMonitorSilver(prev => ({
+                  ...prev,
+                  isAvailable: settings.status_silver === 'available',
+                  lastChecked: lastCheckedTime
+              }));
+          }
+      } catch (e) {
+          console.error("Failed to sync status", e);
+      }
+  };
+
+  // Poll for status updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date().toLocaleTimeString();
-      setMonitorGold(prev => ({ ...prev, lastChecked: now }));
-      setMonitorSilver(prev => ({ ...prev, lastChecked: now }));
-    }, 60000);
+    fetchSystemStatus(); // Initial fetch
+    const interval = setInterval(fetchSystemStatus, 60000); // Check every minute
 
     // Check for payment success query param
     const query = new URLSearchParams(window.location.search);
@@ -193,24 +215,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     }
   };
 
-  const toggleAvailability = (type: 'gold' | 'silver') => {
-    if (type === 'gold') setMonitorGold(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
-    if (type === 'silver') setMonitorSilver(prev => ({ ...prev, isAvailable: !prev.isAvailable }));
-  };
-
-  // Helper for dev testing
-  const toggleFreeSub = () => {
-    setSubscriptionStatus(prev => prev === 'FREE' ? 'NONE' : 'FREE');
-  }
-
   const handleManualCheck = (type: 'gold' | 'silver') => {
     setIsChecking(type);
-    setTimeout(() => {
-      const now = new Date().toLocaleTimeString();
-      if (type === 'gold') setMonitorGold(prev => ({ ...prev, lastChecked: now }));
-      if (type === 'silver') setMonitorSilver(prev => ({ ...prev, lastChecked: now }));
-      setIsChecking(null);
-    }, 1500);
+    // On manual check, we force a refresh from the server DB
+    fetchSystemStatus().then(() => {
+        setTimeout(() => setIsChecking(null), 800); // Small delay for UX
+    });
   };
 
   // -- Email Handling --
@@ -366,10 +376,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
               <ExternalLink size={12} />
               Zum Europa-Park Shop
             </a>
-        </div>
-
-        <div className="px-2 pb-2 bg-slate-50 text-center">
-           <button onClick={() => toggleAvailability(type)} className="text-[9px] text-slate-300 hover:text-slate-500 uppercase">Dev: Toggle Status</button>
         </div>
       </div>
     );
@@ -778,10 +784,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
               </div>
           </div>
         </div>
-      </div>
-      <div className="hidden">
-         {/* Hidden Dev Tool to simulate Free status for testing */}
-         <button onClick={toggleFreeSub}>Toggle Free</button>
       </div>
       <Footer navigate={navigate} />
     </div>
