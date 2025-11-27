@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
@@ -59,12 +59,13 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 .single();
             
             if (profile) {
+                const loadedCode = profile.referral_code || profile.id;
                 setSettings({
                     firstName: profile.first_name || '',
                     lastName: profile.last_name || '',
                     email: profile.email || user.email || '',
                     website: profile.website || '',
-                    referralCode: profile.referral_code || profile.id, // Use custom code or fallback to ID
+                    referralCode: loadedCode, // Use custom code or fallback to ID
                     street: profile.street || '',
                     houseNumber: profile.house_number || '',
                     zip: profile.zip || '',
@@ -79,7 +80,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 });
 
                 // Generate Referral Link based on Code or ID
-                updateRefLinkDisplay(profile.referral_code || profile.id);
+                updateRefLinkDisplay(loadedCode);
             }
 
             // Fetch Commissions Stats
@@ -109,6 +110,12 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       const cleanUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
       setRefLink(`${cleanUrl}?ref=${code}`);
   }
+
+  // Handle immediate visual update when typing
+  const handleCodeChange = (val: string) => {
+      setSettings(prev => ({...prev, referralCode: val}));
+      updateRefLinkDisplay(val);
+  };
 
 
   // Check if mandatory fields are filled
@@ -154,6 +161,31 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
   };
 
+  const validateReferralCode = (code: string) => {
+      if (!code) return false;
+      return /^[a-zA-Z0-9-_]+$/.test(code);
+  }
+
+  const handleSaveReferralCode = async (e: React.MouseEvent) => {
+      e.preventDefault();
+      if (!validateReferralCode(settings.referralCode)) {
+          alert("Der Partner Code darf nur Buchstaben, Zahlen und Bindestriche enthalten.");
+          return;
+      }
+
+      try {
+          // Update only profile data relevant to saving
+          await updateAffiliateProfile(settings);
+          alert("Partner Code erfolgreich gesichert!");
+      } catch (error: any) {
+          if (error.message && error.message.includes('unique_referral_code')) {
+              alert("Dieser Code ist leider schon vergeben. Bitte wähle einen anderen.");
+          } else {
+              alert("Fehler beim Speichern: " + error.message);
+          }
+      }
+  }
+
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (settings.newPassword && settings.newPassword !== settings.confirmNewPassword) {
@@ -161,23 +193,18 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       return;
     }
 
-    // Validate Referral Code (Simple regex: letters, numbers, hyphens)
-    if (settings.referralCode && !/^[a-zA-Z0-9-_]+$/.test(settings.referralCode)) {
+    if (settings.referralCode && !validateReferralCode(settings.referralCode)) {
         alert("Der Partner Code darf nur Buchstaben, Zahlen und Bindestriche enthalten.");
         return;
     }
 
     try {
         await updateAffiliateProfile(settings);
-        
-        // Update the link display immediately
-        updateRefLinkDisplay(settings.referralCode);
-        
         alert("Daten erfolgreich gespeichert.");
         // Clear password fields after save
         setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
     } catch (error: any) {
-        if (error.message.includes('unique_referral_code')) {
+        if (error.message && error.message.includes('unique_referral_code')) {
             alert("Dieser Partner Code ist leider schon vergeben. Bitte wähle einen anderen.");
         } else {
             alert("Fehler beim Speichern: " + error.message);
@@ -411,17 +438,22 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                  <p className="text-sm text-indigo-700 mb-3">
                     Definiere hier deinen persönlichen Code, der am Ende deines Links steht. Mache ihn kurz und merkbar.
                  </p>
-                 <div className="flex gap-2 items-center">
-                    <span className="text-slate-500 text-sm font-mono whitespace-nowrap hidden md:block">
-                        resortpassalarm.com?ref=
-                    </span>
-                    <input 
-                        type="text" 
-                        value={settings.referralCode}
-                        onChange={(e) => setSettings({...settings, referralCode: e.target.value})}
-                        className="flex-1 px-4 py-2 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" 
-                        placeholder="dein-name"
-                    />
+                 <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                    <div className="flex items-center gap-2 w-full md:w-auto flex-1">
+                        <span className="text-slate-500 text-sm font-mono whitespace-nowrap hidden md:block">
+                            resortpassalarm.com?ref=
+                        </span>
+                        <input 
+                            type="text" 
+                            value={settings.referralCode}
+                            onChange={(e) => handleCodeChange(e.target.value)}
+                            className="w-full md:flex-1 px-4 py-2 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" 
+                            placeholder="dein-name"
+                        />
+                    </div>
+                    <Button onClick={handleSaveReferralCode} size="sm" variant="primary" className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
+                        <Check size={16} className="mr-1" /> Code sichern
+                    </Button>
                  </div>
                  <p className="text-xs text-indigo-400 mt-2">Erlaubt: Buchstaben, Zahlen, Bindestrich. Keine Leerzeichen.</p>
               </section>

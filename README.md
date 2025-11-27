@@ -45,20 +45,22 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 
 ## Datenbank Setup (SQL)
 
-Führe diesen SQL-Code im **Supabase SQL Editor** aus, um die Datenbank zu initialisieren:
+Führe diesen SQL-Code im **Supabase SQL Editor** aus, um die Datenbank zu initialisieren.
+Falls Fehler wie "relation already exists" auftreten, ist das gut - dann existiert die Tabelle schon.
 
 ```sql
--- 1. Alles sauber entfernen (Clean Slate mit CASCADE für Abhängigkeiten)
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-DROP FUNCTION IF EXISTS public.handle_new_user();
-DROP TABLE IF EXISTS public.payouts CASCADE;
-DROP TABLE IF EXISTS public.commissions CASCADE;
-DROP TABLE IF EXISTS public.subscriptions CASCADE;
-DROP TABLE IF EXISTS public.profiles CASCADE;
-DROP TABLE IF EXISTS public.system_settings CASCADE;
+-- 1. Bestehende Tabellen entfernen (Vorsicht: Löscht Daten!)
+-- Nur ausführen wenn du ganz von vorne startest!
+-- DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+-- DROP FUNCTION IF EXISTS public.handle_new_user();
+-- DROP TABLE IF EXISTS public.payouts CASCADE;
+-- DROP TABLE IF EXISTS public.commissions CASCADE;
+-- DROP TABLE IF EXISTS public.subscriptions CASCADE;
+-- DROP TABLE IF EXISTS public.profiles CASCADE;
+-- DROP TABLE IF EXISTS public.system_settings CASCADE;
 
--- 2. Tabelle: Profile (Nutzer & Partner)
-CREATE TABLE public.profiles (
+-- 2. Tabellen erstellen (Falls nicht vorhanden)
+CREATE TABLE IF NOT EXISTS public.profiles (
   id uuid REFERENCES auth.users ON DELETE CASCADE NOT NULL PRIMARY KEY,
   email text,
   first_name text,
@@ -75,8 +77,17 @@ CREATE TABLE public.profiles (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 3. Tabelle: Abonnements (Status der Nutzer)
-CREATE TABLE public.subscriptions (
+-- Spalten nachträglich hinzufügen (Falls Tabelle schon da war)
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
+-- Constraints sicherstellen (Ignorieren falls schon da)
+DO $$ BEGIN
+  ALTER TABLE public.profiles ADD CONSTRAINT unique_referral_code UNIQUE (referral_code);
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
+
+CREATE TABLE IF NOT EXISTS public.subscriptions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
   stripe_customer_id text,
@@ -87,66 +98,72 @@ CREATE TABLE public.subscriptions (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 4. Tabelle: Provisionen (Partnerprogramm Tracking)
-CREATE TABLE public.commissions (
+CREATE TABLE IF NOT EXISTS public.commissions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  partner_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL, -- Wer bekommt das Geld?
-  source_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL, -- Wer hat gekauft?
+  partner_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
+  source_user_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL,
   amount decimal(10,2) NOT NULL,
-  status text DEFAULT 'pending', -- 'pending' (vorgemerkt), 'paid' (ausbezahlt)
+  status text DEFAULT 'pending',
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 5. Tabelle: Auszahlungen (Partner fordert Geld an)
-CREATE TABLE public.payouts (
+CREATE TABLE IF NOT EXISTS public.payouts (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   partner_id uuid REFERENCES public.profiles(id) ON DELETE CASCADE,
   amount decimal(10,2) NOT NULL,
-  status text DEFAULT 'requested', -- 'requested', 'completed'
+  status text DEFAULT 'requested',
   paypal_email text,
   requested_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   completed_at timestamp with time zone
 );
 
--- 6. Tabelle: Systemeinstellungen (Global)
-CREATE TABLE public.system_settings (
+CREATE TABLE IF NOT EXISTS public.system_settings (
   key text PRIMARY KEY,
   value text NOT NULL,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
--- 7. Sicherheit aktivieren (Row Level Security)
+-- 3. Sicherheit aktivieren (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
 
--- 8. Zugriffsregeln (Policies)
--- Profiles: Öffentlich lesbar (für System), schreibbar nur durch Inhaber
+-- 4. Policies (Wer darf was?)
+-- Hinweis: Fehler "policy already exists" kann ignoriert werden
+DROP POLICY IF EXISTS "Public profiles are viewable by everyone." ON public.profiles;
 CREATE POLICY "Public profiles are viewable by everyone." ON public.profiles FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Users can insert their own profile." ON public.profiles;
 CREATE POLICY "Users can insert their own profile." ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+
+DROP POLICY IF EXISTS "Users can update own profile." ON public.profiles;
 CREATE POLICY "Users can update own profile." ON public.profiles FOR UPDATE USING (auth.uid() = id);
 
--- Subscriptions: Nutzer sehen nur ihr eigenes Abo
+DROP POLICY IF EXISTS "Users see own subscription" ON public.subscriptions;
 CREATE POLICY "Users see own subscription" ON public.subscriptions FOR SELECT USING (auth.uid() = user_id);
 
--- Commissions: Partner sehen nur ihre eigenen Provisionen
+DROP POLICY IF EXISTS "Partners see own commissions" ON public.commissions;
 CREATE POLICY "Partners see own commissions" ON public.commissions FOR SELECT USING (auth.uid() = partner_id);
 
--- Payouts: Partner sehen nur ihre eigenen Auszahlungen
+DROP POLICY IF EXISTS "Partners see own payouts" ON public.payouts;
 CREATE POLICY "Partners see own payouts" ON public.payouts FOR SELECT USING (auth.uid() = partner_id);
 
--- System Settings: Jeder darf lesen, Admin darf schreiben
+DROP POLICY IF EXISTS "Public read settings" ON public.system_settings;
 CREATE POLICY "Public read settings" ON public.system_settings FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admin update settings" ON public.system_settings;
 CREATE POLICY "Admin update settings" ON public.system_settings FOR UPDATE USING (
   auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
 );
+
+DROP POLICY IF EXISTS "Admin insert settings" ON public.system_settings;
 CREATE POLICY "Admin insert settings" ON public.system_settings FOR INSERT WITH CHECK (
   auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
 );
 
--- 9. Automatik: Profil erstellen bei Registrierung
+-- 5. Automatik Trigger (WICHTIG FÜR NEUE USER)
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 BEGIN
@@ -158,18 +175,19 @@ BEGIN
     new.raw_user_meta_data->>'last_name', 
     COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'),
     new.raw_user_meta_data->>'website',
-    -- Generiere einen kurzen Standard-Code aus dem Vornamen + Zufallszahl, falls keiner da ist
+    -- Generiere Code: vorname-zufallszahl (Alles klein, keine Sonderzeichen)
     LOWER(REGEXP_REPLACE(new.raw_user_meta_data->>'first_name', '\W+', '', 'g')) || '-' || FLOOR(RANDOM() * 1000)::text
   );
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Standardwert für Provision
+-- Standardwert Provision
 INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate', '50') ON CONFLICT DO NOTHING;
 ```
 

@@ -129,8 +129,8 @@ export const updateAffiliateProfile = async (settings: any) => {
     const { error } = await supabase.from('profiles').update({
         first_name: settings.firstName,
         last_name: settings.lastName,
-        website: settings.website, // Added
-        referral_code: settings.referralCode, // Added
+        website: settings.website,
+        referral_code: settings.referralCode,
         street: settings.street,
         house_number: settings.houseNumber,
         zip: settings.zip,
