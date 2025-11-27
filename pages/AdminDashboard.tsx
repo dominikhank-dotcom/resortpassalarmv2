@@ -781,6 +781,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {activeTab === 'partners' && !selectedCustomerId && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
           
+          {/* Commission Settings Block */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                <Settings size={20} className="text-blue-600" /> Programm Konfiguration
+             </h3>
+             <div className="flex items-end gap-4">
+                <div className="flex-1 max-w-xs">
+                   <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Globale Provision (%)</label>
+                   <input 
+                      type="number" 
+                      min="0" max="100"
+                      value={commissionRate}
+                      onChange={(e) => onUpdateCommission(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-bold text-lg"
+                   />
+                </div>
+                <div className="flex-1">
+                   <p className="text-sm text-slate-500 mb-2">
+                     Änderungen wirken sich sofort auf alle Anzeigetexte, Rechenbeispiele und zukünftige Abrechnungen aus.
+                   </p>
+                </div>
+                <Button onClick={() => alert(`Provision auf ${commissionRate}% aktualisiert.`)}>
+                   <Save size={16} className="mr-2" /> Speichern
+                </Button>
+             </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-1 gap-8">
              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="p-6 border-b border-slate-100">

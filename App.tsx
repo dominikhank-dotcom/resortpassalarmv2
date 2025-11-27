@@ -361,7 +361,7 @@ const App: React.FC = () => {
           />
         );
       case 'affiliate-signup':
-        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { /* Wait for auth listener */ }} />;
+        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { /* Wait for auth listener */ }} onNavigate={navigate} />;
       case 'affiliate-login':
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={() => navigate('affiliate')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       case 'user-signup':
