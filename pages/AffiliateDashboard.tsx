@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
@@ -295,11 +295,11 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
           </div>
 
           {/* Link Section */}
-          <div className="bg-indigo-900 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
+          <div className="bg-indigo-900 rounded-2xl p-6 sm:p-8 text-white flex flex-col md:flex-row items-start justify-between gap-6 shadow-lg">
             <div className="w-full md:w-1/2">
               <h3 className="text-lg font-semibold mb-2">Dein Affiliate Link</h3>
               <p className="text-indigo-200 text-sm mb-4">Teile diesen Link auf Social Media, deiner Webseite oder in Newslettern.</p>
-              <div className="flex bg-indigo-800/50 p-1 rounded-lg border border-indigo-700">
+              <div className="flex bg-indigo-800/50 p-1 rounded-lg border border-indigo-700 mb-2">
                 <input 
                   type="text" 
                   value={refLink} 
@@ -310,8 +310,13 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                   <Copy size={16} /> Kopieren
                 </button>
               </div>
+              <div className="text-right">
+                  <button onClick={() => setActiveTab('settings')} className="text-xs text-indigo-300 hover:text-white underline flex items-center gap-1 ml-auto">
+                      ID ändern <ArrowRight size={10} />
+                  </button>
+              </div>
             </div>
-            <div className="hidden md:block w-px h-24 bg-indigo-700/50"></div>
+            <div className="hidden md:block w-px h-24 bg-indigo-700/50 self-center"></div>
             <div className="w-full md:w-1/2">
               <h3 className="text-lg font-semibold mb-2 flex items-center gap-2"><Sparkles size={18} className="text-yellow-400" /> KI Marketing Assistent</h3>
               <p className="text-indigo-200 text-sm mb-4">Lass unsere KI den perfekten Werbetext für dich schreiben.</p>
@@ -438,23 +443,35 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                  <p className="text-sm text-indigo-700 mb-3">
                     Definiere hier deinen persönlichen Code, der am Ende deines Links steht. Mache ihn kurz und merkbar.
                  </p>
-                 <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
-                    <div className="flex items-center gap-2 w-full md:w-auto flex-1">
-                        <span className="text-slate-500 text-sm font-mono whitespace-nowrap hidden md:block">
-                            resortpassalarm.com?ref=
-                        </span>
-                        <input 
-                            type="text" 
-                            value={settings.referralCode}
-                            onChange={(e) => handleCodeChange(e.target.value)}
-                            className="w-full md:flex-1 px-4 py-2 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" 
-                            placeholder="dein-name"
-                        />
+                 
+                 <div className="flex flex-col gap-4">
+                    <div className="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                        <div className="flex items-center gap-2 w-full md:w-auto flex-1">
+                            <span className="text-slate-500 text-sm font-mono whitespace-nowrap hidden md:block">
+                                resortpassalarm.com?ref=
+                            </span>
+                            <input 
+                                type="text" 
+                                value={settings.referralCode}
+                                onChange={(e) => handleCodeChange(e.target.value)}
+                                className="w-full md:flex-1 px-4 py-2 rounded-lg border border-indigo-200 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-900" 
+                                placeholder="dein-name"
+                            />
+                        </div>
+                        <Button onClick={handleSaveReferralCode} size="sm" variant="primary" className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
+                            <Check size={16} className="mr-1" /> Code sichern
+                        </Button>
                     </div>
-                    <Button onClick={handleSaveReferralCode} size="sm" variant="primary" className="bg-indigo-600 hover:bg-indigo-700 whitespace-nowrap">
-                        <Check size={16} className="mr-1" /> Code sichern
-                    </Button>
+                    
+                    {/* Warning Box */}
+                    <div className="flex items-start gap-3 bg-indigo-100/50 p-3 rounded-lg border border-indigo-200">
+                        <AlertTriangle className="text-indigo-500 shrink-0 mt-0.5" size={16} />
+                        <div className="text-xs text-indigo-800">
+                            <strong>Wichtig:</strong> Wenn du deine ID änderst, funktionieren alte Links, die du bereits geteilt hast, <u>nicht mehr</u> für neue Besucher. Deine bisherigen Provisionen bleiben sicher erhalten.
+                        </div>
+                    </div>
                  </div>
+                 
                  <p className="text-xs text-indigo-400 mt-2">Erlaubt: Buchstaben, Zahlen, Bindestrich. Keine Leerzeichen.</p>
               </section>
 

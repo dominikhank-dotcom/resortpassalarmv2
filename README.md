@@ -164,9 +164,36 @@ CREATE POLICY "Admin insert settings" ON public.system_settings FOR INSERT WITH 
 );
 
 -- 5. Automatik Trigger (WICHTIG FÜR NEUE USER)
+-- Aktualisiert, um Webseite zu nutzen
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
+DECLARE
+  base_code text;
+  final_code text;
+  website_input text;
 BEGIN
+  website_input := new.raw_user_meta_data->>'website';
+  
+  -- 1. Versuch: Code aus Webseite generieren
+  IF website_input IS NOT NULL AND length(website_input) > 0 THEN
+     -- Entfernt http, www, alles nach dem ersten Slash und alle Sonderzeichen
+     base_code := lower(regexp_replace(website_input, '^(https?://)?(www\.)?|/.*$|\W', '', 'g'));
+     -- Falls z.B. "instagram.com/user" eingegeben wurde, versuchen wir den User part zu greifen
+     IF length(base_code) > 20 OR length(base_code) < 3 THEN
+        -- Fallback: Einfach alles säubern
+        base_code := lower(regexp_replace(website_input, '\W+', '', 'g'));
+     END IF;
+  END IF;
+
+  -- 2. Fallback: Vorname nutzen, wenn Webseiten-Code nix taugt
+  IF base_code IS NULL OR length(base_code) < 3 THEN
+     base_code := lower(regexp_replace(new.raw_user_meta_data->>'first_name', '\W+', '', 'g'));
+  END IF;
+
+  -- 3. Code bauen: Basis + Zufallszahl (um Kollisionen zu vermeiden)
+  -- Schneidet den Code bei 15 Zeichen ab, damit er nicht zu lang wird
+  final_code := substring(base_code from 1 for 15) || '-' || floor(random() * 1000)::text;
+
   INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code)
   VALUES (
     new.id, 
@@ -174,9 +201,8 @@ BEGIN
     new.raw_user_meta_data->>'first_name', 
     new.raw_user_meta_data->>'last_name', 
     COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'),
-    new.raw_user_meta_data->>'website',
-    -- Generiere Code: vorname-zufallszahl (Alles klein, keine Sonderzeichen)
-    LOWER(REGEXP_REPLACE(new.raw_user_meta_data->>'first_name', '\W+', '', 'g')) || '-' || FLOOR(RANDOM() * 1000)::text
+    website_input,
+    final_code
   );
   RETURN new;
 END;
