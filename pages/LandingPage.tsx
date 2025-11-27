@@ -1,7 +1,8 @@
-import React from 'react';
-import { Clock, Zap, Check, HelpCircle, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
+import { getSystemSettings } from '../services/backendService';
 
 interface LandingProps {
   onSignup: () => void;
@@ -11,6 +12,42 @@ interface LandingProps {
 }
 
 export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onAffiliateInfo, navigate }) => {
+  const [status, setStatus] = useState({
+    gold: 'sold_out', // 'available' | 'sold_out'
+    silver: 'sold_out',
+    lastChecked: null as string | null
+  });
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const settings = await getSystemSettings();
+        if (settings) {
+          setStatus({
+            gold: settings.status_gold || 'sold_out',
+            silver: settings.status_silver || 'sold_out',
+            lastChecked: settings.last_checked || new Date().toISOString()
+          });
+        }
+      } catch (e) {
+        console.error("Failed to load status", e);
+      } finally {
+        setLoadingStatus(false);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  const getTimeAgo = (isoString: string | null) => {
+    if (!isoString) return "Vor kurzem";
+    const diff = Math.floor((new Date().getTime() - new Date(isoString).getTime()) / 60000);
+    if (diff < 1) return "Gerade eben";
+    if (diff === 1) return "Vor 1 Minute";
+    if (diff > 60) return "Vor > 1 Stunde";
+    return `Vor ${diff} Minuten`;
+  };
+
   const scrollToFeatures = () => {
     document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -49,18 +86,31 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
       {/* Status Ticker */}
       <div className="bg-slate-950 border-y border-slate-800 py-3 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-sm gap-2">
-          <div className="flex gap-6 font-mono">
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-              ResortPass Gold: <span className="text-red-400 font-bold uppercase">Ausverkauft</span>
+          {loadingStatus ? (
+             <div className="flex items-center gap-2 text-slate-500">
+                <Loader2 size={14} className="animate-spin" /> Lade Live-Status...
+             </div>
+          ) : (
+            <div className="flex gap-6 font-mono">
+                <div className="flex items-center gap-2 text-slate-300">
+                <span className={`h-2 w-2 rounded-full ${status.gold === 'available' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
+                ResortPass Gold: 
+                <span className={`${status.gold === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>
+                    {status.gold === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}
+                </span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-300">
+                <span className={`h-2 w-2 rounded-full ${status.silver === 'available' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`}></span>
+                ResortPass Silver: 
+                <span className={`${status.silver === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>
+                    {status.silver === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}
+                </span>
+                </div>
             </div>
-            <div className="flex items-center gap-2 text-slate-300">
-              <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse"></span>
-              ResortPass Silver: <span className="text-red-400 font-bold uppercase">Ausverkauft</span>
-            </div>
-          </div>
+          )}
+          
           <div className="text-slate-500 text-xs flex items-center gap-1">
-            <Clock size={12} /> Zuletzt geprüft: Vor 1 Minute
+            <Clock size={12} /> Zuletzt geprüft: {loadingStatus ? '...' : getTimeAgo(status.lastChecked)}
           </div>
         </div>
       </div>
