@@ -177,3 +177,20 @@ export const updateSystemSettings = async (key: string, value: string) => {
         throw error;
     }
 };
+
+export const updateSystemStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/update-system-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type, status, userId: user.id })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Update Status Error:", error);
+        throw error;
+    }
+};

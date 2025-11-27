@@ -5,7 +5,7 @@ import {
   Search, Save, Database, CreditCard, Mail, MessageSquare, 
   Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
   ArrowLeft, RotateCcw, AlertTriangle, UserX, UserCheck, Ban,
-  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift, Lock, Shield, Link
+  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift, Lock, Shield, Link, RefreshCw
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings } from '../services/backendService';
+import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -185,6 +185,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [partners, setPartners] = useState<any[]>([]);
   const [dashboardStats, setDashboardStats] = useState({ activeUsers: 0, revenue: 0, apiCalls: 142000, conversion: 4.2 });
   const [isLoadingData, setIsLoadingData] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState({ gold: 'unknown', silver: 'unknown', lastChecked: '' });
   
   // Customer Detail State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -244,9 +245,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         
         if (partnerData) setPartners(partnerData);
 
-        // 4. Calculate Revenue (Estimation based on active subs if table exists)
-        // Since we don't have a payments table yet in the schema provided earlier (just payouts/commissions),
-        // we can assume active subs * 1.99 for monthly revenue estimation
+        // 4. Calculate Revenue
         const { count } = await supabase
             .from('subscriptions')
             .select('*', { count: 'exact', head: true })
@@ -254,6 +253,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         
         if (count !== null) {
             setDashboardStats(prev => ({ ...prev, revenue: count * 1.99 }));
+        }
+
+        // 5. Fetch Current System Status (Availability)
+        const settings = await getSystemSettings();
+        if (settings) {
+            setCurrentStatus({
+                gold: settings.status_gold || 'unknown',
+                silver: settings.status_silver || 'unknown',
+                lastChecked: settings.last_checked || 'Nie'
+            });
         }
 
       } catch (error) {
@@ -264,7 +273,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     };
 
     fetchData();
-  }, []);
+  }, [activeTab]); // Refresh when switching tabs
+
+  const handleManualStatusChange = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
+      try {
+          await updateSystemStatus(type, status);
+          setCurrentStatus(prev => ({ ...prev, [type]: status, lastChecked: new Date().toISOString() }));
+          alert(`Status für ${type} manuell auf ${status} gesetzt. Startseite aktualisiert.`);
+      } catch (e: any) {
+          alert("Fehler beim Status-Update: " + e.message);
+      }
+  };
 
   const handleSelectCustomer = async (customer: any) => {
     setIsLoadingDetails(true);
@@ -506,6 +525,73 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {/* TAB: DASHBOARD */}
       {activeTab === 'dashboard' && !selectedCustomerId && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+          
+          {/* LIVE STATUS OVERRIDE */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                      <RefreshCw size={20} className="text-blue-600" /> Live Status Override
+                  </h3>
+                  <div className="text-xs text-slate-400">Letzte Prüfung: {currentStatus.lastChecked ? new Date(currentStatus.lastChecked).toLocaleString() : 'Nie'}</div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Gold Control */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-center mb-3">
+                          <span className="font-bold text-slate-700">ResortPass Gold</span>
+                          <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${currentStatus.gold === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {currentStatus.gold === 'available' ? 'Verfügbar' : 'Ausverkauft'}
+                          </span>
+                      </div>
+                      <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white" 
+                            onClick={() => handleManualStatusChange('gold', 'available')}
+                          >
+                              Verfügbar setzen
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => handleManualStatusChange('gold', 'sold_out')}
+                          >
+                              Ausverkauft setzen
+                          </Button>
+                      </div>
+                  </div>
+
+                  {/* Silver Control */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                      <div className="flex justify-between items-center mb-3">
+                          <span className="font-bold text-slate-700">ResortPass Silver</span>
+                          <span className={`text-xs font-bold uppercase px-2 py-1 rounded ${currentStatus.silver === 'available' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                              {currentStatus.silver === 'available' ? 'Verfügbar' : 'Ausverkauft'}
+                          </span>
+                      </div>
+                      <div className="flex gap-2">
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white" 
+                            onClick={() => handleManualStatusChange('silver', 'available')}
+                          >
+                              Verfügbar setzen
+                          </Button>
+                          <Button 
+                            size="sm" 
+                            className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                            onClick={() => handleManualStatusChange('silver', 'sold_out')}
+                          >
+                              Ausverkauft setzen
+                          </Button>
+                      </div>
+                  </div>
+              </div>
+              <p className="text-xs text-slate-400 mt-4 text-center">
+                  Nutze diese Buttons, um die Startseite zu testen oder den Status manuell zu korrigieren, falls der Scraper ausfällt.
+              </p>
+          </div>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -979,7 +1065,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                            {/* Preview */}
                                            <div className="flex flex-col h-full">
                                                <label className="block text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
-                                                   <Eye size={14} /> Vorschau
+                                                   <Edit3 size={14} /> Vorschau
                                                </label>
                                                <div className="flex-1 w-full border border-slate-200 rounded-lg overflow-y-auto bg-white">
                                                    <div className="bg-slate-100 p-3 border-b border-slate-200 text-xs text-slate-500">
