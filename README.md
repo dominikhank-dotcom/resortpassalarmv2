@@ -80,6 +80,11 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Spalten nachträglich hinzufügen (Falls Tabelle schon da war)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_enabled boolean DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS sms_enabled boolean DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text; -- Für SMS
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notification_email text; -- Falls abweichend von Login-Email
+
 -- Constraints sicherstellen (Ignorieren falls schon da)
 DO $$ BEGIN
   ALTER TABLE public.profiles ADD CONSTRAINT unique_referral_code UNIQUE (referral_code);

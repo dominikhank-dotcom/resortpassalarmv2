@@ -9,8 +9,6 @@ const supabase = createClient(
 );
 
 // This webhook is called by Browse.ai when the robot finishes a task
-// You configure this URL in Browse.ai: https://resortpassalarm.com/api/browse-ai-webhook
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -34,8 +32,6 @@ export default async function handler(req, res) {
     const { event, data } = req.body;
 
     // --- DATA PARSING & FALLBACKS ---
-    // Try to find the lists. If they are missing, assume Sold Out (safe default)
-    // but LOG the error so we can debug.
     let goldAvailable = false;
     let silverAvailable = false;
     
@@ -58,7 +54,6 @@ export default async function handler(req, res) {
     }
 
     // --- 1. ALWAYS SAVE STATUS TO DATABASE (For Landing Page) ---
-    // Use upsert to update if exists, insert if new
     const now = new Date().toISOString();
     
     const updates = [
@@ -71,35 +66,90 @@ export default async function handler(req, res) {
 
     if (dbError) {
         console.error("Supabase Write Error:", dbError);
-        // Continue anyway to send alarms if needed, but this is bad
     } else {
         console.log("Database updated successfully.");
     }
 
     // --- 2. ALARM LOGIC ---
+    // Only proceed if available and status changed to available (implied by this webhook usually triggering on change)
     if (!goldAvailable && !silverAvailable) {
        return res.status(200).json({ message: 'Nothing available, status updated, no alarms sent.' });
     }
 
-    // Get Subscribers who want alerts (In a real scenario, filter by preference)
-    // Here we just get all active paid subscriptions
-    const { data: activeSubs } = await supabase
+    // Get Subscribers with ACTIVE status
+    const { data: subscriptions } = await supabase
         .from('subscriptions')
         .select('user_id')
         .eq('status', 'active');
     
-    if (!activeSubs || activeSubs.length === 0) {
+    if (!subscriptions || subscriptions.length === 0) {
         return res.status(200).json({ message: 'Items available but no active subscribers.' });
     }
 
-    // Fetch contact details for these users
-    // For this MVP, we assume we just notify everyone.
-    // In production, you would loop and use Resend/Twilio
-    console.log(`Alarm Triggered! Found ${activeSubs.length} active subscribers to notify.`);
+    // Fetch Profile Settings for these users
+    const userIds = subscriptions.map(s => s.user_id);
+    const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, email, first_name, email_enabled, sms_enabled, phone, notification_email')
+        .in('id', userIds);
 
-    // ... (Alarm logic omitted for brevity as focus is on status update)
+    if (!profiles) return res.status(200).json({ message: 'No profiles found.' });
 
-    res.status(200).json({ success: true, message: "Status updated in DB" });
+    console.log(`Alarm Triggered! Processing ${profiles.length} subscribers.`);
+
+    // Init Providers (Lazy load to prevent crash if env vars missing)
+    let resend;
+    if (process.env.RESEND_API_KEY) resend = new Resend(process.env.RESEND_API_KEY);
+
+    let twilioClient;
+    if (process.env.TWILIO_ACCOUNT_SID) {
+        twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    }
+
+    const results = [];
+
+    // Loop through users and send based on preferences
+    for (const user of profiles) {
+        const targetEmail = user.notification_email || user.email;
+        const productName = goldAvailable && silverAvailable ? "Gold & Silver" : goldAvailable ? "Gold" : "Silver";
+        const link = "https://tickets.mackinternational.de/de/ticket/resortpass-gold"; // Simplified for MVP
+        
+        // EMAIL
+        if (user.email_enabled !== false && targetEmail && resend) {
+            try {
+                await resend.emails.send({
+                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    to: targetEmail,
+                    subject: `🚨 ResortPass ${productName} VERFÜGBAR! Schnell sein!`,
+                    html: `
+                      <h1>ALARM STUFE ROT!</h1>
+                      <p>Hallo ${user.first_name || 'Fan'},</p>
+                      <p>Der <strong>ResortPass ${productName}</strong> ist verfügbar!</p>
+                      <p><a href="${link}">ZUM SHOP</a></p>
+                    `
+                });
+                results.push({ type: 'email', user: user.id, status: 'sent' });
+            } catch (e) {
+                console.error(`Failed to email user ${user.id}:`, e);
+            }
+        }
+
+        // SMS
+        if (user.sms_enabled && user.phone && twilioClient) {
+            try {
+                await twilioClient.messages.create({
+                    body: `🚨 ALARM: ResortPass ist VERFÜGBAR! Schnell zugreifen: ${link}`,
+                    from: process.env.TWILIO_PHONE_NUMBER,
+                    to: user.phone,
+                });
+                results.push({ type: 'sms', user: user.id, status: 'sent' });
+            } catch (e) {
+                console.error(`Failed to sms user ${user.id}:`, e);
+            }
+        }
+    }
+
+    res.status(200).json({ success: true, message: "Status updated and alarms sent based on preferences", log: results });
 
   } catch (error) {
     console.error("Webhook Error:", error);

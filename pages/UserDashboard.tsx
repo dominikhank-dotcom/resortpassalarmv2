@@ -101,18 +101,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     email: profile.email || user.email || ''
                 });
 
-                // Populate Notifications (default email to profile email, sms empty)
+                // Populate Notifications
                 setNotifications({
-                    email: profile.email || user.email || '',
-                    sms: "", 
-                    emailEnabled: true,
-                    smsEnabled: false
+                    email: profile.notification_email || profile.email || user.email || '',
+                    sms: profile.phone || "", 
+                    emailEnabled: profile.email_enabled !== false, // Default to true if null
+                    smsEnabled: profile.sms_enabled === true
                 });
 
                 // Init temp data for editing
                 setTempData({
-                    email: profile.email || user.email || '',
-                    sms: ""
+                    email: profile.notification_email || profile.email || user.email || '',
+                    sms: profile.phone || ""
                 });
             }
 
@@ -152,6 +152,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     return () => clearInterval(interval);
   }, []);
 
+  // --- DB Update Helpers ---
+  const updateProfileColumn = async (column: string, value: any) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { error } = await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
+      if (error) console.error(`Error updating ${column}:`, error);
+  };
+
+  const handleToggleEmail = (enabled: boolean) => {
+      setNotifications(prev => ({...prev, emailEnabled: enabled}));
+      updateProfileColumn('email_enabled', enabled);
+  };
+
+  const handleToggleSms = (enabled: boolean) => {
+      setNotifications(prev => ({...prev, smsEnabled: enabled}));
+      updateProfileColumn('sms_enabled', enabled);
+  };
+
   const handleSavePersonalData = async (e: React.FormEvent) => {
     e.preventDefault();
     const { data: { user } } = await supabase.auth.getUser();
@@ -169,8 +187,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             alert("Fehler beim Speichern: " + error.message);
         } else {
             alert("Persönliche Daten erfolgreich gespeichert.");
-            // Also update notification email if it was the same
-            setNotifications(prev => ({ ...prev, email: personalData.email }));
+            // Note: We deliberately do NOT update notification_email here anymore
+            // to allow separate configuration.
         }
     }
   };
@@ -202,13 +220,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     setErrors(prev => ({ ...prev, email: '' }));
   };
 
-  const saveEmail = () => {
+  const saveEmail = async () => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(tempData.email)) {
       setErrors(prev => ({ ...prev, email: "Bitte eine gültige E-Mail Adresse eingeben." }));
       return;
     }
     setNotifications(prev => ({ ...prev, email: tempData.email }));
+    await updateProfileColumn('notification_email', tempData.email);
     setEditMode(prev => ({ ...prev, email: false }));
     setErrors(prev => ({ ...prev, email: '' }));
   };
@@ -225,7 +244,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     setErrors(prev => ({ ...prev, sms: '' }));
   };
 
-  const saveSms = () => {
+  const saveSms = async () => {
     if (!tempData.sms.startsWith('+') || tempData.sms.length < 9) {
       setErrors(prev => ({ ...prev, sms: "Format ungültig. Bitte mit Landesvorwahl angeben (z.B. +49...)." }));
       return;
@@ -236,6 +255,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     }
 
     setNotifications(prev => ({ ...prev, sms: tempData.sms }));
+    await updateProfileColumn('phone', tempData.sms);
     setEditMode(prev => ({ ...prev, sms: false }));
     setErrors(prev => ({ ...prev, sms: '' }));
   };
@@ -423,7 +443,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                           type="checkbox" 
                           className="sr-only peer" 
                           checked={notifications.emailEnabled}
-                          onChange={() => setNotifications(prev => ({...prev, emailEnabled: !prev.emailEnabled}))}
+                          onChange={(e) => handleToggleEmail(e.target.checked)}
                         />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
@@ -472,7 +492,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                           type="checkbox" 
                           className="sr-only peer" 
                           checked={notifications.smsEnabled}
-                          onChange={() => setNotifications(prev => ({...prev, smsEnabled: !prev.smsEnabled}))}
+                          onChange={(e) => handleToggleSms(e.target.checked)}
                         />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
