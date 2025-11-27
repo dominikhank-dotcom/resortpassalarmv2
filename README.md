@@ -27,7 +27,7 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 **Frontend (Vite Prefix):**
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_SITE_URL` (Deine Vercel Domain, z.B. https://dein-projekt.vercel.app - ohne Slash am Ende)
+- `VITE_SITE_URL` (Deine Domain, z.B. https://resortpassalarm.com - ohne Slash am Ende!)
 
 **Backend (Server):**
 - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
@@ -42,6 +42,15 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 - `API_KEY` (für Google Gemini)
 - `NEXT_PUBLIC_SUPABASE_URL` (Gleicher Wert wie VITE_SUPABASE_URL)
 - `SUPABASE_SERVICE_ROLE_KEY` (Für Admin-Zugriff im Backend)
+
+## GO-LIVE CHECKLISTE (Domain Umzug)
+
+Wenn du deine eigene Domain (z.B. resortpassalarm.com) aufschaltest, beachte folgende Punkte:
+
+1. **Vercel Env Var:** Ändere `VITE_SITE_URL` auf `https://resortpassalarm.com` und redeploye die App.
+2. **Supabase Auth:** Ändere unter Authentication -> URL Configuration die Site URL auf `https://resortpassalarm.com` und füge `https://resortpassalarm.com/**` zu den Redirect URLs hinzu.
+3. **Stripe Webhook:** Aktualisiere die URL im Stripe Dashboard auf `https://resortpassalarm.com/api/stripe-webhook`.
+4. **Browse.ai Webhook:** Aktualisiere die Integration auf `https://resortpassalarm.com/api/browse-ai-webhook`.
 
 ## Datenbank Setup (SQL)
 
