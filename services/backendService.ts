@@ -1,4 +1,5 @@
 import { EmailTemplate } from '../types';
+import { supabase } from '../lib/supabase';
 
 // Helper to safely handle responses that might not be JSON (e.g. 404/500 HTML pages)
 const handleResponse = async (response: Response) => {
@@ -119,4 +120,22 @@ export const getCustomerDetails = async (userId: string) => {
       console.error("Get Customer Details Error:", error);
       throw error;
   }
+};
+
+export const updateAffiliateProfile = async (settings: any) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    const { error } = await supabase.from('profiles').update({
+        first_name: settings.firstName,
+        last_name: settings.lastName,
+        street: settings.street,
+        house_number: settings.houseNumber,
+        zip: settings.zip,
+        city: settings.city,
+        country: settings.country,
+        paypal_email: settings.paypalEmail
+    }).eq('id', user.id);
+
+    if (error) throw error;
 };

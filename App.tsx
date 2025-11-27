@@ -393,7 +393,7 @@ const App: React.FC = () => {
         return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={() => navigate('dashboard')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
       
       case 'affiliate':
-        if (role === UserRole.AFFILIATE) return <AffiliateDashboard />;
+        if (role === UserRole.AFFILIATE) return <AffiliateDashboard commissionRate={globalCommissionRate} />;
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={() => navigate('affiliate')} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       
       case 'login':

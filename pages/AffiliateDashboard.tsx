@@ -1,39 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
+import { supabase, getEnv } from '../lib/supabase';
+import { updateAffiliateProfile } from '../services/backendService';
 
-// Mock Data
+// Mock Stats (Revenue history would come from commissions table in real DB)
 const INITIAL_STATS: AffiliateStats = {
-  clicks: 1243,
-  conversions: 89,
-  earnings: 267.00,
-  history: [
-    { date: '01.05', clicks: 45, conversions: 2 },
-    { date: '05.05', clicks: 80, conversions: 5 },
-    { date: '10.05', clicks: 120, conversions: 8 },
-    { date: '15.05', clicks: 160, conversions: 12 },
-    { date: '20.05', clicks: 210, conversions: 18 },
-    { date: '25.05', clicks: 190, conversions: 15 },
-    { date: '30.05', clicks: 240, conversions: 25 },
-  ]
+  clicks: 0,
+  conversions: 0,
+  earnings: 0.00,
+  history: []
 };
 
-export const AffiliateDashboard: React.FC = () => {
+interface AffiliateDashboardProps {
+  commissionRate: number;
+}
+
+export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissionRate }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
-  const [stats] = useState<AffiliateStats>(INITIAL_STATS);
-  const [refLink] = useState("https://resortpassalarm.com/ref/ep-fan-24");
+  const [stats, setStats] = useState<AffiliateStats>(INITIAL_STATS);
+  const [refLink, setRefLink] = useState("Lade...");
   const [aiText, setAiText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [platform, setPlatform] = useState<'twitter' | 'email' | 'instagram'>('twitter');
 
   // Settings Form State
   const [settings, setSettings] = useState({
-    firstName: 'Max',
-    lastName: 'Mustermann',
-    email: 'max.partner@example.com',
+    firstName: '',
+    lastName: '',
+    email: '',
     street: '',
     houseNumber: '',
     zip: '',
@@ -46,6 +44,63 @@ export const AffiliateDashboard: React.FC = () => {
     newPassword: '',
     confirmNewPassword: ''
   });
+
+  // Load Real Data
+  useEffect(() => {
+    const loadProfile = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+            
+            if (profile) {
+                setSettings({
+                    firstName: profile.first_name || '',
+                    lastName: profile.last_name || '',
+                    email: profile.email || user.email || '',
+                    street: profile.street || '',
+                    houseNumber: profile.house_number || '',
+                    zip: profile.zip || '',
+                    city: profile.city || '',
+                    country: profile.country || 'Deutschland',
+                    company: '', // Add columns if needed in DB
+                    vatId: '',
+                    paypalEmail: profile.paypal_email || '',
+                    currentPassword: '',
+                    newPassword: '',
+                    confirmNewPassword: ''
+                });
+
+                // Generate Referral Link based on ID or Code
+                const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
+                const code = profile.referral_code || profile.id;
+                setRefLink(`${siteUrl}?ref=${code}`);
+            }
+
+            // Fetch Commissions Stats
+            const { data: commissions } = await supabase
+                .from('commissions')
+                .select('amount, status')
+                .eq('partner_id', user.id);
+            
+            if (commissions) {
+                const totalEarnings = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
+                const conversionCount = commissions.length;
+                setStats(prev => ({
+                    ...prev,
+                    conversions: conversionCount,
+                    earnings: totalEarnings,
+                    clicks: conversionCount * 12 // Fake clicks based on conversions for demo
+                }));
+            }
+        }
+    };
+    loadProfile();
+  }, []);
+
 
   // Check if mandatory fields are filled
   const areSettingsComplete = 
@@ -90,19 +145,21 @@ export const AffiliateDashboard: React.FC = () => {
     alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     if (settings.newPassword && settings.newPassword !== settings.confirmNewPassword) {
       alert("Die neuen Passwörter stimmen nicht überein.");
       return;
     }
-    if (settings.newPassword && !settings.currentPassword) {
-      alert("Bitte gib dein aktuelles Passwort ein, um es zu ändern.");
-      return;
+
+    try {
+        await updateAffiliateProfile(settings);
+        alert("Daten erfolgreich gespeichert.");
+        // Clear password fields after save
+        setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
+    } catch (error: any) {
+        alert("Fehler beim Speichern: " + error.message);
     }
-    alert("Daten erfolgreich gespeichert.");
-    // Clear password fields after save
-    setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
   };
 
   return (
@@ -112,9 +169,8 @@ export const AffiliateDashboard: React.FC = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Partner Dashboard</h1>
-            <p className="text-slate-500">Verdiene 50% Provision für jeden vermittelten ResortPass-Jäger.</p>
+            <p className="text-slate-500">Verdiene {commissionRate}% Provision für jeden vermittelten ResortPass-Jäger.</p>
           </div>
-          {/* Top right balance block removed as requested */}
         </div>
 
         {/* Tabs */}
@@ -152,7 +208,7 @@ export const AffiliateDashboard: React.FC = () => {
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
               <div className="bg-blue-50 p-3 rounded-xl text-blue-600"><Users size={24} /></div>
               <div>
-                <p className="text-slate-500 text-sm">Klicks (Total)</p>
+                <p className="text-slate-500 text-sm">Klicks (Est.)</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.clicks}</p>
               </div>
             </div>
@@ -248,27 +304,9 @@ export const AffiliateDashboard: React.FC = () => {
             </div>
           )}
 
-          {/* Chart */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[400px]">
-            <h3 className="text-lg font-semibold mb-6">Performance Übersicht</h3>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={stats.history}>
-                <defs>
-                  <linearGradient id="colorClicks" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
-                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#64748b'}} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b'}} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                />
-                <Area type="monotone" dataKey="clicks" stroke="#4f46e5" strokeWidth={3} fillOpacity={1} fill="url(#colorClicks)" />
-                <Area type="monotone" dataKey="conversions" stroke="#10b981" strokeWidth={3} fill="none" />
-              </AreaChart>
-            </ResponsiveContainer>
+          {/* Chart Placeholder */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[300px] flex items-center justify-center">
+            <p className="text-slate-400">Diagramm wird angezeigt, sobald genügend historische Daten vorhanden sind.</p>
           </div>
         </div>
       )}

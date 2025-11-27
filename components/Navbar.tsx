@@ -1,6 +1,7 @@
 import React from 'react';
 import { Ticket, User, LogOut, Menu, X } from 'lucide-react';
 import { UserRole } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface NavbarProps {
   role: UserRole;
@@ -18,7 +19,9 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
     setIsMenuOpen(false);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Real Supabase Logout
+    await supabase.auth.signOut();
     setRole(UserRole.GUEST);
     handleNav('landing');
   };
