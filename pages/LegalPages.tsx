@@ -6,8 +6,8 @@ import { Button } from '../components/Button';
 const AddressImage = () => (
   <div className="my-4 p-4 bg-slate-50 border border-slate-200 rounded-lg inline-block">
     <img 
-      src={`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="350" height="50"><text x="0" y="20" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Dominik Hank</text><text x="0" y="45" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Straßburger Weg 2, 77975 Ringsheim</text></svg>`} 
-      alt="Anschrift" 
+      src={`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="350" height="80"><text x="0" y="20" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Dominik Hank</text><text x="0" y="45" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Straßburger Weg 2, 77975 Ringsheim</text><text x="0" y="70" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Support: Tel.: +49 176 64857291</text></svg>`} 
+      alt="Anschrift und Kontakt" 
       className="block"
     />
   </div>
