@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+// @ts-ignore
 import { buffer } from 'micro';
 import { createClient } from '@supabase/supabase-js';
 
@@ -18,7 +19,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).send('Method not allowed');
   }
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
   }
 }
 
-async function handleNewSubscription(session) {
+async function handleNewSubscription(session: any) {
   const customerEmail = session.customer_email;
   const stripeCustomerId = session.customer;
   const subscriptionId = session.subscription;
@@ -116,7 +117,7 @@ async function handleNewSubscription(session) {
   }
 }
 
-async function handleRecurringPayment(invoice) {
+async function handleRecurringPayment(invoice: any) {
   // Logic for monthly renewals
   if (!invoice.subscription) return;
 

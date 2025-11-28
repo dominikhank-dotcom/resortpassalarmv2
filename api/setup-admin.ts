@@ -11,7 +11,9 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, secret } = req.body;
+  // Explicitly cast body to any to avoid TypeScript 'never' errors
+  const body = req.body as any;
+  const { email, secret } = body;
 
   // Simple protection
   if (secret !== process.env.SUPABASE_SERVICE_ROLE_KEY) {
