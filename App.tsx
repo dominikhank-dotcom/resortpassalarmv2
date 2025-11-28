@@ -258,8 +258,9 @@ const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState('landing');
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
   
-  // Global Commission State to sync between Admin and Affiliate Page
+  // Global Commission & Price State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
+  const [prices, setPrices] = useState({ new: 1.99, existing: 1.99 });
 
   // Global Product URLs State
   const [productUrls, setProductUrls] = useState({
@@ -274,6 +275,12 @@ const App: React.FC = () => {
        if (settings) {
           if (settings.global_commission_rate) {
              setGlobalCommissionRate(Number(settings.global_commission_rate));
+          }
+          if (settings.price_new_customers) {
+             setPrices(p => ({...p, new: Number(settings.price_new_customers)}));
+          }
+          if (settings.price_existing_customers) {
+             setPrices(p => ({...p, existing: Number(settings.price_existing_customers)}));
           }
        }
     };
@@ -381,6 +388,7 @@ const App: React.FC = () => {
             onBack={() => navigate('landing')} 
             onLogin={() => navigate('affiliate-login')}
             commissionRate={globalCommissionRate} 
+            price={prices.new}
             navigate={navigate}
           />
         );
@@ -396,7 +404,9 @@ const App: React.FC = () => {
          return role === UserRole.ADMIN 
           ? <AdminDashboard 
               commissionRate={globalCommissionRate} 
-              onUpdateCommission={setGlobalCommissionRate} 
+              onUpdateCommission={setGlobalCommissionRate}
+              prices={prices}
+              onUpdatePrices={setPrices}
               productUrls={productUrls}
               onUpdateProductUrls={setProductUrls}
             /> 
@@ -413,18 +423,18 @@ const App: React.FC = () => {
         return <RevocationPage onBack={() => navigate('landing')} />;
 
       case 'dashboard':
-        if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} />;
+        if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} prices={prices} />;
         return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
       
       case 'affiliate':
-        if (role === UserRole.AFFILIATE) return <AffiliateDashboard commissionRate={globalCommissionRate} />;
+        if (role === UserRole.AFFILIATE) return <AffiliateDashboard commissionRate={globalCommissionRate} price={prices.new} />;
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       
       case 'login':
          return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
 
       default: // 'landing'
-        return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} />;
+        return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} />;
     }
   };
 

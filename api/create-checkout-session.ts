@@ -32,6 +32,17 @@ export default async function handler(req, res) {
             userId = user.id;
         }
     }
+
+    // 2. Fetch Price from Database
+    const { data: priceSetting } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'price_new_customers')
+      .single();
+    
+    // Default to 1.99 if setting not found
+    const priceValue = priceSetting && priceSetting.value ? parseFloat(priceSetting.value) : 1.99;
+    const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card', 'paypal'],
@@ -43,7 +54,7 @@ export default async function handler(req, res) {
               name: 'ResortPass Alarm Premium',
               description: 'Monatliche Überwachung für Gold & Silver Pässe',
             },
-            unit_amount: 199, // 1.99 EUR
+            unit_amount: unitAmount,
             recurring: {
               interval: 'month',
             },

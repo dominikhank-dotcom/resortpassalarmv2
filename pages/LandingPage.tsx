@@ -9,9 +9,10 @@ interface LandingProps {
   onAffiliate: () => void;
   onAffiliateInfo: () => void;
   navigate: (page: string) => void;
+  price: number;
 }
 
-export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onAffiliateInfo, navigate }) => {
+export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onAffiliateInfo, navigate, price }) => {
   const [status, setStatus] = useState({
     gold: 'sold_out', // 'available' | 'sold_out'
     silver: 'sold_out',
@@ -137,7 +138,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
               </p>
               <div className="mt-auto">
                  <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-4xl font-bold text-[#00305e]">1,99 €</span>
+                    <span className="text-4xl font-bold text-[#00305e]">{price.toFixed(2).replace('.', ',')} €</span>
                     <span className="text-slate-500">/ Monat</span>
                  </div>
                  <p className="text-xs text-slate-400">Inkl. MwSt. Monatlich kündbar.</p>
@@ -217,7 +218,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
               },
               {
                 q: "Was kostet der Service?",
-                a: "Der Service kostet nur 1,99 € pro Monat. Das deckt unsere Serverkosten für die ständige Überwachung und die SMS-Kosten ab. Ein kleiner Preis für die Chance auf eine Jahreskarte."
+                a: `Der Service kostet nur ${price.toFixed(2).replace('.', ',')} € pro Monat. Das deckt unsere Serverkosten für die ständige Überwachung und die SMS-Kosten ab. Ein kleiner Preis für die Chance auf eine Jahreskarte.`
               },
               {
                 q: "Kann ich jederzeit kündigen?",

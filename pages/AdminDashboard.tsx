@@ -175,9 +175,11 @@ interface AdminDashboardProps {
   onUpdateCommission: (rate: number) => void;
   productUrls: { gold: string, silver: string };
   onUpdateProductUrls: (urls: { gold: string, silver: string }) => void;
+  prices: { new: number, existing: number };
+  onUpdatePrices: (prices: { new: number, existing: number }) => void;
 }
 
-export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, onUpdateCommission, productUrls, onUpdateProductUrls }) => {
+export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, onUpdateCommission, productUrls, onUpdateProductUrls, prices, onUpdatePrices }) => {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'customers' | 'partners' | 'emails' | 'settings'>('dashboard');
   
   // Real Data State
@@ -252,7 +254,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             .eq('status', 'active');
         
         if (count !== null) {
-            setDashboardStats(prev => ({ ...prev, revenue: count * 1.99 }));
+            setDashboardStats(prev => ({ ...prev, revenue: count * prices.existing }));
         }
 
         // 5. Fetch Current System Status (Availability)
@@ -397,6 +399,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         alert("Fehler beim Speichern der Provision: " + error.message);
     }
   };
+
+  const handleSavePrices = async () => {
+      try {
+          await updateSystemSettings('price_new_customers', prices.new.toString());
+          await updateSystemSettings('price_existing_customers', prices.existing.toString());
+          alert("Preise erfolgreich gespeichert.");
+      } catch (error: any) {
+          alert("Fehler beim Speichern der Preise: " + error.message);
+      }
+  }
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
@@ -1211,6 +1223,49 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                          Passwort ändern
                      </Button>
                  </form>
+             </div>
+          </div>
+
+          {/* Pricing Settings (New) */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+             <div className="p-6 border-b border-slate-100 bg-slate-50">
+                 <div className="flex items-center gap-3">
+                     <div className="bg-white p-2 rounded-lg text-slate-700 shadow-sm border border-slate-100"><DollarSign size={20} /></div>
+                     <div>
+                         <h3 className="text-lg font-bold text-slate-900">Finanzen & Preise</h3>
+                         <p className="text-slate-500 text-sm">Lege fest, was das Abo kostet.</p>
+                     </div>
+                 </div>
+             </div>
+             
+             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Preis für Neukunden (€/Monat)</label>
+                     <input 
+                         type="number"
+                         step="0.01"
+                         value={prices.new}
+                         onChange={(e) => onUpdatePrices({...prices, new: Number(e.target.value)})}
+                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none font-bold text-slate-800"
+                     />
+                     <p className="text-xs text-slate-400 mt-1">Wirkt sich auf die Landingpage, Checkout und neue Abos aus.</p>
+                 </div>
+                 <div>
+                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Preis für Bestandskunden (€/Monat)</label>
+                     <input 
+                         type="number"
+                         step="0.01"
+                         value={prices.existing}
+                         onChange={(e) => onUpdatePrices({...prices, existing: Number(e.target.value)})}
+                         className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-blue-500 outline-none font-bold text-slate-800"
+                     />
+                     <p className="text-xs text-slate-400 mt-1">Anzeige im Dashboard für bestehende Abonnenten.</p>
+                 </div>
+                 <div className="md:col-span-2 flex justify-end">
+                     <Button size="sm" onClick={handleSavePrices}>
+                        <Save size={16} className="mr-2" /> Preise speichern
+                     </Button>
+                 </div>
              </div>
           </div>
           

@@ -17,9 +17,10 @@ const INITIAL_STATS: AffiliateStats = {
 
 interface AffiliateDashboardProps {
   commissionRate: number;
+  price: number;
 }
 
-export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissionRate }) => {
+export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissionRate, price }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'settings'>('overview');
   const [stats, setStats] = useState<AffiliateStats>(INITIAL_STATS);
   const [refLink, setRefLink] = useState("Lade...");
@@ -46,6 +47,9 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     newPassword: '',
     confirmNewPassword: ''
   });
+
+  // Calculate earning per new sub
+  const earningPerSub = (price * commissionRate / 100).toFixed(2);
 
   // Load Real Data
   useEffect(() => {
@@ -219,7 +223,9 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Partner Dashboard</h1>
-            <p className="text-slate-500">Verdiene {commissionRate}% Provision für jeden vermittelten ResortPass-Jäger.</p>
+            <p className="text-slate-500">
+                Deine Provision: <span className="text-[#00305e] font-bold">{commissionRate}%</span> = <span className="text-[#00305e] font-bold">{earningPerSub} €</span> pro neuem Abo.
+            </p>
           </div>
         </div>
 
@@ -314,6 +320,12 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                   <button onClick={() => setActiveTab('settings')} className="text-xs text-indigo-300 hover:text-white underline flex items-center gap-1 ml-auto">
                       ID ändern <ArrowRight size={10} />
                   </button>
+              </div>
+              <div className="mt-2 text-xs text-indigo-300 flex items-center gap-1">
+                  <ArrowRight size={10} className="text-[#ffcc00]" />
+                  <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }} className="hover:text-white underline">
+                      ID hier ändern
+                  </a>
               </div>
             </div>
             <div className="hidden md:block w-px h-24 bg-indigo-700/50 self-center"></div>

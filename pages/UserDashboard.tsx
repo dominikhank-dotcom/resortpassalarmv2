@@ -18,9 +18,10 @@ type SubscriptionStatus = 'NONE' | 'PAID' | 'FREE';
 interface UserDashboardProps {
   navigate: (page: string) => void;
   productUrls: { gold: string, silver: string };
+  prices: { new: number, existing: number };
 }
 
-export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls }) => {
+export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls, prices }) => {
   // Simulation State
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
   const [isChecking, setIsChecking] = useState<string | null>(null); 
@@ -582,7 +583,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         </span>
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
                         </div>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">1,99 € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">{prices.existing.toFixed(2).replace('.', ',')} € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
                         <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
                     </div>
                   )}
@@ -627,7 +628,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                       onClick={handleSubscribe} 
                       className="w-full bg-[#00305e] text-white hover:bg-[#002040]"
                     >
-                      Jetzt aktivieren (1,99 €)
+                      Jetzt aktivieren ({prices.new.toFixed(2).replace('.', ',')} €)
                     </Button>
                     
                     <div className="mt-6 border-t border-slate-100 pt-4 w-full">

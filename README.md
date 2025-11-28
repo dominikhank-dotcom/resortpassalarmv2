@@ -227,8 +227,10 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
--- Standardwert Provision
+-- Standardwert Provision & Preise
 INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate', '50') ON CONFLICT DO NOTHING;
+INSERT INTO public.system_settings (key, value) VALUES ('price_new_customers', '1.99') ON CONFLICT DO NOTHING;
+INSERT INTO public.system_settings (key, value) VALUES ('price_existing_customers', '1.99') ON CONFLICT DO NOTHING;
 ```
 
 ## E-Mail Templates

@@ -8,12 +8,13 @@ interface AffiliateInfoProps {
   onBack: () => void;
   onLogin: () => void;
   commissionRate: number;
+  price: number;
   navigate: (page: string) => void;
 }
 
-export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBack, onLogin, commissionRate, navigate }) => {
+export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBack, onLogin, commissionRate, price, navigate }) => {
   const [activeUsers, setActiveUsers] = useState(500);
-  const pricePerMonth = 1.99;
+  const pricePerMonth = price;
   const commissionDecimal = commissionRate / 100;
   
   const monthlyEarnings = (activeUsers * pricePerMonth * commissionDecimal).toFixed(2).replace('.', ',');
@@ -98,7 +99,7 @@ export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBa
                     Viele Fanseiten und Gruppen haben Tausende Mitglieder. Da der ResortPass extrem begehrt ist, sind die Abschlussraten sehr hoch.
                     </p>
                     <p>
-                    Angenommen, du nutzt einen Aktionspreis von 1,99 € für deine Community:
+                    Angenommen, du nutzt einen Aktionspreis von {pricePerMonth.toFixed(2).replace('.', ',')} € für deine Community:
                     </p>
                 </div>
                 
@@ -153,7 +154,7 @@ export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBa
                         <div className="grid grid-cols-2 gap-4 py-6 border-t border-blue-700/50 border-b">
                         <div>
                             <p className="text-xs text-blue-300 uppercase">Preis pro Abo</p>
-                            <p className="text-lg font-semibold">x 1,99 €</p>
+                            <p className="text-lg font-semibold">x {pricePerMonth.toFixed(2).replace('.', ',')} €</p>
                         </div>
                         <div className="text-right">
                             <p className="text-xs text-blue-300 uppercase">Deine Provision</p>
