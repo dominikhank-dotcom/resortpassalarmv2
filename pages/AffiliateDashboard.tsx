@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
 import { supabase, getEnv } from '../lib/supabase';
-import { updateAffiliateProfile } from '../services/backendService';
+import { updateAffiliateProfile, connectStripe, requestStripePayout } from '../services/backendService';
 
 // Mock Stats (Revenue history would come from commissions table in real DB)
 const INITIAL_STATS: AffiliateStats = {
@@ -27,6 +27,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
   const [aiText, setAiText] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [platform, setPlatform] = useState<'twitter' | 'email' | 'instagram'>('twitter');
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [isPayoutLoading, setIsPayoutLoading] = useState(false);
 
   // Settings Form State
   const [settings, setSettings] = useState({
@@ -83,6 +85,10 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     confirmNewPassword: ''
                 });
 
+                if (profile.stripe_account_id) {
+                    setStripeConnected(true);
+                }
+
                 // Generate Referral Link based on Code or ID
                 updateRefLinkDisplay(loadedCode);
             }
@@ -91,21 +97,37 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
             const { data: commissions } = await supabase
                 .from('commissions')
                 .select('amount, status')
-                .eq('partner_id', user.id);
+                .eq('partner_id', user.id)
+                .eq('status', 'pending');
             
+            const { data: allCommissions } = await supabase
+                .from('commissions')
+                .select('id')
+                .eq('partner_id', user.id);
+
             if (commissions) {
-                const totalEarnings = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
-                const conversionCount = commissions.length;
+                const pendingEarnings = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
+                const conversionCount = allCommissions ? allCommissions.length : 0;
                 setStats(prev => ({
                     ...prev,
                     conversions: conversionCount,
-                    earnings: totalEarnings,
+                    earnings: pendingEarnings,
                     clicks: conversionCount * 12 // Fake clicks based on conversions for demo
                 }));
             }
         }
     };
     loadProfile();
+
+    // Check for Stripe Connect Redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('stripe_connected') === 'true') {
+        alert("Stripe Account erfolgreich verknüpft!");
+        setActiveTab('settings');
+        // Clear param
+        window.history.replaceState({}, document.title, window.location.pathname);
+        setStripeConnected(true);
+    }
   }, []);
 
   const updateRefLinkDisplay = (code: string) => {
@@ -131,7 +153,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     settings.houseNumber.trim() !== '' &&
     settings.zip.trim() !== '' &&
     settings.city.trim() !== '' &&
-    settings.paypalEmail.trim() !== '';
+    (settings.paypalEmail.trim() !== '' || stripeConnected);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(refLink);
@@ -151,18 +173,35 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     }
   };
 
-  const handlePayout = () => {
-    // Double check logic, though button should be disabled
+  const handlePayoutPayPal = () => {
     if (stats.earnings < 20) {
       alert("Auszahlung erst ab 20,00 € möglich.");
       return;
     }
-    if (!areSettingsComplete) {
-      alert("Bitte vervollständige deine Stammdaten in den Einstellungen.");
-      setActiveTab('settings');
-      return;
-    }
     alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
+  };
+
+  const handlePayoutStripe = async () => {
+      if (stats.earnings < 20) {
+          alert("Auszahlung erst ab 20,00 € möglich.");
+          return;
+      }
+      if (!stripeConnected) {
+          alert("Bitte verbinde erst dein Stripe Konto in den Einstellungen.");
+          setActiveTab('settings');
+          return;
+      }
+      
+      setIsPayoutLoading(true);
+      try {
+          await requestStripePayout();
+          alert("Auszahlung erfolgreich! Das Geld ist auf dem Weg zu deinem Bankkonto.");
+          setStats(prev => ({ ...prev, earnings: 0 })); // Reset pending earnings UI
+      } catch (error: any) {
+          alert("Fehler bei der Auszahlung: " + error.message);
+      } finally {
+          setIsPayoutLoading(false);
+      }
   };
 
   const validateReferralCode = (code: string) => {
@@ -216,6 +255,14 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     }
   };
 
+  const handleConnectStripe = async () => {
+      try {
+          await connectStripe();
+      } catch (error: any) {
+          alert("Fehler beim Verbinden mit Stripe: " + error.message);
+      }
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Header & Tabs */}
@@ -224,7 +271,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Partner Dashboard</h1>
             <p className="text-slate-500">
-                Deine Provision: <span className="text-[#00305e] font-bold">{commissionRate}%</span> = <span className="text-[#00305e] font-bold">{earningPerSub} €</span> pro neuem Abo.
+                Deine Provision: <span className="text-[#00305e] font-bold">{commissionRate}%</span> = <span className="text-[#00305e] font-bold">{earningPerSub} €</span> pro neuem Abo. Jeden Monat!
             </p>
           </div>
         </div>
@@ -284,15 +331,27 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 </div>
               </div>
               <div>
-                <Button 
-                  onClick={handlePayout} 
-                  size="sm" 
-                  variant="outline" 
-                  className="w-full text-green-700 border-green-200 hover:bg-green-50"
-                  disabled={stats.earnings < 20 || !areSettingsComplete}
-                >
-                  <CreditCard size={16} /> Auszahlen
-                </Button>
+                {stripeConnected ? (
+                    <Button 
+                        onClick={handlePayoutStripe} 
+                        size="sm" 
+                        disabled={stats.earnings < 20 || isPayoutLoading}
+                        className="w-full bg-slate-800 text-white hover:bg-slate-900"
+                    >
+                        <CreditCard size={16} /> 
+                        {isPayoutLoading ? 'Verarbeite...' : 'Auszahlen via Stripe'}
+                    </Button>
+                ) : (
+                    <Button 
+                        onClick={handlePayoutPayPal} 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full text-blue-700 border-blue-200 hover:bg-blue-50"
+                        disabled={stats.earnings < 20 || !areSettingsComplete}
+                    >
+                        <Wallet size={16} /> Auszahlen (PayPal)
+                    </Button>
+                )}
                 {!areSettingsComplete && (
                   <p className="text-xs text-red-500 mt-2 text-center font-medium">Pflichtangaben unvollständig</p>
                 )}
@@ -590,24 +649,61 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
               {/* Payout Section */}
               <section>
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Auszahlungsmethode</h3>
-                <div className="bg-blue-50 rounded-xl p-6 border border-blue-100">
-                   <div className="flex flex-col md:flex-row gap-6 md:items-end">
-                      <div className="flex-1">
-                        <label className="block text-sm font-bold text-blue-900 mb-2">PayPal E-Mail Adresse <span className="text-red-500">*</span></label>
-                        <input 
-                          type="email" 
-                          required
-                          value={settings.paypalEmail}
-                          onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
-                          className="w-full px-4 py-3 rounded-lg border border-blue-200 focus:ring-2 focus:ring-blue-500 outline-none" 
-                          placeholder="deine-email@paypal.com"
-                        />
-                      </div>
-                      <div className="flex items-center gap-2 text-blue-700 text-sm bg-blue-100/50 px-4 py-2 rounded-lg h-fit mb-1">
-                        <AlertCircle size={16} />
-                        Auszahlung kann manuell angefordert werden, sobald das Guthaben 20,00 € erreicht.
-                      </div>
-                   </div>
+                
+                <div className="grid grid-cols-1 gap-6">
+                    {/* Stripe Option */}
+                    <div className={`rounded-xl p-6 border ${stripeConnected ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                                    <CreditCard size={18} className="text-slate-700" /> Stripe Connect (Empfohlen)
+                                </h4>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Automatische Auszahlung direkt auf dein Bankkonto.
+                                </p>
+                            </div>
+                            {stripeConnected ? (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold flex items-center gap-1">
+                                    <Check size={12} /> Verbunden
+                                </span>
+                            ) : (
+                                <span className="bg-slate-200 text-slate-600 text-xs px-2 py-1 rounded">Nicht verbunden</span>
+                            )}
+                        </div>
+                        
+                        {!stripeConnected ? (
+                            <Button 
+                                type="button" 
+                                onClick={handleConnectStripe}
+                                className="bg-[#635BFF] hover:bg-[#5851E3] text-white w-full sm:w-auto"
+                            >
+                                Mit Stripe verbinden
+                            </Button>
+                        ) : (
+                            <div className="text-sm text-green-700">
+                                Dein Konto ist erfolgreich verknüpft. Du kannst Auszahlungen im Dashboard anfordern.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PayPal Option */}
+                    <div className="rounded-xl p-6 border bg-white border-slate-200 opacity-75">
+                        <h4 className="font-bold text-slate-900 flex items-center gap-2 mb-2">
+                            <Wallet size={18} className="text-blue-700" /> PayPal (Alternativ)
+                        </h4>
+                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-slate-700 mb-1">PayPal E-Mail Adresse</label>
+                                <input 
+                                type="email" 
+                                value={settings.paypalEmail}
+                                onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
+                                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                                placeholder="deine-email@paypal.com"
+                                />
+                            </div>
+                        </div>
+                    </div>
                 </div>
               </section>
 

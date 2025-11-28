@@ -194,3 +194,40 @@ export const updateSystemStatus = async (type: 'gold' | 'silver', status: 'avail
         throw error;
     }
 };
+
+// --- STRIPE CONNECT ---
+
+export const connectStripe = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/stripe-connect-onboard', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        const data = await handleResponse(response);
+        if (data.url) window.location.href = data.url;
+    } catch (error: any) {
+        console.error("Connect Stripe Error:", error);
+        throw error;
+    }
+};
+
+export const requestStripePayout = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/stripe-payout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Request Payout Error:", error);
+        throw error;
+    }
+};

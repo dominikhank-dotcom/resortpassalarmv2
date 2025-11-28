@@ -83,6 +83,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   referral_code text UNIQUE, -- Für Partner: Ihr eigener Code
   website text, -- Partner Webseite
   paypal_email text, -- Für Partner Auszahlungen
+  stripe_account_id text, -- Für Stripe Connect Auszahlungen
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -93,6 +94,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_enabled boolean DEFAU
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS sms_enabled boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text; -- Für SMS
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notification_email text; -- Falls abweichend von Login-Email
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_account_id text; -- Stripe Connect ID
 
 -- Constraints sicherstellen (Ignorieren falls schon da)
 DO $$ BEGIN
@@ -231,56 +233,3 @@ CREATE TRIGGER on_auth_user_created
 INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate', '50') ON CONFLICT DO NOTHING;
 INSERT INTO public.system_settings (key, value) VALUES ('price_new_customers', '1.99') ON CONFLICT DO NOTHING;
 INSERT INTO public.system_settings (key, value) VALUES ('price_existing_customers', '1.99') ON CONFLICT DO NOTHING;
-```
-
-## E-Mail Templates
-
-Füge diesen HTML-Code in Supabase unter **Email Templates -> Confirm signup** ein:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; margin: 0; padding: 0; }
-    .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 40px; border-radius: 8px; margin-top: 40px; border: 1px solid #e2e8f0; }
-    .header { text-align: center; margin-bottom: 30px; }
-    .logo { font-size: 24px; font-weight: bold; color: #00305e; text-decoration: none; }
-    .logo span { color: #ffcc00; }
-    .button { display: inline-block; background-color: #00305e; color: #ffffff !important; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold; margin-top: 20px; }
-    .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #94a3b8; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <a href="{{ .SiteURL }}" class="logo">ResortPass<span>Alarm</span></a>
-    </div>
-    
-    <!-- INTELLIGENTE UNTERSCHEIDUNG: PARTNER ODER KUNDE -->
-    {{ if eq .Data.role "AFFILIATE" }}
-        <h2>Willkommen beim Partnerprogramm!</h2>
-        <p>Hallo {{ .Data.first_name }},</p>
-        <p>Du bist nur noch einen Klick davon entfernt, Provisionen zu verdienen.</p>
-        <p>Bitte bestätige deine E-Mail Adresse, um deinen Partner-Account zu aktivieren und Zugriff auf dein Dashboard und deinen Tracking-Link zu erhalten.</p>
-    {{ else }}
-        <h2>Willkommen an Bord!</h2>
-        <p>Hallo {{ .Data.first_name }},</p>
-        <p>Du hast dich gerade für den ResortPassAlarm registriert.</p>
-        <p>Um deinen Account zu aktivieren und mit der Überwachung zu starten, bestätige bitte deine E-Mail Adresse.</p>
-    {{ end }}
-    
-    <div style="text-align: center;">
-      <a href="{{ .ConfirmationURL }}" class="button">E-Mail bestätigen</a>
-    </div>
-    
-    <p style="margin-top: 30px; font-size: 12px; color: #64748b;">Falls du dich nicht registriert hast, kannst du diese E-Mail ignorieren.</p>
-    
-    <div class="footer">
-      &copy; ResortPassAlarm. Keine offizielle Seite des Europa-Park Resorts.
-    </div>
-  </div>
-</body>
-</html>
-```
