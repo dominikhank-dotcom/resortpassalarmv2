@@ -5,7 +5,7 @@ import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
 import { supabase, getEnv } from '../lib/supabase';
-import { updateAffiliateProfile, connectStripe, requestStripePayout } from '../services/backendService';
+import { updateAffiliateProfile, connectStripe, requestStripePayout, requestPaypalPayout } from '../services/backendService';
 
 // Mock Stats (Revenue history would come from commissions table in real DB)
 const INITIAL_STATS: AffiliateStats = {
@@ -173,12 +173,29 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     }
   };
 
-  const handlePayoutPayPal = () => {
+  const handlePayoutPayPal = async () => {
     if (stats.earnings < 20) {
       alert("Auszahlung erst ab 20,00 € möglich.");
       return;
     }
-    alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
+    if (!settings.paypalEmail) {
+        alert("Bitte hinterlege zuerst deine PayPal-Adresse in den Einstellungen.");
+        setActiveTab('settings');
+        return;
+    }
+
+    if (confirm(`Auszahlung von ${stats.earnings.toFixed(2)} € an ${settings.paypalEmail} anfordern?`)) {
+        setIsPayoutLoading(true);
+        try {
+            await requestPaypalPayout();
+            alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
+            setStats(prev => ({ ...prev, earnings: 0 })); // Reset visible earnings
+        } catch (error: any) {
+            alert("Fehler bei der Anforderung: " + error.message);
+        } finally {
+            setIsPayoutLoading(false);
+        }
+    }
   };
 
   const handlePayoutStripe = async () => {
@@ -226,6 +243,16 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
           } else {
               alert("Fehler beim Speichern: " + error.message);
           }
+      }
+  }
+
+  const handleSavePayPal = async (e: React.MouseEvent) => {
+      e.preventDefault();
+      try {
+          await updateAffiliateProfile(settings);
+          alert("PayPal Adresse erfolgreich gespeichert! Du kannst jetzt in der Übersicht eine Auszahlung anfordern.");
+      } catch (error: any) {
+          alert("Fehler beim Speichern: " + error.message);
       }
   }
 
@@ -347,13 +374,14 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         size="sm" 
                         variant="outline" 
                         className="w-full text-blue-700 border-blue-200 hover:bg-blue-50"
-                        disabled={stats.earnings < 20 || !areSettingsComplete}
+                        disabled={stats.earnings < 20 || !settings.paypalEmail || isPayoutLoading}
                     >
-                        <Wallet size={16} /> Auszahlen (PayPal)
+                        <Wallet size={16} /> 
+                        {isPayoutLoading ? 'Verarbeite...' : 'Auszahlen (PayPal)'}
                     </Button>
                 )}
-                {!areSettingsComplete && (
-                  <p className="text-xs text-red-500 mt-2 text-center font-medium">Pflichtangaben unvollständig</p>
+                {(!areSettingsComplete || (stats.earnings >= 20 && !stripeConnected && !settings.paypalEmail)) && (
+                  <p className="text-xs text-red-500 mt-2 text-center font-medium">Pflichtangaben (PayPal/Stripe) fehlen</p>
                 )}
               </div>
             </div>
@@ -687,21 +715,38 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     </div>
 
                     {/* PayPal Option */}
-                    <div className="rounded-xl p-6 border bg-white border-slate-200 opacity-75">
+                    <div className="rounded-xl p-6 border bg-white border-slate-200">
                         <h4 className="font-bold text-slate-900 flex items-center gap-2 mb-2">
                             <Wallet size={18} className="text-blue-700" /> PayPal (Alternativ)
                         </h4>
+                        <p className="text-sm text-slate-500 mb-4">
+                            Für manuelle Auszahlungen.
+                        </p>
                         <div className="flex flex-col md:flex-row gap-4 md:items-end">
                             <div className="flex-1">
                                 <label className="block text-sm font-medium text-slate-700 mb-1">PayPal E-Mail Adresse</label>
-                                <input 
-                                type="email" 
-                                value={settings.paypalEmail}
-                                onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
-                                className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
-                                placeholder="deine-email@paypal.com"
-                                />
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="email" 
+                                        value={settings.paypalEmail}
+                                        onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
+                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
+                                        placeholder="deine-email@paypal.com"
+                                    />
+                                    <Button 
+                                        type="button" 
+                                        onClick={handleSavePayPal}
+                                        size="sm" 
+                                        variant="primary" 
+                                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
+                                    >
+                                        <Save size={16} className="mr-1" /> Speichern
+                                    </Button>
+                                </div>
                             </div>
+                        </div>
+                        <div className="mt-3 text-xs text-slate-500 flex items-center gap-1">
+                            Gespeichert? Hier <button type="button" onClick={() => setActiveTab('overview')} className="text-blue-600 hover:underline font-bold">Auszahlung anfordern</button>.
                         </div>
                     </div>
                 </div>

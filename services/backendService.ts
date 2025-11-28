@@ -231,3 +231,48 @@ export const requestStripePayout = async () => {
         throw error;
     }
 };
+
+// --- PAYPAL / MANUAL PAYOUTS ---
+
+export const requestPaypalPayout = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/request-payout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Request PayPal Payout Error:", error);
+        throw error;
+    }
+};
+
+export const getAdminPayouts = async () => {
+    try {
+        const response = await fetch('/api/admin-payouts', {
+            method: 'GET'
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Get Admin Payouts Error:", error);
+        throw error;
+    }
+};
+
+export const markPayoutComplete = async (payoutId: string) => {
+    try {
+        const response = await fetch('/api/admin-payouts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ payoutId })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Mark Payout Complete Error:", error);
+        throw error;
+    }
+};
