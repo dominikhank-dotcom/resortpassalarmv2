@@ -1,23 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
-  TrendingUp, DollarSign, Activity, Calendar, 
-  Search, Save, Database, CreditCard, Mail, MessageSquare, 
-  Sparkles, Download, AlertCircle, CheckCircle, Globe, Key,
-  ArrowLeft, RotateCcw, AlertTriangle, UserX, UserCheck, Ban,
-  Wifi, Edit3, Eye, Send, X, Copy, Terminal, Gift, Lock, Shield, Link, RefreshCw, Wallet, Check
+  TrendingUp, DollarSign, Activity, Database, Mail, 
+  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal
 } from 'lucide-react';
-import { 
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Legend 
-} from 'recharts';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTestAlarm, sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete } from '../services/backendService';
+import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
-// ... (KEEP DEFAULT_TEMPLATES AS IS, NO CHANGE)
+// --- DEFAULT TEMPLATES ---
 const DEFAULT_TEMPLATES: EmailTemplate[] = [
   // --- CUSTOMER EMAILS ---
   {
@@ -192,13 +185,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   // Customer Detail State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any>(null);
-  const [refundRange, setRefundRange] = useState({ start: '', end: '' });
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
 
   // Partner Settings & Payouts
   const [aiInsights, setAiInsights] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [pendingPayouts, setPendingPayouts] = useState<any[]>([]); // New State for Payouts
+  const [pendingPayouts, setPendingPayouts] = useState<any[]>([]);
 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
@@ -209,7 +201,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
   // Admin Account Settings State
   const [adminAuth, setAdminAuth] = useState({
-      currentEmail: '', // Will be loaded from session
+      currentEmail: '', 
       newEmail: '',
       emailPassword: '', 
       pwCurrent: '',
@@ -283,7 +275,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     };
 
     fetchData();
-  }, [activeTab]); // Refresh when switching tabs
+  }, [activeTab]);
 
   const handleManualStatusChange = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       try {
@@ -300,10 +292,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     setSelectedCustomerId(customer.id);
     
     try {
-        // Use Backend Service to fetch details (Bypasses RLS)
         const response = await getCustomerDetails(customer.id);
         const sub = response.subscription;
-        const profile = response.profile || customer; // Fallback to passed customer object
+        const profile = response.profile || customer;
 
         const details = {
             id: profile.id,
@@ -325,8 +316,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 isFree: sub ? sub.plan_type === 'Manuell (Gratis)' : false,
                 paymentMethod: sub ? 'Stripe' : '–'
             },
-            referrer: null, // Would need tracking table
-            transactions: [] // Would need payments table
+            referrer: null,
+            transactions: []
         };
         setCustomerDetail(details);
     } catch (error: any) {
@@ -355,10 +346,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     else alert("Kundendaten erfolgreich aktualisiert.");
   };
 
-  const handleToggleSubscription = () => {
-    alert("Diese Funktion erfordert eine direkte Stripe-API-Anbindung für Stornierungen.");
-  };
-
   const handleToggleFreeSubscription = async () => {
       if (!customerDetail) return;
 
@@ -385,18 +372,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       } catch (error: any) {
           alert("Fehler bei der Abo-Änderung: " + error.message);
       }
-  };
-
-  const handleRefundSingle = (txId: string) => {
-    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
-  };
-
-  const handleRefundAll = () => {
-    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
-  };
-
-  const handleRefundRange = () => {
-    alert("Rückerstattungs-Logik erfordert Stripe API Key.");
   };
 
   const handleSaveCommission = async () => {
@@ -433,7 +408,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const handleAnalyze = async () => {
     setIsAnalyzing(true);
     try {
-      // Use real fetched data for analysis if available, else mock
       const insights = await generateAdminInsights({ 
           activePartners: partners.length, 
           totalCustomers: customers.length,
@@ -457,7 +431,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
          const result = await testGeminiConnection();
          alert(`✅ ERFOLG: ${result.message}`);
       } else {
-          // --- SIMULATION FOR OTHERS ---
           await new Promise(resolve => setTimeout(resolve, 1500));
           alert(`Test für ${service} erfolgreich initiiert. (Prüfe Vercel Logs für echte Sende-Status)`);
       }
@@ -468,7 +441,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     }
   };
 
-  // ... (EMAIL MANAGEMENT HANDLERS REMAIN THE SAME) ...
   const toggleEmailTemplate = (id: string) => {
     setTemplates(prev => prev.map(t => 
       t.id === id ? { ...t, isEnabled: !t.isEnabled } : t
@@ -493,7 +465,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     }
   };
 
-  // ... (ADMIN ACCOUNT HANDLERS REMAIN THE SAME) ...
   const handleUpdateAdminPassword = (e: React.FormEvent) => {
       e.preventDefault();
       alert("Funktion in dieser Version deaktiviert (Auth via Supabase Dashboard empfohlen).");
@@ -732,11 +703,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                     </div>
                 </div>
             ) : (
-                /* ... customer details ... (KEEP AS IS) */
                 <div className="animate-in fade-in slide-in-from-right-4">
-                    {/* (Customer Details UI Code Here - same as previous) */}
-                    {/* For brevity, copying the structure from previous snippet but assuming it's correctly placed */}
-                    {/* ... */}
                     <div className="flex items-center gap-4 mb-6">
                             <Button variant="outline" size="sm" onClick={() => setSelectedCustomerId(null)}>
                                 <ArrowLeft size={16} className="mr-2" /> Zurück zur Liste
@@ -744,20 +711,61 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                             <div className="flex-1">
                                 <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
                                     {customerDetail?.firstName} {customerDetail?.lastName}
-                                    {/* ... badges ... */}
+                                    {customerDetail?.subscription.isFree && (
+                                        <span className="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded-full font-bold">Free User</span>
+                                    )}
+                                    {customerDetail?.subscription.status === 'Active' && !customerDetail?.subscription.isFree && (
+                                        <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-full font-bold">Premium</span>
+                                    )}
                                 </h2>
                             </div>
                     </div>
-                    {/* ... grids ... */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        {/* LEFT: FORM (Same as before) */}
+                        {/* LEFT: FORM */}
                         <div className="lg:col-span-2 space-y-6">
                              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                                     <Users size={20} className="text-blue-600" /> Stammdaten Bearbeiten
                                 </h3>
                                 <form onSubmit={handleSaveCustomer} className="space-y-4">
-                                    {/* ... input fields ... */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vorname</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.firstName} onChange={e => setCustomerDetail({...customerDetail, firstName: e.target.value})} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachname</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.lastName} onChange={e => setCustomerDetail({...customerDetail, lastName: e.target.value})} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="flex-1">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Straße</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.address.street} onChange={e => setCustomerDetail({...customerDetail, address: {...customerDetail.address, street: e.target.value}})} />
+                                        </div>
+                                        <div className="w-full md:w-24">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nr.</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.address.houseNumber} onChange={e => setCustomerDetail({...customerDetail, address: {...customerDetail.address, houseNumber: e.target.value}})} />
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">PLZ</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.address.zip} onChange={e => setCustomerDetail({...customerDetail, address: {...customerDetail.address, zip: e.target.value}})} />
+                                        </div>
+                                        <div className="col-span-1 md:col-span-2">
+                                            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Ort</label>
+                                            <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.address.city} onChange={e => setCustomerDetail({...customerDetail, address: {...customerDetail.address, city: e.target.value}})} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Land</label>
+                                        <select className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white" value={customerDetail?.address.country} onChange={e => setCustomerDetail({...customerDetail, address: {...customerDetail.address, country: e.target.value}})}>
+                                            <option>Deutschland</option>
+                                            <option>Österreich</option>
+                                            <option>Schweiz</option>
+                                        </select>
+                                    </div>
                                     <div className="flex justify-end pt-2">
                                         <Button type="submit" size="sm" variant="outline">
                                             <Save size={14} className="mr-2" /> Änderungen speichern
@@ -766,11 +774,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                 </form>
                              </div>
                         </div>
-                        {/* RIGHT: SUB INFO (Same as before) */}
+                        {/* RIGHT: SUB INFO */}
                         <div className="space-y-6">
                             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                                 <h3 className="font-bold text-slate-900 mb-4">Abo Übersicht</h3>
-                                {/* ... content ... */}
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between py-2 border-b border-slate-50">
+                                        <span className="text-slate-500">Status</span>
+                                        <span className={`font-bold ${customerDetail?.subscription.status === 'Active' ? 'text-green-600' : 'text-slate-900'}`}>{customerDetail?.subscription.status}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2 border-b border-slate-50">
+                                        <span className="text-slate-500">Plan</span>
+                                        <span className="font-medium text-slate-900">{customerDetail?.subscription.plan}</span>
+                                    </div>
+                                    <div className="flex justify-between py-2 border-b border-slate-50">
+                                        <span className="text-slate-500">Startdatum</span>
+                                        <span className="font-medium text-slate-900">{customerDetail?.subscription.startDate}</span>
+                                    </div>
+                                    {customerDetail?.subscription.endDate && (
+                                        <div className="flex justify-between py-2 border-b border-slate-50">
+                                            <span className="text-slate-500">Endet am</span>
+                                            <span className="font-medium text-red-600">{customerDetail?.subscription.endDate}</span>
+                                        </div>
+                                    )}
+                                </div>
                                 <div className="pt-4 border-t border-slate-100 space-y-2">
                                     <Button 
                                         onClick={handleToggleFreeSubscription}
@@ -819,7 +846,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
              </div>
           </div>
 
-          {/* PAYPAL PAYOUTS SECTION (NEW) */}
+          {/* PAYPAL PAYOUTS SECTION */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
             <div className="p-6 border-b border-slate-100 bg-amber-50">
                 <h3 className="font-bold text-amber-900 flex items-center gap-2">
@@ -923,83 +950,286 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </div>
       )}
 
-      {/* ... (EMAILS & SETTINGS TABS REMAIN THE SAME) ... */}
-      {/* ... Only change was in the Partner Tab to add the Payout Table ... */}
+      {/* TAB: EMAILS */}
       {activeTab === 'emails' && !selectedCustomerId && (
-          /* ... emails content ... */
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-              {/* ... (Keep existing Email Management UI) ... */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  {/* ... */}
-                  <div>
-                    <h2 className="text-xl font-bold text-slate-900">E-Mail Vorlagen</h2>
-                    {/* ... */}
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Mail size={20} /></div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900">E-Mail Vorlagen</h2>
+                        <p className="text-sm text-slate-500">Verwalte hier alle automatischen System-E-Mails.</p>
+                    </div>
                   </div>
-                  {/* ... */}
               </div>
+
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* ... */}
+                  {/* Template List */}
                   <div className="space-y-8 lg:col-span-1">
-                      {/* ... Template List ... */}
                       {['CUSTOMER', 'PARTNER'].map((category) => (
                           <div key={category} className="space-y-3">
-                              {/* ... */}
+                              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{category === 'CUSTOMER' ? 'Kunden Kommunikation' : 'Partner Programm'}</h3>
                               {templates.filter(t => t.category === category).map(template => (
-                                  <div key={template.id} onClick={() => setEditingTemplateId(template.id)} className="...">
-                                      {/* ... */}
-                                      <h4 className="font-bold text-slate-900 text-sm">{template.name}</h4>
-                                      {/* ... */}
+                                  <div 
+                                    key={template.id} 
+                                    onClick={() => setEditingTemplateId(template.id)}
+                                    className={`p-4 rounded-xl border cursor-pointer transition-all ${editingTemplateId === template.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-300'}`}
+                                  >
+                                      <div className="flex justify-between items-start mb-1">
+                                          <h4 className="font-bold text-slate-900 text-sm">{template.name}</h4>
+                                          <div className={`w-2 h-2 rounded-full ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}></div>
+                                      </div>
+                                      <p className="text-xs text-slate-500 line-clamp-2">{template.description}</p>
                                   </div>
                               ))}
                           </div>
                       ))}
                   </div>
-                  {/* ... Editor ... */}
+
+                  {/* Editor */}
                   <div className="lg:col-span-2">
                       {editingTemplateId ? (
-                          /* ... Editor UI ... */
                           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-24">
-                              {/* ... */}
+                              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                                  <span className="text-xs font-mono text-slate-400">{editingTemplateId}</span>
+                                  <div className="flex items-center gap-3">
+                                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+                                          <input 
+                                            type="checkbox" 
+                                            checked={templates.find(t => t.id === editingTemplateId)?.isEnabled}
+                                            onChange={() => toggleEmailTemplate(editingTemplateId)}
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                          />
+                                          Aktiviert
+                                      </label>
+                                      <Button size="sm" variant="outline" onClick={() => handleSendTestEmail(templates.find(t => t.id === editingTemplateId)!)}>
+                                          {isSendingTestEmail ? 'Sende...' : 'Test senden'}
+                                      </Button>
+                                  </div>
+                              </div>
                               <div className="p-6 space-y-6">
-                                  {/* ... Inputs ... */}
-                                  <textarea value={templates.find(t => t.id === editingTemplateId)!.body} onChange={(e) => updateTemplate(editingTemplateId!, 'body', e.target.value)} className="..." />
-                                  {/* ... */}
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                      <input 
+                                        type="text" 
+                                        value={templates.find(t => t.id === editingTemplateId)?.subject}
+                                        onChange={(e) => updateTemplate(editingTemplateId, 'subject', e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-medium"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">HTML Inhalt</label>
+                                      <textarea 
+                                        rows={12}
+                                        value={templates.find(t => t.id === editingTemplateId)?.body}
+                                        onChange={(e) => updateTemplate(editingTemplateId, 'body', e.target.value)}
+                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-mono text-sm"
+                                      />
+                                  </div>
+                                  <div>
+                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Verfügbare Platzhalter</label>
+                                      <div className="flex flex-wrap gap-2">
+                                          {templates.find(t => t.id === editingTemplateId)?.variables.map(v => (
+                                              <span key={v} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-xs font-mono border border-slate-200">{v}</span>
+                                          ))}
+                                      </div>
+                                  </div>
                               </div>
                               <div className="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3">
-                                  {/* ... Buttons ... */}
-                                  <Button onClick={() => alert('Gespeichert')}>Speichern</Button>
+                                  <Button variant="primary" onClick={() => alert('Speichern simuliert (Datenbank-Tabelle für Templates erforderlich).')}>
+                                      <Save size={16} className="mr-2" /> Änderungen speichern
+                                  </Button>
                               </div>
                           </div>
                       ) : (
-                          /* ... Placeholder ... */
-                          <div className="...">Wähle eine Vorlage</div>
+                          <div className="h-full flex flex-col items-center justify-center text-slate-400 min-h-[400px] border-2 border-dashed border-slate-200 rounded-2xl">
+                              <Mail size={48} className="mb-4 text-slate-200" />
+                              <p>Wähle eine Vorlage aus der Liste links.</p>
+                          </div>
                       )}
                   </div>
               </div>
           </div>
       )}
 
+      {/* TAB: SETTINGS */}
       {activeTab === 'settings' && !selectedCustomerId && (
-          /* ... settings content ... */
           <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 space-y-8">
-              {/* ... (Keep existing Settings UI: Admin Auth, Pricing, Urls, Env Vars) ... */}
-              {/* ... (Just confirming it's there, no changes needed) ... */}
+              
+              {/* Admin Account Settings */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  {/* ... Pricing ... */}
+                  <div className="p-6 border-b border-slate-100">
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                          <Lock size={20} className="text-blue-600" /> Admin Sicherheit & Login
+                      </h3>
+                  </div>
+                  <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Email Change */}
+                      <form onSubmit={handleUpdateAdminEmail} className="space-y-4">
+                          <h4 className="text-sm font-bold text-slate-700">E-Mail ändern</h4>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Aktuelle E-Mail</label>
+                              <input type="text" value={adminAuth.currentEmail} disabled className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-500" />
+                          </div>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Neue E-Mail</label>
+                              <input type="email" required value={adminAuth.newEmail} onChange={e => setAdminAuth({...adminAuth, newEmail: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                          </div>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Bestätigung durch aktuelles Passwort</label>
+                              <input type="password" required value={adminAuth.emailPassword} onChange={e => setAdminAuth({...adminAuth, emailPassword: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                          </div>
+                          <Button size="sm" type="submit" variant="secondary" className="w-full">E-Mail ändern</Button>
+                      </form>
+
+                      {/* Password Change */}
+                      <form onSubmit={handleUpdateAdminPassword} className="space-y-4 md:border-l md:pl-8 border-slate-100">
+                          <h4 className="text-sm font-bold text-slate-700">Passwort ändern</h4>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Aktuelles Passwort</label>
+                              <input type="password" required value={adminAuth.pwCurrent} onChange={e => setAdminAuth({...adminAuth, pwCurrent: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                          </div>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Neues Passwort</label>
+                              <input type="password" required value={adminAuth.pwNew} onChange={e => setAdminAuth({...adminAuth, pwNew: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                          </div>
+                          <div>
+                              <label className="block text-xs text-slate-500 mb-1">Wiederholen</label>
+                              <input type="password" required value={adminAuth.pwConfirm} onChange={e => setAdminAuth({...adminAuth, pwConfirm: e.target.value})} className="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+                          </div>
+                          <Button size="sm" type="submit" variant="secondary" className="w-full">Passwort ändern</Button>
+                      </form>
+                  </div>
+              </div>
+
+              {/* Pricing Config */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50">
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                          <DollarSign size={20} className="text-green-600" /> Finanzen & Preise
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">Lege fest, was das Abo kostet.</p>
+                  </div>
                   <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* ... */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Preis für Neukunden (€)</label>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="number" step="0.01" 
+                                  value={prices.new} 
+                                  onChange={(e) => onUpdatePrices({...prices, new: parseFloat(e.target.value)})}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-lg" 
+                              />
+                          </div>
+                          <p className="text-xs text-slate-400 mt-2">Gilt ab sofort für alle neuen Checkouts.</p>
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Preis für Bestandskunden (€)</label>
+                          <div className="flex gap-2">
+                              <input 
+                                  type="number" step="0.01" 
+                                  value={prices.existing} 
+                                  onChange={(e) => onUpdatePrices({...prices, existing: parseFloat(e.target.value)})}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-bold text-lg bg-slate-50" 
+                              />
+                          </div>
+                          <p className="text-xs text-slate-400 mt-2">Nur Anzeigewert. Änderung erfordert Stripe-Migration.</p>
+                      </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
                       <Button size="sm" onClick={handleSavePrices}>Preise speichern</Button>
                   </div>
               </div>
+
+              {/* Product URLs Config */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  {/* ... URLs ... */}
+                  <div className="p-6 border-b border-slate-100">
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                          <Link size={20} className="text-blue-600" /> Produkt Links
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">Wohin sollen die "Zum Shop" Buttons führen?</p>
+                  </div>
                   <div className="p-6 grid grid-cols-1 gap-6">
-                      {/* ... */}
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">ResortPass Gold URL</label>
+                          <input 
+                              type="text" 
+                              value={productUrls.gold} 
+                              onChange={(e) => onUpdateProductUrls({...productUrls, gold: e.target.value})}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono text-slate-600" 
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-xs font-bold text-slate-500 uppercase mb-2">ResortPass Silver URL</label>
+                          <input 
+                              type="text" 
+                              value={productUrls.silver} 
+                              onChange={(e) => onUpdateProductUrls({...productUrls, silver: e.target.value})}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-mono text-slate-600" 
+                          />
+                      </div>
+                  </div>
+                  <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
                       <Button size="sm" onClick={() => alert("Links erfolgreich aktualisiert.")}>Links speichern</Button>
                   </div>
               </div>
+
+              {/* Env Vars & Connection Tests */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  {/* ... Env Vars ... */}
+                  <div className="p-6 border-b border-slate-100">
+                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                          <Terminal size={20} className="text-slate-600" /> Systemverbindungen
+                      </h3>
+                      <p className="text-sm text-slate-500 mt-1">Status der externen API-Dienste (Vercel Environment Variables).</p>
+                  </div>
+                  
+                  <div className="p-6 space-y-6">
+                      {/* Browse AI */}
+                      <div>
+                          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center justify-between">
+                              Browse.ai (Scraping)
+                              <button onClick={() => handleTestConnection('browseai')} disabled={isTestingConnection} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-medium transition">
+                                  Verbindung testen
+                              </button>
+                          </h4>
+                          <EnvVarRow name="BROWSE_AI_API_KEY" description="API Zugriff" />
+                          <EnvVarRow name="BROWSE_AI_ROBOT_ID" description="Roboter Identifikation" />
+                      </div>
+
+                      {/* Google Gemini */}
+                      <div>
+                          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center justify-between">
+                              Google Gemini (KI)
+                              <button onClick={() => handleTestConnection('gemini')} disabled={isTestingConnection} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-medium transition">
+                                  Verbindung testen
+                              </button>
+                          </h4>
+                          <EnvVarRow name="API_KEY" description="Gemini API Key" />
+                      </div>
+
+                      {/* Stripe */}
+                      <div>
+                          <h4 className="text-sm font-bold text-slate-700 mb-3">Stripe (Payment)</h4>
+                          <EnvVarRow name="NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" description="Frontend Key" />
+                          <EnvVarRow name="STRIPE_SECRET_KEY" description="Backend Key" />
+                          <EnvVarRow name="STRIPE_WEBHOOK_SECRET" description="Webhook Signierung" />
+                      </div>
+
+                      {/* Messaging */}
+                      <div>
+                          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center justify-between">
+                              Benachrichtigungen
+                              <div className="flex gap-2">
+                                  <button onClick={() => handleTestConnection('email')} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-medium">Test E-Mail</button>
+                                  <button onClick={() => handleTestConnection('sms')} className="text-xs bg-slate-100 hover:bg-slate-200 px-2 py-1 rounded text-slate-600 font-medium">Test SMS</button>
+                              </div>
+                          </h4>
+                          <EnvVarRow name="RESEND_API_KEY" description="E-Mail Versand" />
+                          <EnvVarRow name="TWILIO_ACCOUNT_SID" description="SMS Konto" />
+                          <EnvVarRow name="TWILIO_AUTH_TOKEN" description="SMS Authentifizierung" />
+                          <EnvVarRow name="TWILIO_PHONE_NUMBER" description="Absender Nummer" />
+                      </div>
+                  </div>
               </div>
           </div>
       )}
