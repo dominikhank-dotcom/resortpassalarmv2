@@ -76,6 +76,23 @@ export const createPortalSession = async () => {
     }
 };
 
+export const syncSubscription = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/sync-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Sync Sub Error:", error);
+        throw error;
+    }
+};
+
 export const sendTemplateTest = async (template: EmailTemplate, toEmail: string, urls?: { gold: string, silver: string }) => {
   try {
     const response = await fetch('/api/send-template-test', {

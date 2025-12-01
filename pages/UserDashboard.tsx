@@ -3,7 +3,7 @@ import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSqua
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
-import { sendTestAlarm, createCheckoutSession, getSystemSettings, createPortalSession } from '../services/backendService';
+import { sendTestAlarm, createCheckoutSession, getSystemSettings, createPortalSession, syncSubscription } from '../services/backendService';
 import { supabase } from '../lib/supabase';
 
 interface LogEntry {
@@ -27,6 +27,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [subscriptionDetails, setSubscriptionDetails] = useState<{ endDate: string | null, price: number | null }>({ endDate: null, price: null });
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [monitorGold, setMonitorGold] = useState<MonitorStatus>({
     isActive: true,
@@ -79,68 +80,69 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   // Derived state for easy checking
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
+  const fetchProfileAndSub = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+        
+        if (profile) {
+            // Populate Personal Data
+            setPersonalData({
+                firstName: profile.first_name || '',
+                lastName: profile.last_name || '',
+                street: profile.street || '',
+                houseNumber: profile.house_number || '',
+                zip: profile.zip || '',
+                city: profile.city || '',
+                country: profile.country || 'Deutschland',
+                email: profile.email || user.email || ''
+            });
+
+            // Populate Notifications
+            setNotifications({
+                email: profile.notification_email || profile.email || user.email || '',
+                sms: profile.phone || "", 
+                emailEnabled: profile.email_enabled !== false, // Default to true if null
+                smsEnabled: profile.sms_enabled === true
+            });
+
+            // Init temp data for editing
+            setTempData({
+                email: profile.notification_email || profile.email || user.email || '',
+                sms: profile.phone || ""
+            });
+        }
+
+        // Fetch Subscription Status
+        const { data: sub } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .single();
+        
+        if (sub) {
+            if (sub.plan_type === 'premium') setSubscriptionStatus('PAID');
+            else if (sub.plan_type === 'Manuell (Gratis)') setSubscriptionStatus('FREE');
+            else setSubscriptionStatus('PAID');
+
+            // Set real details
+            setSubscriptionDetails({
+                endDate: sub.current_period_end,
+                // If no price stored in sub yet, fallback to existing prop
+                price: prices.existing 
+            });
+        }
+    }
+  };
+
   // Load Real User Data on Mount
   useEffect(() => {
-    const fetchProfile = async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-            
-            if (profile) {
-                // Populate Personal Data
-                setPersonalData({
-                    firstName: profile.first_name || '',
-                    lastName: profile.last_name || '',
-                    street: profile.street || '',
-                    houseNumber: profile.house_number || '',
-                    zip: profile.zip || '',
-                    city: profile.city || '',
-                    country: profile.country || 'Deutschland',
-                    email: profile.email || user.email || ''
-                });
-
-                // Populate Notifications
-                setNotifications({
-                    email: profile.notification_email || profile.email || user.email || '',
-                    sms: profile.phone || "", 
-                    emailEnabled: profile.email_enabled !== false, // Default to true if null
-                    smsEnabled: profile.sms_enabled === true
-                });
-
-                // Init temp data for editing
-                setTempData({
-                    email: profile.notification_email || profile.email || user.email || '',
-                    sms: profile.phone || ""
-                });
-            }
-
-            // Fetch Subscription Status
-            const { data: sub } = await supabase
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'active')
-                .single();
-            
-            if (sub) {
-                if (sub.plan_type === 'premium') setSubscriptionStatus('PAID');
-                else if (sub.plan_type === 'Manuell (Gratis)') setSubscriptionStatus('FREE');
-                else setSubscriptionStatus('PAID');
-
-                // Set real details
-                setSubscriptionDetails({
-                    endDate: sub.current_period_end,
-                    // If no price stored in sub yet, fallback to existing prop
-                    price: prices.existing 
-                });
-            }
-        }
-    };
-    fetchProfile();
+    fetchProfileAndSub();
   }, [prices.existing]);
 
   // Fetch REAL System Status (Sync with Admin/LandingPage)
@@ -176,8 +178,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     // Check for payment success query param
     const query = new URLSearchParams(window.location.search);
     if (query.get('payment_success')) {
-      setSubscriptionStatus('PAID');
-      alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+      // FORCE SYNC with Stripe
+      setIsSyncing(true);
+      syncSubscription().then(() => {
+          fetchProfileAndSub(); // Reload local state
+          setIsSyncing(false);
+          setSubscriptionStatus('PAID');
+          alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+      }).catch(() => {
+          setIsSyncing(false);
+      });
+      
       // Clear URL param
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -230,6 +241,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         setTimeout(() => setIsChecking(null), 800); 
     });
   };
+
+  const handleManualSync = async () => {
+      setIsSyncing(true);
+      try {
+          const result = await syncSubscription();
+          if (result.found) {
+              await fetchProfileAndSub();
+              alert("Abo erfolgreich synchronisiert! Dein Status ist jetzt aktiv.");
+          } else {
+              alert("Kein aktives Abo bei Stripe gefunden.");
+          }
+      } catch (e: any) {
+          alert("Fehler beim Synchronisieren: " + e.message);
+      } finally {
+          setIsSyncing(false);
+      }
+  }
 
   // -- Email Handling --
   const startEditEmail = () => {
@@ -580,11 +608,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                       Jetzt aktivieren ({prices.new.toFixed(2).replace('.', ',')} €)
                     </Button>
                     
-                    <div className="mt-6 border-t border-slate-100 pt-4 w-full">
-                         <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
-                              Rechnungen anzeigen
-                              <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
-                        </Button>
+                    <div className="mt-6 border-t border-slate-100 pt-4 w-full text-center">
+                         <p className="text-xs text-slate-400 mb-2">Bereits bezahlt?</p>
+                         <button onClick={handleManualSync} disabled={isSyncing} className="text-xs text-blue-600 underline font-medium hover:text-blue-800">
+                              {isSyncing ? "Prüfe..." : "Status aktualisieren / Käufe wiederherstellen"}
+                         </button>
                     </div>
                 </div>
               )}
@@ -592,7 +620,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           </div>
         </div>
 
-        {/* ... Personal Data & History Sections (Same as before) ... */}
+        {/* ... Personal Data & History Sections ... */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
               <div className="p-6 border-b border-slate-100">
