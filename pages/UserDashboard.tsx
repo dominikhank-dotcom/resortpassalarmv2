@@ -134,8 +134,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             // Set real details
             setSubscriptionDetails({
                 endDate: sub.current_period_end,
-                // Display logic for price: if we don't have it in DB, show existing prop
-                price: prices.existing 
+                // Display logic for price: if we HAVE it in DB, show individual price, else fallback
+                price: sub.subscription_price || prices.existing 
             });
         } else {
             setSubscriptionStatus('NONE');

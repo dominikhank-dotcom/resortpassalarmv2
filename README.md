@@ -111,8 +111,12 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   status text DEFAULT 'inactive', -- 'active', 'canceled', 'past_due'
   plan_type text DEFAULT 'standard',
   current_period_end timestamp with time zone,
+  subscription_price decimal(10,2), -- Individual price for the user
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Add price column if missing
+ALTER TABLE public.subscriptions ADD COLUMN IF NOT EXISTS subscription_price decimal(10,2);
 
 CREATE TABLE IF NOT EXISTS public.commissions (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,

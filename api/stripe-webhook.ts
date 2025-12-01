@@ -59,6 +59,7 @@ export default async function handler(req: any, res: any) {
                 try {
                     const subDetails = await stripe.subscriptions.retrieve(session.subscription as string);
                     currentPeriodEnd = new Date(subDetails.current_period_end * 1000).toISOString();
+                    // Amount in cents
                     amount = session.amount_total ? session.amount_total / 100 : 0;
                 } catch (e) {
                     console.error("Error fetching sub details", e);
@@ -79,6 +80,7 @@ export default async function handler(req: any, res: any) {
                 status: 'active',
                 plan_type: 'premium',
                 current_period_end: currentPeriodEnd,
+                subscription_price: amount // SAVE REAL PRICE
             };
 
             if (existingSub) {
@@ -142,7 +144,8 @@ export default async function handler(req: any, res: any) {
              if (sub) {
                  await supabase.from('subscriptions').update({
                      status: 'active',
-                     current_period_end: new Date(subDetails.current_period_end * 1000).toISOString()
+                     current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
+                     subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null
                  }).eq('user_id', sub.user_id);
              }
         }

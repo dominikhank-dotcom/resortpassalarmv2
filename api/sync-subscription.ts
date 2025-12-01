@@ -52,6 +52,11 @@ export default async function handler(req: any, res: any) {
     if (subscriptions && subscriptions.length > 0) {
         const sub = subscriptions[0]; // Take the first active one
         
+        let priceAmount = 0;
+        if (sub.items && sub.items.data.length > 0 && sub.items.data[0].price.unit_amount) {
+            priceAmount = sub.items.data[0].price.unit_amount / 100;
+        }
+
         // 4. Update Database (ROBUST WAY: Check then Update/Insert)
         const { data: existingSub } = await supabase
             .from('subscriptions')
@@ -65,6 +70,7 @@ export default async function handler(req: any, res: any) {
             status: 'active',
             plan_type: 'premium',
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
+            subscription_price: priceAmount // SYNC PRICE
         };
 
         if (existingSub) {
@@ -79,7 +85,6 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ success: true, message: 'Subscription synced successfully.', found: true });
     } else {
         // If user has no active sub in Stripe, set inactive
-        // Check if exists first to avoid errors
         const { data: existingSub } = await supabase
             .from('subscriptions')
             .select('id')
