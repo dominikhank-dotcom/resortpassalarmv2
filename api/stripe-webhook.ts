@@ -59,7 +59,6 @@ export default async function handler(req: any, res: any) {
                 try {
                     const subDetails = await stripe.subscriptions.retrieve(session.subscription as string);
                     currentPeriodEnd = new Date(subDetails.current_period_end * 1000).toISOString();
-                    // Amount in cents
                     amount = session.amount_total ? session.amount_total / 100 : 0;
                 } catch (e) {
                     console.error("Error fetching sub details", e);

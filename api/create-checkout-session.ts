@@ -45,6 +45,9 @@ export default async function handler(req, res) {
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
     const session = await stripe.checkout.sessions.create({
+      // REQUIRED: Collect address for invoices
+      billing_address_collection: 'required',
+      
       // FIXED: Removed 'paypal' to prevent crash if not enabled in dashboard
       // Only 'card' is enabled by default. Apple Pay / Google Pay work automatically via 'card'.
       payment_method_types: ['card'],
