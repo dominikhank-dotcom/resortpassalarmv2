@@ -107,7 +107,7 @@ export default async function handler(req: any, res: any) {
                 }
             }
 
-            // 3. Send Confirmation Email
+            // 3. Send Confirmation Email (Uses template code logic directly here for stability)
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 const resend = new Resend(process.env.RESEND_API_KEY);
                 const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
@@ -134,6 +134,7 @@ export default async function handler(req: any, res: any) {
         }
     }
 
+    // Handle Renewal / Payment Succeeded
     if (event.type === 'invoice.payment_succeeded') {
         const invoice = event.data.object;
         if (invoice.subscription) {
@@ -144,12 +145,23 @@ export default async function handler(req: any, res: any) {
                  await supabase.from('subscriptions').update({
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
-                     subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null
+                     subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null,
+                     cancel_at_period_end: false // Reset cancellation on renewal
                  }).eq('user_id', sub.user_id);
              }
         }
     }
 
+    // Handle Subscription Updated (e.g. Cancellation scheduled)
+    if (event.type === 'customer.subscription.updated') {
+        const subscription = event.data.object;
+        await supabase.from('subscriptions').update({ 
+            cancel_at_period_end: subscription.cancel_at_period_end,
+            current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
+        }).eq('stripe_subscription_id', subscription.id);
+    }
+
+    // Handle Subscription Deleted (Immediate cancellation)
     if (event.type === 'customer.subscription.deleted') {
         const subscription = event.data.object;
         await supabase.from('subscriptions').update({ status: 'canceled' }).eq('stripe_subscription_id', subscription.id);

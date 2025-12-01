@@ -57,7 +57,7 @@ export default async function handler(req: any, res: any) {
             priceAmount = sub.items.data[0].price.unit_amount / 100;
         }
 
-        // 4. Update Database (ROBUST WAY: Check then Update/Insert)
+        // 4. Update Database
         const { data: existingSub } = await supabase
             .from('subscriptions')
             .select('id')
@@ -70,7 +70,8 @@ export default async function handler(req: any, res: any) {
             status: 'active',
             plan_type: 'premium',
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-            subscription_price: priceAmount // SYNC PRICE
+            subscription_price: priceAmount,
+            cancel_at_period_end: sub.cancel_at_period_end // SYNC CANCEL STATUS
         };
 
         if (existingSub) {
