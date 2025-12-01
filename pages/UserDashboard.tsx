@@ -3,7 +3,7 @@ import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSqua
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
-import { sendTestAlarm, createCheckoutSession, getSystemSettings } from '../services/backendService';
+import { sendTestAlarm, createCheckoutSession, getSystemSettings, createPortalSession } from '../services/backendService';
 import { supabase } from '../lib/supabase';
 
 interface LogEntry {
@@ -24,6 +24,7 @@ interface UserDashboardProps {
 export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productUrls, prices }) => {
   // Simulation State
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>('NONE');
+  const [subscriptionDetails, setSubscriptionDetails] = useState<{ endDate: string | null, price: number | null }>({ endDate: null, price: null });
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
 
@@ -129,11 +130,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 if (sub.plan_type === 'premium') setSubscriptionStatus('PAID');
                 else if (sub.plan_type === 'Manuell (Gratis)') setSubscriptionStatus('FREE');
                 else setSubscriptionStatus('PAID');
+
+                // Set real details
+                setSubscriptionDetails({
+                    endDate: sub.current_period_end,
+                    // If no price stored in sub yet, fallback to existing prop
+                    price: prices.existing 
+                });
             }
         }
     };
     fetchProfile();
-  }, []);
+  }, [prices.existing]);
 
   // Fetch REAL System Status (Sync with Admin/LandingPage)
   const fetchSystemStatus = async () => {
@@ -170,6 +178,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     if (query.get('payment_success')) {
       setSubscriptionStatus('PAID');
       alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+      // Clear URL param
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     return () => clearInterval(interval);
@@ -210,17 +220,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             alert("Fehler beim Speichern: " + error.message);
         } else {
             alert("Persönliche Daten erfolgreich gespeichert.");
-            // Note: We deliberately do NOT update notification_email here anymore
-            // to allow separate configuration.
         }
     }
   };
 
   const handleManualCheck = (type: 'gold' | 'silver') => {
     setIsChecking(type);
-    // On manual check, we force a refresh from the server DB
     fetchSystemStatus().then(() => {
-        setTimeout(() => setIsChecking(null), 800); // Small delay for UX
+        setTimeout(() => setIsChecking(null), 800); 
     });
   };
 
@@ -276,7 +283,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     setErrors(prev => ({ ...prev, sms: '' }));
   };
 
-  // --- REAL BACKEND INTEGRATION ---
+  // --- ACTIONS ---
   const handleTestAlarm = async () => {
     const activeMethods = [];
     if (notifications.emailEnabled) activeMethods.push("E-Mail");
@@ -290,8 +297,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     setIsSendingAlarm(true);
     try {
       await sendTestAlarm(notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled);
-      
-      // Add to log only on success
       const newEntry: LogEntry = {
           id: Math.random().toString(36).substr(2, 9),
           date: new Date().toLocaleString(),
@@ -310,6 +315,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const handleSubscribe = async () => {
     await createCheckoutSession(personalData.email);
   };
+
+  const handleManageBilling = async () => {
+      await createPortalSession();
+  }
 
   const StatusCard = ({ title, type, monitor }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus }) => {
     const isLoading = isChecking === type;
@@ -435,6 +444,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             )}
             
             <div className="p-6 space-y-4 flex-1">
+              {/* Email & SMS Settings UI ... (Same as before) */}
               
               {/* Email Settings */}
               <div className="flex flex-col p-4 border border-slate-100 rounded-xl hover:border-indigo-100 transition-colors">
@@ -443,45 +453,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     <Mail className={notifications.emailEnabled ? "text-blue-600" : "text-slate-300"} size={20} />
                     <p className="font-medium text-slate-900">Email Alarm</p>
                   </div>
-                  
                   <div className="flex items-center gap-3">
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={notifications.emailEnabled}
-                          onChange={(e) => handleToggleEmail(e.target.checked)}
-                        />
+                        <input type="checkbox" className="sr-only peer" checked={notifications.emailEnabled} onChange={(e) => handleToggleEmail(e.target.checked)} />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
-                      
-                      {!editMode.email ? (
-                          <button onClick={startEditEmail} className="text-slate-400 hover:text-blue-600 p-1">
-                              <Pencil size={16} />
-                          </button>
-                      ) : (
-                          <div className="flex gap-1">
-                              <button onClick={saveEmail} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button>
-                              <button onClick={cancelEditEmail} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button>
-                          </div>
-                      )}
+                      {!editMode.email ? ( <button onClick={startEditEmail} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={16} /></button> ) : ( <div className="flex gap-1"><button onClick={saveEmail} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button><button onClick={cancelEditEmail} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button></div> )}
                   </div>
                 </div>
-
                 <div className="ml-8">
-                  {editMode.email ? (
-                      <div className="space-y-1">
-                          <input 
-                            type="email" 
-                            value={tempData.email}
-                            onChange={(e) => setTempData({...tempData, email: e.target.value})}
-                            className={`w-full text-sm p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none ${errors.email ? 'border-red-300 bg-red-50' : 'border-blue-300'}`}
-                          />
-                          {errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 truncate">{notifications.email || 'Nicht konfiguriert'}</p>
-                    )}
+                  {editMode.email ? ( <div className="space-y-1"><input type="email" value={tempData.email} onChange={(e) => setTempData({...tempData, email: e.target.value})} className={`w-full text-sm p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none ${errors.email ? 'border-red-300 bg-red-50' : 'border-blue-300'}`} />{errors.email && <p className="text-xs text-red-500 font-medium">{errors.email}</p>}</div> ) : ( <p className="text-sm text-slate-500 truncate">{notifications.email || 'Nicht konfiguriert'}</p> )}
                 </div>
               </div>
 
@@ -492,50 +473,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     <MessageSquare className={notifications.smsEnabled ? "text-blue-600" : "text-slate-300"} size={20} />
                     <p className="font-medium text-slate-900">SMS Alarm</p>
                   </div>
-                  
                   <div className="flex items-center gap-3">
                       <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                          type="checkbox" 
-                          className="sr-only peer" 
-                          checked={notifications.smsEnabled}
-                          onChange={(e) => handleToggleSms(e.target.checked)}
-                        />
+                        <input type="checkbox" className="sr-only peer" checked={notifications.smsEnabled} onChange={(e) => handleToggleSms(e.target.checked)} />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div>
                       </label>
-
-                      {!editMode.sms ? (
-                          <button onClick={startEditSms} className="text-slate-400 hover:text-blue-600 p-1">
-                              <Pencil size={16} />
-                          </button>
-                      ) : (
-                          <div className="flex gap-1">
-                              <button onClick={saveSms} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button>
-                              <button onClick={cancelEditSms} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button>
-                          </div>
-                      )}
+                      {!editMode.sms ? ( <button onClick={startEditSms} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={16} /></button> ) : ( <div className="flex gap-1"><button onClick={saveSms} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button><button onClick={cancelEditSms} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button></div> )}
                   </div>
                 </div>
-
                 <div className="ml-8">
-                  {editMode.sms ? (
-                      <div className="space-y-1">
-                          <input 
-                            type="tel" 
-                            value={tempData.sms}
-                            onChange={(e) => setTempData({...tempData, sms: e.target.value})}
-                            placeholder="+49 170 123456"
-                            className={`w-full text-sm p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none ${errors.sms ? 'border-red-300 bg-red-50' : 'border-blue-300'}`}
-                          />
-                          {errors.sms ? (
-                              <p className="text-xs text-red-500 font-medium">{errors.sms}</p>
-                          ) : (
-                              <p className="text-xs text-slate-400">Bitte mit Landesvorwahl (z.B. +49)</p>
-                          )}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p>
-                    )}
+                  {editMode.sms ? ( <div className="space-y-1"><input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} placeholder="+49 170 123456" className={`w-full text-sm p-2 border rounded focus:ring-1 focus:ring-blue-500 outline-none ${errors.sms ? 'border-red-300 bg-red-50' : 'border-blue-300'}`} />{errors.sms ? ( <p className="text-xs text-red-500 font-medium">{errors.sms}</p> ) : ( <p className="text-xs text-slate-400">Bitte mit Landesvorwahl (z.B. +49)</p> )}</div> ) : ( <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> )}
                 </div>
               </div>
 
@@ -583,8 +530,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         </span>
                         <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
                         </div>
-                        <div className="text-3xl font-bold text-slate-900 mb-1">{prices.existing.toFixed(2).replace('.', ',')} € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
-                        <p className="text-sm text-slate-500">Nächste Abrechnung: 01.06.2024</p>
+                        <div className="text-3xl font-bold text-slate-900 mb-1">{subscriptionDetails.price ? subscriptionDetails.price.toFixed(2).replace('.', ',') : prices.existing.toFixed(2).replace('.', ',')} € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
+                        <p className="text-sm text-slate-500">
+                            Nächste Abrechnung: {subscriptionDetails.endDate ? new Date(subscriptionDetails.endDate).toLocaleDateString('de-DE') : 'Lade...'}
+                        </p>
                     </div>
                   )}
 
@@ -592,11 +541,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                   <div className="space-y-2 mt-auto">
                     {subscriptionStatus === 'PAID' && (
                         <>
-                            <Button variant="outline" size="sm" className="w-full justify-between group">
+                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
                             Zahlungsmethode bearbeiten
                             <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
                             </Button>
-                            <Button variant="outline" size="sm" className="w-full justify-between group">
+                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
                             Rechnungen anzeigen
                             <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
                             </Button>
@@ -604,7 +553,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                             variant="outline" 
                             size="sm" 
                             className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
-                            onClick={() => { if(confirm('Abo wirklich kündigen?')) setSubscriptionStatus('NONE'); }}
+                            onClick={handleManageBilling}
                             >
                             Abo kündigen
                             </Button>
@@ -632,7 +581,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     </Button>
                     
                     <div className="mt-6 border-t border-slate-100 pt-4 w-full">
-                         <Button variant="outline" size="sm" className="w-full justify-between group">
+                         <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
                               Rechnungen anzeigen
                               <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
                         </Button>
@@ -643,6 +592,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           </div>
         </div>
 
+        {/* ... Personal Data & History Sections (Same as before) ... */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
               <div className="p-6 border-b border-slate-100">
@@ -653,100 +603,54 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
               </div>
               <div className="p-6">
                   <form onSubmit={handleSavePersonalData} className="space-y-4">
+                      {/* ... Personal Data Inputs ... */}
                       <div className="grid grid-cols-2 gap-4">
                           <div>
                               <label className="block text-sm font-medium text-slate-700 mb-1">Vorname</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
-                                  value={personalData.firstName}
-                                  readOnly
-                              />
+                              <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none" value={personalData.firstName} readOnly />
                           </div>
                           <div>
                               <label className="block text-sm font-medium text-slate-700 mb-1">Nachname</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none"
-                                  value={personalData.lastName}
-                                  readOnly
-                              />
+                              <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none" value={personalData.lastName} readOnly />
                           </div>
                       </div>
-
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="md:col-span-2 flex gap-4">
                               <div className="flex-1">
                                   <label className="block text-sm font-medium text-slate-700 mb-1">Straße</label>
-                                  <input 
-                                      type="text" 
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
-                                      value={personalData.street}
-                                      onChange={(e) => setPersonalData({...personalData, street: e.target.value})}
-                                  />
+                                  <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.street} onChange={(e) => setPersonalData({...personalData, street: e.target.value})} />
                               </div>
                               <div className="w-20">
                                   <label className="block text-sm font-medium text-slate-700 mb-1">Nr.</label>
-                                  <input 
-                                      type="text" 
-                                      className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
-                                      value={personalData.houseNumber}
-                                      onChange={(e) => setPersonalData({...personalData, houseNumber: e.target.value})}
-                                  />
+                                  <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.houseNumber} onChange={(e) => setPersonalData({...personalData, houseNumber: e.target.value})} />
                               </div>
                           </div>
                       </div>
-
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                           <div className="col-span-1">
                               <label className="block text-sm font-medium text-slate-700 mb-1">PLZ</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
-                                  value={personalData.zip}
-                                  onChange={(e) => setPersonalData({...personalData, zip: e.target.value})}
-                              />
+                              <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.zip} onChange={(e) => setPersonalData({...personalData, zip: e.target.value})} />
                           </div>
                           <div className="col-span-1 md:col-span-2">
                               <label className="block text-sm font-medium text-slate-700 mb-1">Ort</label>
-                              <input 
-                                  type="text" 
-                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
-                                  value={personalData.city}
-                                  onChange={(e) => setPersonalData({...personalData, city: e.target.value})}
-                              />
+                              <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.city} onChange={(e) => setPersonalData({...personalData, city: e.target.value})} />
                           </div>
                       </div>
-                      
                       <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">Land</label>
-                          <select 
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-                              value={personalData.country}
-                              onChange={(e) => setPersonalData({...personalData, country: e.target.value})}
-                          >
+                          <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none bg-white" value={personalData.country} onChange={(e) => setPersonalData({...personalData, country: e.target.value})}>
                               <option>Deutschland</option>
                               <option>Österreich</option>
                               <option>Schweiz</option>
                               <option>Frankreich</option>
                           </select>
                       </div>
-
                       <div>
                           <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail Adresse</label>
-                          <input 
-                              type="email" 
-                              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none"
-                              value={personalData.email}
-                              onChange={(e) => setPersonalData({...personalData, email: e.target.value})}
-                          />
+                          <input type="email" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.email} onChange={(e) => setPersonalData({...personalData, email: e.target.value})} />
                       </div>
-
                       <div className="pt-2 flex justify-end">
-                          <Button type="submit" size="sm">
-                              <Save size={16} />
-                              Daten speichern
-                          </Button>
+                          <Button type="submit" size="sm"><Save size={16} /> Daten speichern</Button>
                       </div>
                   </form>
               </div>

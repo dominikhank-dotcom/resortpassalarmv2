@@ -1,6 +1,7 @@
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
+// Helper to safely handle responses that might not be JSON (e.g. 404/500 HTML pages)
 const handleResponse = async (response: Response) => {
   const contentType = response.headers.get('content-type');
   if (contentType && contentType.includes('application/json')) {
@@ -10,6 +11,7 @@ const handleResponse = async (response: Response) => {
     }
     return data;
   } else {
+    // If not JSON, read text to show the actual server error (likely HTML or plain text)
     const text = await response.text();
     console.error("Non-JSON Response:", text);
     throw new Error(`Server antwortete nicht mit JSON (Status ${response.status}). Prüfe die Vercel Logs.`);
@@ -32,15 +34,19 @@ export const sendTestAlarm = async (email: string, phone: string, sendEmail: boo
 
 export const createCheckoutSession = async (email: string) => {
   try {
+    // Check for referral code in local storage
     const referralCode = localStorage.getItem('resortpass_referral');
+
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, referralCode })
     });
+
     const data = await handleResponse(response);
+    
     if (data.url) {
-      window.location.href = data.url;
+      window.location.href = data.url; // Redirect to Stripe
     } else {
       throw new Error("Keine Checkout URL erhalten");
     }
@@ -48,6 +54,26 @@ export const createCheckoutSession = async (email: string) => {
     console.error("Checkout Error:", error);
     alert(`Fehler beim Starten des Bezahlvorgangs: ${error.message}`);
   }
+};
+
+export const createPortalSession = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/create-portal-session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        const data = await handleResponse(response);
+        if (data.url) {
+            window.location.href = data.url;
+        }
+    } catch (error: any) {
+        console.error("Portal Error:", error);
+        alert(`Fehler beim Öffnen des Kundenportals: ${error.message}`);
+    }
 };
 
 export const sendTemplateTest = async (template: EmailTemplate, toEmail: string, urls?: { gold: string, silver: string }) => {
@@ -66,7 +92,9 @@ export const sendTemplateTest = async (template: EmailTemplate, toEmail: string,
 
 export const testBrowseAiConnection = async () => {
   try {
-    const response = await fetch('/api/test-browse-ai', { method: 'GET' });
+    const response = await fetch('/api/test-browse-ai', {
+      method: 'GET',
+    });
     return await handleResponse(response);
   } catch (error: any) {
     console.error("Browse AI Test Error:", error);
@@ -76,7 +104,9 @@ export const testBrowseAiConnection = async () => {
 
 export const testGeminiConnection = async () => {
   try {
-    const response = await fetch('/api/test-gemini', { method: 'GET' });
+    const response = await fetch('/api/test-gemini', {
+      method: 'GET',
+    });
     return await handleResponse(response);
   } catch (error: any) {
     console.error("Gemini Test Error:", error);
@@ -132,10 +162,15 @@ export const updateAffiliateProfile = async (settings: any) => {
     if (error) throw error;
 };
 
+// --- SYSTEM SETTINGS ---
+
 export const getSystemSettings = async () => {
   try {
-    const response = await fetch('/api/system-settings', { method: 'GET' });
+    const response = await fetch('/api/system-settings', {
+      method: 'GET'
+    });
     if (response.status === 404) {
+      // API not available yet (maybe due to build error), fail gracefully
       console.warn("System Settings API not found (404). Using defaults.");
       return null;
     }
@@ -149,6 +184,7 @@ export const getSystemSettings = async () => {
 export const updateSystemSettings = async (key: string, value: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht eingeloggt");
+
     try {
         const response = await fetch('/api/system-settings', {
             method: 'POST',
@@ -165,6 +201,7 @@ export const updateSystemSettings = async (key: string, value: string) => {
 export const updateSystemStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht eingeloggt");
+
     try {
         const response = await fetch('/api/update-system-status', {
             method: 'POST',
@@ -178,9 +215,12 @@ export const updateSystemStatus = async (type: 'gold' | 'silver', status: 'avail
     }
 };
 
+// --- STRIPE CONNECT ---
+
 export const connectStripe = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht eingeloggt");
+
     try {
         const response = await fetch('/api/stripe-connect-onboard', {
             method: 'POST',
@@ -198,6 +238,7 @@ export const connectStripe = async () => {
 export const requestStripePayout = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht eingeloggt");
+
     try {
         const response = await fetch('/api/stripe-payout', {
             method: 'POST',
@@ -211,9 +252,12 @@ export const requestStripePayout = async () => {
     }
 };
 
+// --- PAYPAL PAYOUTS ---
+
 export const requestPaypalPayout = async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Nicht eingeloggt");
+
     try {
         const response = await fetch('/api/request-payout', {
             method: 'POST',

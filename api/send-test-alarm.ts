@@ -9,6 +9,7 @@ export default async function handler(req: any, res: any) {
   const { email, phone, sendEmail, sendSms } = req.body;
   const results = { email: null as string | null, sms: null as string | null, errors: [] as string[] };
 
+  // --- SEND EMAIL ---
   if (sendEmail && email) {
     if (!process.env.RESEND_API_KEY) {
        results.errors.push("Email aktiviert, aber RESEND_API_KEY fehlt.");
@@ -19,7 +20,13 @@ export default async function handler(req: any, res: any) {
                 from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
                 to: email,
                 subject: '🔔 Test-Alarm: Dein Wächter funktioniert!',
-                html: `<h1>Funktionstest erfolgreich!</h1><p>Hallo,</p><p>Dies ist ein Test-Alarm von deinem ResortPass Wächter.</p>`
+                html: `
+                  <h1>Funktionstest erfolgreich!</h1>
+                  <p>Hallo,</p>
+                  <p>Dies ist ein Test-Alarm von deinem ResortPass Wächter.</p>
+                  <p>Wenn du diese Mail liest, sind deine Einstellungen korrekt.</p>
+                  <p>Wir melden uns, sobald Tickets verfügbar sind.</p>
+                `
             });
             if (data.error) throw data.error;
             results.email = 'sent';
@@ -30,6 +37,7 @@ export default async function handler(req: any, res: any) {
     }
   }
 
+  // --- SEND SMS ---
   if (sendSms && phone) {
       if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
           results.errors.push("SMS aktiviert, aber Twilio Keys fehlen.");
