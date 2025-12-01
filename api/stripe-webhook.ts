@@ -41,7 +41,7 @@ export default async function handler(req: any, res: any) {
         const session = event.data.object;
         let userId = session.client_reference_id;
 
-        // Fallback: Try to find user by email if client_reference_id is missing
+        // Fallback: Try to find user by email
         if (!userId && session.customer_email) {
             const { data: user } = await supabase
                 .from('profiles')
@@ -52,31 +52,40 @@ export default async function handler(req: any, res: any) {
         }
 
         if (userId) {
-            // Retrieve full subscription details to get accurate period_end
-            let currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Fallback
+            let currentPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
             let amount = 0;
 
             if (session.subscription) {
                 try {
                     const subDetails = await stripe.subscriptions.retrieve(session.subscription as string);
                     currentPeriodEnd = new Date(subDetails.current_period_end * 1000).toISOString();
-                    // Amount from the session (in cents)
                     amount = session.amount_total ? session.amount_total / 100 : 0;
                 } catch (e) {
                     console.error("Error fetching sub details", e);
                 }
             }
 
-            // 1. Create/Update Subscription in DB
-            await supabase.from('subscriptions').upsert({
+            // 1. ROBUST DB UPDATE (Check existing first)
+            const { data: existingSub } = await supabase
+                .from('subscriptions')
+                .select('id')
+                .eq('user_id', userId)
+                .maybeSingle();
+
+            const subData = {
                 user_id: userId,
                 stripe_customer_id: session.customer as string,
                 stripe_subscription_id: session.subscription as string,
                 status: 'active',
                 plan_type: 'premium',
                 current_period_end: currentPeriodEnd,
-                // We could add a 'price' column to subscriptions table in SQL if we wanted to store it permanently per user
-            }, { onConflict: 'user_id' }); // Upsert based on user_id to avoid duplicates
+            };
+
+            if (existingSub) {
+                await supabase.from('subscriptions').update(subData).eq('id', existingSub.id);
+            } else {
+                await supabase.from('subscriptions').insert(subData);
+            }
 
             // 2. Handle Affiliate Commission
             if (session.metadata?.referralCode) {
@@ -87,10 +96,7 @@ export default async function handler(req: any, res: any) {
                     .single();
                 
                 if (partner) {
-                    // Calculate commission (e.g. 50% of amount) - logic should match system settings ideally
-                    // For now using safe default or recalculating
                     const commissionAmount = amount > 0 ? (amount * 0.5) : 0.99;
-                    
                     await supabase.from('commissions').insert({
                         partner_id: partner.id,
                         source_user_id: userId,
@@ -103,8 +109,6 @@ export default async function handler(req: any, res: any) {
             // 3. Send Confirmation Email
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 const resend = new Resend(process.env.RESEND_API_KEY);
-                
-                // Get First Name
                 const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                 const firstName = profile?.first_name || 'Kunde';
 
@@ -129,7 +133,6 @@ export default async function handler(req: any, res: any) {
         }
     }
 
-    // Handle Recurring Payments (Invoice Paid)
     if (event.type === 'invoice.payment_succeeded') {
         const invoice = event.data.object;
         if (invoice.subscription) {
@@ -137,26 +140,14 @@ export default async function handler(req: any, res: any) {
              const { data: sub } = await supabase.from('subscriptions').select('user_id').eq('stripe_subscription_id', invoice.subscription).single();
              
              if (sub) {
-                 // Extend Subscription
                  await supabase.from('subscriptions').update({
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString()
                  }).eq('user_id', sub.user_id);
-
-                 // Add Commission for Partner (Recurring)
-                 // Need to find who referred this user originally.
-                 // Complex query or store referrer in subscription table.
-                 // For MVP: We check if there was a previous commission for this pair?
-                 // Better: Add referrer_id to profiles table (we did that in SQL earlier implicitly?)
-                 // Let's rely on profiles.referral_code lookup if we stored who referred whom?
-                 // Current SQL schema doesn't strictly link user -> partner ID permanently in profile, 
-                 // but we can look at the first commission?
-                 // For now, MVP assumes recurring logic will be added later or via 'metadata' on subscription object in Stripe if we added it there.
              }
         }
     }
 
-    // Handle Cancellations
     if (event.type === 'customer.subscription.deleted') {
         const subscription = event.data.object;
         await supabase.from('subscriptions').update({ status: 'canceled' }).eq('stripe_subscription_id', subscription.id);

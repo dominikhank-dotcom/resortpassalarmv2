@@ -117,13 +117,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             });
         }
 
-        // Fetch Subscription Status
+        // Fetch Subscription Status (ROBUST: use maybeSingle or limit)
         const { data: sub } = await supabase
             .from('subscriptions')
             .select('*')
             .eq('user_id', user.id)
             .eq('status', 'active')
-            .single();
+            .limit(1)
+            .maybeSingle();
         
         if (sub) {
             if (sub.plan_type === 'premium') setSubscriptionStatus('PAID');
@@ -133,9 +134,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             // Set real details
             setSubscriptionDetails({
                 endDate: sub.current_period_end,
-                // If no price stored in sub yet, fallback to existing prop
+                // Display logic for price: if we don't have it in DB, show existing prop
                 price: prices.existing 
             });
+        } else {
+            setSubscriptionStatus('NONE');
         }
     }
   };

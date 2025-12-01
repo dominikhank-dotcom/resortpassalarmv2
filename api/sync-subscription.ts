@@ -52,20 +52,44 @@ export default async function handler(req: any, res: any) {
     if (subscriptions && subscriptions.length > 0) {
         const sub = subscriptions[0]; // Take the first active one
         
-        // 4. Update Database
-        await supabase.from('subscriptions').upsert({
-            user_id: userId,
+        // 4. Update Database (ROBUST WAY: Check then Update/Insert)
+        const { data: existingSub } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+
+        const subData = {
             stripe_customer_id: customer.id,
             stripe_subscription_id: sub.id,
             status: 'active',
             plan_type: 'premium',
             current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-        }, { onConflict: 'user_id' });
+        };
+
+        if (existingSub) {
+            await supabase.from('subscriptions').update(subData).eq('id', existingSub.id);
+        } else {
+            await supabase.from('subscriptions').insert({
+                user_id: userId,
+                ...subData
+            });
+        }
 
         return res.status(200).json({ success: true, message: 'Subscription synced successfully.', found: true });
     } else {
-        // If user has no active sub in Stripe, make sure DB reflects that
-        await supabase.from('subscriptions').update({ status: 'inactive' }).eq('user_id', userId);
+        // If user has no active sub in Stripe, set inactive
+        // Check if exists first to avoid errors
+        const { data: existingSub } = await supabase
+            .from('subscriptions')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+            
+        if (existingSub) {
+            await supabase.from('subscriptions').update({ status: 'inactive' }).eq('id', existingSub.id);
+        }
+        
         return res.status(200).json({ success: true, message: 'No active subscription found in Stripe.', found: false });
     }
 
