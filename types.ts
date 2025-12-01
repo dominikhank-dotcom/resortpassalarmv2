@@ -32,7 +32,7 @@ export interface EmailTemplate {
   description: string;
   category: 'CUSTOMER' | 'PARTNER';
   subject: string;
-  body: string; // HTML content
-  variables: string[]; // e.g. ['{name}', '{link}']
+  body: string; 
+  variables: string[];
   isEnabled: boolean;
 }
