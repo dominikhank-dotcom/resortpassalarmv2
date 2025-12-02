@@ -44,12 +44,19 @@ export default async function handler(req, res) {
     const priceValue = priceSetting && priceSetting.value ? parseFloat(priceSetting.value) : 1.99;
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
+    // Ensure referralCode is a safe string
+    const safeRefCode = referralCode ? String(referralCode) : "";
+
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
       billing_address_collection: 'required',
       
-      // FIXED: Removed 'paypal' to prevent crash if not enabled in dashboard
-      // Only 'card' is enabled by default. Apple Pay / Google Pay work automatically via 'card'.
+      // ENABLE STRIPE TAX AUTOMATION
+      automatic_tax: {
+        enabled: true,
+      },
+      
+      // Only 'card' is enabled by default to prevent crashes if PayPal isn't active in Stripe
       payment_method_types: ['card'],
       line_items: [
         {
@@ -63,6 +70,7 @@ export default async function handler(req, res) {
             recurring: {
               interval: 'month',
             },
+            tax_behavior: 'inclusive',
           },
           quantity: 1,
         },
@@ -74,10 +82,10 @@ export default async function handler(req, res) {
       // Metadata is KEY for the webhook to know who referred this user
       metadata: {
         service: 'ResortPassAlarm',
-        referralCode: referralCode || '',
+        referralCode: safeRefCode,
         userId: userId || ''
       },
-      client_reference_id: userId // Standard way to link stripe session to internal user
+      client_reference_id: userId // CRITICAL: Links stripe session to internal user ID
     });
 
     res.status(200).json({ url: session.url });

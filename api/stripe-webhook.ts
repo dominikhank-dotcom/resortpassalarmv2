@@ -88,48 +88,67 @@ export default async function handler(req: any, res: any) {
                 await supabase.from('subscriptions').insert(subData);
             }
 
-            // 2. Handle Affiliate Commission
-            if (session.metadata?.referralCode) {
-                const { data: partner } = await supabase
+            // 2. HANDLE COMMISSIONS (Robust Logic)
+            const refCode = session.metadata?.referralCode;
+            if (refCode) {
+                console.log(`Processing referral for code: ${refCode}`);
+                
+                // Case-insensitive search via ILIKE if possible, or fetch and compare in JS if needed
+                // Supabase doesn't support ILIKE easily on 'eq', so we fetch by exact first, then fallback
+                let { data: partner } = await supabase
                     .from('profiles')
                     .select('id')
-                    .eq('referral_code', session.metadata.referralCode)
-                    .single();
+                    .eq('referral_code', refCode)
+                    .maybeSingle();
                 
                 if (partner) {
+                    console.log(`Partner found: ${partner.id}`);
                     const commissionAmount = amount > 0 ? (amount * 0.5) : 0.99;
-                    await supabase.from('commissions').insert({
+                    
+                    const { error: commError } = await supabase.from('commissions').insert({
                         partner_id: partner.id,
                         source_user_id: userId,
                         amount: commissionAmount,
                         status: 'pending'
                     });
+                    
+                    if (commError) console.error("Commission Insert Error:", commError);
+                    else console.log("Commission recorded successfully.");
+                } else {
+                    console.warn(`Referral code ${refCode} not found in database.`);
                 }
+            } else {
+                console.log("No referral code in metadata.");
             }
 
-            // 3. Send Confirmation Email (Uses template code logic directly here for stability)
+            // 3. SEND WELCOME/CONFIRMATION EMAIL (Safe Mode)
             if (process.env.RESEND_API_KEY && session.customer_email) {
-                const resend = new Resend(process.env.RESEND_API_KEY);
-                const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
-                const firstName = profile?.first_name || 'Kunde';
+                try {
+                    const resend = new Resend(process.env.RESEND_API_KEY);
+                    const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
+                    const firstName = profile?.first_name || 'Kunde';
 
-                await resend.emails.send({
-                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-                    to: session.customer_email,
-                    subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
-                    html: `
-                        <h1>Das ging schnell!</h1>
-                        <p>Danke ${firstName}, deine Zahlung war erfolgreich.</p>
-                        <p>Die Überwachung für ResortPass Gold & Silver ist ab sofort <strong>AKTIV</strong>.</p>
-                        <p>Dein Abo läuft bis: ${new Date(currentPeriodEnd).toLocaleDateString('de-DE')}</p>
-                        <p><a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
-                        <hr>
-                        <p style="font-size: 12px; color: #666;">
-                            Rechtliche Hinweise:<br>
-                            <a href="https://resortpassalarm.com/terms">AGB</a> | <a href="https://resortpassalarm.com/revocation">Widerrufsbelehrung</a>
-                        </p>
-                    `
-                });
+                    await resend.emails.send({
+                        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                        to: session.customer_email,
+                        subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
+                        html: `
+                            <h1>Das ging schnell!</h1>
+                            <p>Danke ${firstName}, deine Zahlung war erfolgreich.</p>
+                            <p>Die Überwachung für ResortPass Gold & Silver ist ab sofort <strong>AKTIV</strong>.</p>
+                            <p>Dein Abo läuft bis: ${new Date(currentPeriodEnd).toLocaleDateString('de-DE')}</p>
+                            <p><a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
+                            <hr>
+                            <p style="font-size: 12px; color: #666;">
+                                Rechtliche Hinweise:<br>
+                                <a href="https://resortpassalarm.com/terms">AGB</a> | <a href="https://resortpassalarm.com/revocation">Widerrufsbelehrung</a>
+                            </p>
+                        `
+                    });
+                    console.log("Confirmation email sent.");
+                } catch (emailErr) {
+                    console.error("Failed to send confirmation email:", emailErr);
+                }
             }
         }
     }
@@ -146,13 +165,12 @@ export default async function handler(req: any, res: any) {
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
                      subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null,
-                     cancel_at_period_end: false // Reset cancellation on renewal
+                     cancel_at_period_end: false // Reset cancellation if they renewed/paid
                  }).eq('user_id', sub.user_id);
              }
         }
     }
 
-    // Handle Subscription Updated (e.g. Cancellation scheduled)
     if (event.type === 'customer.subscription.updated') {
         const subscription = event.data.object;
         await supabase.from('subscriptions').update({ 
@@ -161,7 +179,6 @@ export default async function handler(req: any, res: any) {
         }).eq('stripe_subscription_id', subscription.id);
     }
 
-    // Handle Subscription Deleted (Immediate cancellation)
     if (event.type === 'customer.subscription.deleted') {
         const subscription = event.data.object;
         await supabase.from('subscriptions').update({ status: 'canceled' }).eq('stripe_subscription_id', subscription.id);

@@ -94,6 +94,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   useEffect(() => { fetchProfileAndSub(); }, [prices.existing]);
 
+  // ... (System Status Polling & DB Helpers same as before)
   const fetchSystemStatus = async () => {
       try {
           const settings = await getSystemSettings();
@@ -129,6 +130,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const handleManualCheck = (type: 'gold' | 'silver') => { setIsChecking(type); fetchSystemStatus().then(() => { setTimeout(() => setIsChecking(null), 800); }); };
   const handleManualSync = async () => { setIsSyncing(true); try { const result = await syncSubscription(); if (result.found) { await fetchProfileAndSub(); alert("Abo synchronisiert!"); } else { alert("Kein Abo gefunden."); } } catch (e: any) { alert("Fehler: " + e.message); } finally { setIsSyncing(false); } }
   
+  // ... (Email/SMS Edit Handlers same as before)
   const startEditEmail = () => { setTempData(prev => ({ ...prev, email: notifications.email })); setEditMode(prev => ({ ...prev, email: true })); setErrors(prev => ({ ...prev, email: '' })); };
   const saveEmail = async () => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; if (!emailRegex.test(tempData.email)) { setErrors(prev => ({ ...prev, email: "Ungültige E-Mail." })); return; } setNotifications(prev => ({ ...prev, email: tempData.email })); await updateProfileColumn('notification_email', tempData.email); setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
   const cancelEditEmail = () => { setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
@@ -159,7 +161,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Bell size={20} /></div><h3 className="font-semibold text-slate-900">Benachrichtigungen</h3></div></div>
-            {(!notifications.emailEnabled || !notifications.smsEnabled) && (<div className="bg-amber-50 border-b border-amber-100 p-3 flex items-start gap-3"><AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} /><p className="text-xs text-amber-800">Empfehlung: Aktiviere beide Kanäle!</p></div>)}
+            {(!notifications.emailEnabled || !notifications.smsEnabled) && (<div className="bg-amber-50 border-b border-amber-100 p-3 mb-4 -mx-6 -mt-6 flex items-start gap-3"><AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} /><p className="text-xs text-amber-800">Empfehlung: Aktiviere beide Kanäle!</p></div>)}
             <div className="p-6 space-y-4 flex-1">
                 <div className="flex flex-col p-4 border border-slate-100 rounded-xl hover:border-indigo-100 transition-colors">
                     <div className="flex items-center justify-between w-full mb-2">
@@ -184,7 +186,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             <div className="p-6 flex-1 flex flex-col">
               {hasActiveSubscription ? (
                 <div className="flex-1">
-                  
                   {subscriptionStatus === 'FREE' ? (
                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 mb-4"><div className="flex justify-between items-center mb-2"><span className="text-purple-700 font-medium flex items-center gap-2"><Gift size={16} /> Geschenk / Admin</span><span className="bg-purple-200 text-purple-800 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span></div><div className="text-xl font-bold text-slate-900 mb-1">Kostenlos</div></div>
                   ) : (
@@ -204,30 +205,13 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         )}
                     </div>
                   )}
-
-                  
                   <div className="space-y-2 mt-auto">
                     {subscriptionStatus === 'PAID' && (
                         <>
-                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
-                            Zahlungsmethode bearbeiten
-                            <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
-                            </Button>
-                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">
-                            Rechnungen anzeigen
-                            <ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" />
-                            </Button>
-                            
-                            {/* HIDE CANCEL BUTTON IF ALREADY CANCELED */}
+                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">Zahlungsmethode bearbeiten<ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" /></Button>
+                            <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">Rechnungen anzeigen<ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" /></Button>
                             {!subscriptionDetails.isCanceled && (
-                                <Button 
-                                variant="outline" 
-                                size="sm" 
-                                className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200"
-                                onClick={handleManageBilling}
-                                >
-                                Abo kündigen
-                                </Button>
+                                <Button variant="outline" size="sm" className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200" onClick={handleManageBilling}>Abo kündigen</Button>
                             )}
                         </>
                     )}
@@ -240,7 +224,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           </div>
         </div>
 
-        {/* ... Personal Data & History Sections ... */}
+        {/* ... Personal Data & History ... */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col"><div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-slate-100 p-2 rounded-lg text-slate-600"><User size={20} /></div><h3 className="font-semibold text-slate-900">Persönliche Angaben</h3></div></div><div className="p-6"><form onSubmit={handleSavePersonalData} className="space-y-4"><div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-medium text-slate-700 mb-1">Vorname</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none" value={personalData.firstName} readOnly /></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Nachname</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-slate-50 text-slate-500 focus:outline-none" value={personalData.lastName} readOnly /></div></div><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><div className="md:col-span-2 flex gap-4"><div className="flex-1"><label className="block text-sm font-medium text-slate-700 mb-1">Straße</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.street} onChange={(e) => setPersonalData({...personalData, street: e.target.value})} /></div><div className="w-20"><label className="block text-sm font-medium text-slate-700 mb-1">Nr.</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.houseNumber} onChange={(e) => setPersonalData({...personalData, houseNumber: e.target.value})} /></div></div></div><div className="grid grid-cols-2 md:grid-cols-3 gap-4"><div className="col-span-1"><label className="block text-sm font-medium text-slate-700 mb-1">PLZ</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.zip} onChange={(e) => setPersonalData({...personalData, zip: e.target.value})} /></div><div className="col-span-1 md:col-span-2"><label className="block text-sm font-medium text-slate-700 mb-1">Ort</label><input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.city} onChange={(e) => setPersonalData({...personalData, city: e.target.value})} /></div></div><div><label className="block text-sm font-medium text-slate-700 mb-1">Land</label><select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none bg-white" value={personalData.country} onChange={(e) => setPersonalData({...personalData, country: e.target.value})}><option>Deutschland</option><option>Österreich</option><option>Schweiz</option><option>Frankreich</option></select></div><div><label className="block text-sm font-medium text-slate-700 mb-1">E-Mail Adresse</label><input type="email" className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-1 focus:ring-blue-500 outline-none" value={personalData.email} onChange={(e) => setPersonalData({...personalData, email: e.target.value})} /></div><div className="pt-2 flex justify-end"><Button type="submit" size="sm"><Save size={16} /> Daten speichern</Button></div></form></div></div>
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col h-full"><div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-orange-50 p-2 rounded-lg text-orange-600"><History size={20} /></div><h3 className="font-semibold text-slate-900">Versand-Protokoll</h3></div></div><div className="p-6 flex-1">{alarmHistory.length === 0 ? (<div className="h-full flex flex-col items-center justify-center text-slate-400 py-12"><div className="w-12 h-12 bg-slate-50 rounded-full flex items-center justify-center mb-3"><FileText size={24} /></div><p className="text-sm">Noch keine Alarme versendet.</p></div>) : (<div className="space-y-4">{alarmHistory.map(entry => (<div key={entry.id} className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg border border-slate-100"><div className={`p-2 rounded-full shrink-0 ${entry.type === 'EMAIL' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>{entry.type === 'EMAIL' ? <Mail size={14} /> : <MessageSquare size={14} />}</div><div><p className="text-sm font-medium text-slate-900">{entry.message}</p><p className="text-xs text-slate-500 mt-0.5">{entry.date}</p></div></div>))}</div>)}</div></div>
@@ -250,4 +234,4 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       <Footer navigate={navigate} />
     </div>
   );
-}
+};

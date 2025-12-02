@@ -30,6 +30,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({ success: true });
   } catch (error: any) {
     console.error("Welcome Email Error:", error);
-    return res.status(500).json({ message: error.message });
+    // Return 200 even on error to not block the UI flow, but log it server side
+    return res.status(200).json({ success: false, message: error.message });
   }
 }

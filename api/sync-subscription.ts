@@ -85,7 +85,6 @@ export default async function handler(req: any, res: any) {
 
         return res.status(200).json({ success: true, message: 'Subscription synced successfully.', found: true });
     } else {
-        // If user has no active sub in Stripe, set inactive
         const { data: existingSub } = await supabase
             .from('subscriptions')
             .select('id')
