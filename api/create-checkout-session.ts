@@ -20,7 +20,6 @@ export default async function handler(req, res) {
     const { email, referralCode } = req.body;
 
     // 1. Get User ID from Supabase
-    // Since the user is logged in, their email exists in 'profiles'
     let userId = null;
     if (email) {
         const { data: user } = await supabase
@@ -45,7 +44,19 @@ export default async function handler(req, res) {
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
     // Ensure referralCode is a safe string
-    const safeRefCode = referralCode ? String(referralCode) : "";
+    // If frontend didn't pass it, check DB for 'referred_by'
+    let safeRefCode = referralCode ? String(referralCode) : "";
+    
+    if (!safeRefCode && userId) {
+        const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('referred_by')
+            .eq('id', userId)
+            .single();
+        if (userProfile && userProfile.referred_by) {
+            safeRefCode = userProfile.referred_by;
+        }
+    }
 
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
@@ -56,7 +67,7 @@ export default async function handler(req, res) {
         enabled: true,
       },
       
-      // Only 'card' is enabled by default to prevent crashes if PayPal isn't active in Stripe
+      // Only 'card' is enabled by default. Apple Pay / Google Pay work automatically via 'card'.
       payment_method_types: ['card'],
       line_items: [
         {

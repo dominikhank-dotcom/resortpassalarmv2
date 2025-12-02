@@ -93,8 +93,6 @@ export default async function handler(req: any, res: any) {
             if (refCode) {
                 console.log(`Processing referral for code: ${refCode}`);
                 
-                // Case-insensitive search via ILIKE if possible, or fetch and compare in JS if needed
-                // Supabase doesn't support ILIKE easily on 'eq', so we fetch by exact first, then fallback
                 let { data: partner } = await supabase
                     .from('profiles')
                     .select('id')
@@ -117,11 +115,9 @@ export default async function handler(req: any, res: any) {
                 } else {
                     console.warn(`Referral code ${refCode} not found in database.`);
                 }
-            } else {
-                console.log("No referral code in metadata.");
             }
 
-            // 3. SEND WELCOME/CONFIRMATION EMAIL (Safe Mode)
+            // 3. SEND WELCOME EMAIL (Safe Mode)
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 try {
                     const resend = new Resend(process.env.RESEND_API_KEY);
@@ -145,7 +141,6 @@ export default async function handler(req: any, res: any) {
                             </p>
                         `
                     });
-                    console.log("Confirmation email sent.");
                 } catch (emailErr) {
                     console.error("Failed to send confirmation email:", emailErr);
                 }
@@ -153,7 +148,6 @@ export default async function handler(req: any, res: any) {
         }
     }
 
-    // Handle Renewal / Payment Succeeded
     if (event.type === 'invoice.payment_succeeded') {
         const invoice = event.data.object;
         if (invoice.subscription) {
@@ -165,7 +159,7 @@ export default async function handler(req: any, res: any) {
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
                      subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null,
-                     cancel_at_period_end: false // Reset cancellation if they renewed/paid
+                     cancel_at_period_end: false 
                  }).eq('user_id', sub.user_id);
              }
         }

@@ -20,6 +20,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [debugMsg, setDebugMsg] = useState<string | null>(null);
 
   const validateEmail = (email: string) => {
     return String(email)
@@ -59,6 +60,9 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
       // Force redirect to /login so App.tsx picks it up
       const redirectUrl = `${siteUrl}/login`;
 
+      // 0. CHECK FOR REFERRAL CODE (Critical for tracking)
+      const referralCode = localStorage.getItem('resortpass_referral');
+
       // 1. Sign up with Supabase
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -68,12 +72,37 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
           data: {
             first_name: formData.firstName,
             last_name: formData.lastName,
-            role: 'CUSTOMER'
+            role: 'CUSTOMER',
+            // Save referral code directly to user metadata for robust tracking
+            referred_by: referralCode || null 
           }
         }
       });
 
       if (signUpError) throw signUpError;
+
+      // 2. Send Welcome Email (Wait for it to ensure it sends)
+      try {
+        const emailResponse = await fetch('/api/send-welcome-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                toEmail: formData.email, 
+                firstName: formData.firstName 
+            })
+        });
+        
+        if (!emailResponse.ok) {
+            const txt = await emailResponse.text();
+            console.error("Welcome email failed", txt);
+            setDebugMsg(`Account erstellt, aber Mail fehlgeschlagen: ${txt}`);
+        } else {
+            console.log("Welcome email trigger sent");
+        }
+      } catch (e: any) {
+          console.error("Failed to trigger welcome email network error", e);
+          setDebugMsg(`Account erstellt, aber Netzwerkfehler bei Mail: ${e.message}`);
+      }
 
       setIsSuccess(true);
 
@@ -97,6 +126,13 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
               <p className="text-slate-600 mb-6">
                 Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
               </p>
+              
+              {debugMsg && (
+                  <div className="bg-amber-50 text-amber-800 text-xs p-2 mb-4 rounded border border-amber-200 text-left">
+                      Debug: {debugMsg}
+                  </div>
+              )}
+
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-8 text-sm text-blue-800 text-left">
                 <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Danach kannst du dich einloggen.
               </div>
