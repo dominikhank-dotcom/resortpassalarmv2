@@ -183,7 +183,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Bell size={20} /></div><h3 className="font-semibold text-slate-900">Benachrichtigungen</h3></div></div>
-            {/* FIXED UI: Removed negative margins (-mx-6 -mt-6) that caused overflow */}
             {(!notifications.emailEnabled || !notifications.smsEnabled) && (<div className="bg-amber-50 border border-amber-100 p-3 mb-4 rounded-lg flex items-start gap-3"><AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} /><p className="text-xs text-amber-800">Empfehlung: Aktiviere beide Kanäle!</p></div>)}
             <div className="p-6 space-y-4 flex-1">
                 <div className="flex flex-col p-4 border border-slate-100 rounded-xl hover:border-indigo-100 transition-colors">
