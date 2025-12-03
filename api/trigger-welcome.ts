@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default async function handler(req: any, res: any) {
   // --- DEBUG LOG START ---
   console.log(">>> API: trigger-welcome START");
@@ -25,22 +27,40 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // 1. Check idempotency
-    const { data: profile, error: dbError } = await supabase
-        .from('profiles')
-        .select('welcome_mail_sent')
-        .eq('id', userId)
-        .single();
-    
-    if (dbError) {
-        console.error(">>> API DB ERROR (Fetch Profile):", dbError);
-    } else {
-        console.log(`>>> API DB Check: welcome_mail_sent is currently '${profile?.welcome_mail_sent}'`);
+    // 1. Check idempotency with Retry Logic (Race Condition Handler)
+    let profile = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('welcome_mail_sent')
+            .eq('id', userId)
+            .single();
+        
+        if (data) {
+            profile = data;
+            break;
+        }
+        
+        console.log(`>>> API: Profile not found (Attempt ${attempts + 1}/${maxAttempts}). Waiting...`);
+        await sleep(1000); // Wait 1s
+        attempts++;
     }
 
-    if (profile && profile.welcome_mail_sent) {
-        console.log(">>> API: Mail already marked as sent. Skipping.");
-        return res.status(200).json({ success: true, message: 'Already sent' });
+    if (!profile) {
+        console.warn(">>> API WARNING: Profile still not found after retries. Assuming new user and proceeding anyway.");
+        // We proceed to send email because user exists in Auth (validated by caller having ID/Email).
+        // We can't check 'welcome_mail_sent' flag but better to send duplicate than none.
+        // Actually, if profile is missing, we can't update it later. 
+        // But maybe the trigger is JUST about to finish.
+    } else {
+        console.log(`>>> API DB Check: welcome_mail_sent is currently '${profile.welcome_mail_sent}'`);
+        if (profile.welcome_mail_sent) {
+            console.log(">>> API: Mail already marked as sent. Skipping.");
+            return res.status(200).json({ success: true, message: 'Already sent' });
+        }
     }
 
     // 2. Check API Key
@@ -74,7 +94,8 @@ export default async function handler(req: any, res: any) {
 
     console.log(">>> API RESEND SUCCESS:", JSON.stringify(emailData, null, 2));
 
-    // 4. Mark as sent in DB
+    // 4. Mark as sent in DB (If profile exists)
+    // We try to update even if we didn't find profile earlier (maybe it appeared now)
     const { error: updateError } = await supabase.from('profiles').update({ welcome_mail_sent: true }).eq('id', userId);
     
     if (updateError) {
