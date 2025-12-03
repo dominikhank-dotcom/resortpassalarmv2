@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
@@ -53,6 +53,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
 
+  // Prevent double firing of welcome mail
+  const welcomeTriggered = useRef(false);
+
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
   const fetchProfileAndSub = async () => {
@@ -100,6 +103,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   };
 
   useEffect(() => { fetchProfileAndSub(); }, [prices.existing]);
+
+  // Welcome Mail Trigger Logic - Runs when profile is loaded
+  useEffect(() => {
+    if (userProfile && (userProfile.welcome_mail_sent === false || userProfile.welcome_mail_sent === null) && !welcomeTriggered.current) {
+        welcomeTriggered.current = true;
+        console.log("Dashboard detected missing welcome mail. Triggering now...");
+        
+        fetch('/api/trigger-welcome', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ 
+                userId: userProfile.id, 
+                email: userProfile.email || personalData.email, 
+                firstName: userProfile.first_name 
+            })
+        }).then(res => {
+             console.log("Welcome trigger API result:", res.status);
+             // Optimistically update local state to ensure UI consistency if we re-render
+             setUserProfile((prev: any) => ({...prev, welcome_mail_sent: true}));
+        }).catch(err => console.error("Welcome trigger API failed:", err));
+    }
+  }, [userProfile]);
 
   const fetchSystemStatus = async () => {
       try {

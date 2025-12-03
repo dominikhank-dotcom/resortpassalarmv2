@@ -325,19 +325,6 @@ const App: React.FC = () => {
             if (profile.role) setRole(profile.role as UserRole);
             if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
             
-            // CHECK WELCOME MAIL: Send if not sent yet
-            // Robust check: if explicit false OR null
-            if ((profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) && profile.role === 'CUSTOMER') {
-               console.log("Welcome mail check triggered. Status:", profile.welcome_mail_sent);
-               try {
-                  fetch('/api/trigger-welcome', {
-                      method: 'POST',
-                      headers: {'Content-Type': 'application/json'},
-                      body: JSON.stringify({ userId: session.user.id, email: session.user.email, firstName: profile.first_name })
-                  }).then(res => console.log("Welcome trigger response:", res.status));
-               } catch (e) { console.error("Welcome trigger failed:", e); }
-            }
-
             // Only redirect if we are not already on a specific intended page
             if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
                 if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
@@ -366,16 +353,6 @@ const App: React.FC = () => {
                     if (data.role) setRole(data.role as UserRole);
                     if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
                     
-                    // Welcome Mail Check on fresh login
-                    if ((data.welcome_mail_sent === false || data.welcome_mail_sent === null) && data.role === 'CUSTOMER') {
-                       console.log("Welcome mail check (onAuth) triggered.");
-                       fetch('/api/trigger-welcome', {
-                          method: 'POST',
-                          headers: {'Content-Type': 'application/json'},
-                          body: JSON.stringify({ userId: session.user.id, email: session.user.email, firstName: data.first_name })
-                       });
-                    }
-
                     if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
                     else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
                     else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
