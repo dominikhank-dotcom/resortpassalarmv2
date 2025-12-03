@@ -103,13 +103,14 @@ export default async function handler(req: any, res: any) {
             try {
                 const refCode = session.metadata?.referralCode;
                 if (refCode) {
-                    console.log(`Processing referral for code: ${refCode}`);
+                    console.log(`Processing referral for code: "${refCode}"`);
                     
-                    // Try to find partner by referral_code OR id
+                    // Try to find partner by referral_code (Case Insensitive!)
+                    // .ilike is important because users might type "Dom2" but DB has "dom2"
                     let { data: partner } = await supabase
                         .from('profiles')
                         .select('id')
-                        .eq('referral_code', refCode)
+                        .ilike('referral_code', refCode.trim())
                         .maybeSingle();
                     
                     if (!partner) {
@@ -139,7 +140,7 @@ export default async function handler(req: any, res: any) {
                         if (commError) console.error("Commission Insert Error:", commError);
                         else console.log("Commission recorded successfully.");
                     } else {
-                        console.warn(`Referral code ${refCode} not found in database (checked as code and ID).`);
+                        console.warn(`Referral code "${refCode}" not found in database (checked as code and ID).`);
                     }
                 } else {
                     console.log("No referral code in metadata.");
@@ -152,7 +153,7 @@ export default async function handler(req: any, res: any) {
             // Note: Use try-catch block independently to ensure this runs even if commission failed
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 try {
-                    console.log("Attempting to send confirmation email...");
+                    console.log(`Attempting to send confirmation email to ${session.customer_email}...`);
                     const resend = new Resend(process.env.RESEND_API_KEY);
                     const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                     const firstName = profile?.first_name || 'Kunde';
@@ -174,9 +175,14 @@ export default async function handler(req: any, res: any) {
                             </p>
                         `
                     });
-                    console.log("Confirmation email sent via Webhook:", emailResult);
+                    
+                    if (emailResult.error) {
+                        console.error("Resend API Error:", emailResult.error);
+                    } else {
+                        console.log("Confirmation email sent via Webhook:", emailResult.data?.id);
+                    }
                 } catch (emailErr) {
-                    console.error("Failed to send confirmation email:", emailErr);
+                    console.error("Failed to execute send email logic:", emailErr);
                 }
             } else {
                 console.log("Skipping email: API Key or email missing.");

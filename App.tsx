@@ -314,25 +314,43 @@ const App: React.FC = () => {
     }
 
     // 2. Check Session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
         // Fetch role AND Name
-        supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
-          .then(({ data }) => {
-            if (data) {
-                if (data.role) setRole(data.role as UserRole);
-                if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
-                
-                // Only redirect if we are not already on a specific intended page
-                if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
-                    if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
-                    else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
-                    else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
-                }
+        const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single();
+        
+        if (profile) {
+            if (profile.role) setRole(profile.role as UserRole);
+            if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
+            
+            // CHECK WELCOME MAIL: Send if not sent yet
+            if (profile.welcome_mail_sent === false && profile.role === 'CUSTOMER') {
+               console.log("Welcome mail not sent yet. Triggering...");
+               try {
+                  fetch('/api/trigger-welcome', {
+                      method: 'POST',
+                      headers: {'Content-Type': 'application/json'},
+                      body: JSON.stringify({ userId: session.user.id, email: session.user.email, firstName: profile.first_name })
+                  });
+               } catch (e) { console.error(e); }
             }
-          });
+
+            // Only redirect if we are not already on a specific intended page
+            if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
+                if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
+                else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
+            }
+        } else {
+             // Fallback if profile missing
+             setRole(UserRole.CUSTOMER);
+        }
       }
-    });
+    };
+    
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_OUT') {
@@ -340,13 +358,22 @@ const App: React.FC = () => {
             setUserName('');
             setCurrentPage('landing');
         } else if (event === 'SIGNED_IN' && session) {
-            // Re-fetch role and name to be sure
-             supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
+            // Re-fetch logic (same as above for robustness)
+             supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single()
              .then(({ data }) => {
                 if (data) {
                     if (data.role) setRole(data.role as UserRole);
                     if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
-                    // Force navigation to dashboard on successful login event
+                    
+                    // Welcome Mail Check on fresh login
+                    if (data.welcome_mail_sent === false && data.role === 'CUSTOMER') {
+                       fetch('/api/trigger-welcome', {
+                          method: 'POST',
+                          headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify({ userId: session.user.id, email: session.user.email, firstName: data.first_name })
+                       });
+                    }
+
                     if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
                     else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
                     else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');

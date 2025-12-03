@@ -20,7 +20,6 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [debugMsg, setDebugMsg] = useState<string | null>(null);
 
   const validateEmail = (email: string) => {
     return String(email)
@@ -81,28 +80,8 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
 
       if (signUpError) throw signUpError;
 
-      // 2. Send Welcome Email (Wait for it to ensure it sends)
-      try {
-        const emailResponse = await fetch('/api/send-welcome-email', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                toEmail: formData.email, 
-                firstName: formData.firstName 
-            })
-        });
-        
-        if (!emailResponse.ok) {
-            const txt = await emailResponse.text();
-            console.error("Welcome email failed", txt);
-            setDebugMsg(`Account erstellt, aber Mail fehlgeschlagen: ${txt}`);
-        } else {
-            console.log("Welcome email trigger sent");
-        }
-      } catch (e: any) {
-          console.error("Failed to trigger welcome email network error", e);
-          setDebugMsg(`Account erstellt, aber Netzwerkfehler bei Mail: ${e.message}`);
-      }
+      // Note: We do NOT send the welcome email here anymore. 
+      // It is triggered in App.tsx only after the user has confirmed email & logged in.
 
       setIsSuccess(true);
 
@@ -127,14 +106,8 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
                 Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
               </p>
               
-              {debugMsg && (
-                  <div className="bg-amber-50 text-amber-800 text-xs p-2 mb-4 rounded border border-amber-200 text-left">
-                      Debug: {debugMsg}
-                  </div>
-              )}
-
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-8 text-sm text-blue-800 text-left">
-                <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Danach kannst du dich einloggen.
+                <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Erst danach ist der Login möglich.
               </div>
               
               <Button onClick={onLoginClick} className="w-full justify-center bg-[#00305e]">

@@ -25,6 +25,11 @@ export default async function handler(req, res) {
     let userId = null;
     let safeRefCode = "";
 
+    // Prioritize passed referralCode
+    if (referralCode) {
+        safeRefCode = String(referralCode).trim();
+    }
+
     if (email) {
         const { data: user } = await supabase
             .from('profiles')
@@ -33,17 +38,12 @@ export default async function handler(req, res) {
             .single();
         if (user) {
             userId = user.id;
-            // Use DB stored referral code as backup if not provided in body
-            if (!referralCode && user.referred_by) {
-                safeRefCode = user.referred_by;
+            // Use DB stored referral code as backup if not provided in body AND body was empty
+            if (!safeRefCode && user.referred_by) {
+                safeRefCode = user.referred_by.trim();
                 console.log(`Using DB referral code: ${safeRefCode}`);
             }
         }
-    }
-
-    // Prioritize passed referralCode
-    if (referralCode) {
-        safeRefCode = String(referralCode);
     }
 
     // 2. Fetch Price from Database

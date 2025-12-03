@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   website text, -- Partner Webseite
   paypal_email text, -- Für Partner Auszahlungen
   stripe_account_id text, -- Für Stripe Connect Auszahlungen
+  welcome_mail_sent boolean DEFAULT false, -- NEU: Verhindert doppelte Willkommens-Mails
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -97,6 +98,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS sms_enabled boolean DEFAULT
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text; -- Für SMS
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notification_email text; -- Falls abweichend von Login-Email
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_account_id text; -- Stripe Connect ID
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS welcome_mail_sent boolean DEFAULT false; -- NEU
 
 -- Constraints sicherstellen (Ignorieren falls schon da)
 DO $$ BEGIN
