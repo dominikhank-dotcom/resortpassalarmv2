@@ -274,9 +274,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         if (statsRes.ok) {
             const stats = await statsRes.json();
             setDashboardStats({
-                activeUsers: stats.activeSubs || 0,
+                activeUsers: stats.activeUsers || 0, // Fix: API returns activeUsers, not activeSubs
                 revenue: stats.revenue || 0,
-                newCustomers: stats.newCustomers || 0,
+                newCustomers: stats.newCustomers || 0, // Now represents New Subscriptions
                 conversionRate: stats.conversionRate || 0
             });
         }
@@ -638,7 +638,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-slate-500 text-sm font-medium">Neue Kunden</p>
+                  <p className="text-slate-500 text-sm font-medium">Neue Abos</p>
                   <h3 className="text-3xl font-bold text-slate-900">{isLoadingData ? '...' : dashboardStats.newCustomers}</h3>
                 </div>
                 <div className="bg-purple-50 p-2 rounded-lg text-purple-600"><UserPlus size={20} /></div>
@@ -985,99 +985,339 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {/* TAB: EMAILS */}
       {activeTab === 'emails' && !selectedCustomerId && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Mail size={20} /></div>
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-900">E-Mail Vorlagen</h2>
-                        <p className="text-sm text-slate-500">Verwalte hier alle automatischen System-E-Mails.</p>
-                    </div>
-                  </div>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                  <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Mail size={20} className="text-blue-600" />
+                    System E-Mails
+                  </h2>
+                  <p className="text-sm text-slate-500 max-w-lg text-right">
+                    Hier siehst du, welche E-Mails unser System automatisch versendet. Du kannst den Text anpassen oder die Mails deaktivieren.
+                  </p>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  {/* Template List */}
-                  <div className="space-y-8 lg:col-span-1">
-                      {['CUSTOMER', 'PARTNER'].map((category) => (
-                          <div key={category} className="space-y-3">
-                              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">{category === 'CUSTOMER' ? 'Kunden Kommunikation' : 'Partner Programm'}</h3>
-                              {templates.filter(t => t.category === category).map(template => (
-                                  <div 
-                                    key={template.id} 
-                                    onClick={() => setEditingTemplateId(template.id)}
-                                    className={`p-4 rounded-xl border cursor-pointer transition-all ${editingTemplateId === template.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-200 hover:border-blue-300'}`}
-                                  >
-                                      <div className="flex justify-between items-start mb-1">
-                                          <h4 className="font-bold text-slate-900 text-sm">{template.name}</h4>
-                                          <div className={`w-2 h-2 rounded-full ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                                      </div>
-                                      <p className="text-xs text-slate-500 line-clamp-2">{template.description}</p>
-                                  </div>
-                              ))}
-                          </div>
-                      ))}
-                  </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                 {/* Customer Templates */}
+                 <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Kunden Kommunikation</h3>
+                    {templates.filter(t => t.category === 'CUSTOMER').map(template => (
+                        <div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-blue-300 transition-colors">
+                            <div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100">
+                                <div>
+                                    <h4 className="font-bold text-slate-900">{template.name}</h4>
+                                    <p className="text-xs text-slate-500 mt-1">{template.description}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={() => toggleEmailTemplate(template.id)}
+                                      className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}
+                                    >
+                                        <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {editingTemplateId === template.id ? (
+                                <div className="p-4 space-y-4 bg-slate-50">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                        <input 
+                                            type="text" 
+                                            value={template.subject}
+                                            onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)}
+                                            className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label>
+                                        <textarea 
+                                            value={template.body}
+                                            onChange={(e) => updateTemplate(template.id, 'body', e.target.value)}
+                                            className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="text-xs text-slate-400">Variablen:</span>
+                                        {template.variables.map(v => (
+                                            <span key={v} className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-mono">{v}</span>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button>
+                                        <Button size="sm" onClick={() => setEditingTemplateId(null)}>Speichern</Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-4">
+                                    <div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div>
+                                    <div className="flex gap-2 justify-end">
+                                        <Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>
+                                            Test senden
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>
+                                            Bearbeiten
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                 </div>
 
-                  {/* Editor */}
-                  <div className="lg:col-span-2">
-                      {editingTemplateId ? (
-                          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden sticky top-24">
-                              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                                  <span className="text-xs font-mono text-slate-400">{editingTemplateId}</span>
-                                  <div className="flex items-center gap-3">
-                                      <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
-                                          <input 
-                                            type="checkbox" 
-                                            checked={templates.find(t => t.id === editingTemplateId)?.isEnabled}
-                                            onChange={() => toggleEmailTemplate(editingTemplateId)}
-                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                          />
-                                          Aktiviert
-                                      </label>
-                                      <Button size="sm" variant="outline" onClick={() => handleSendTestEmail(templates.find(t => t.id === editingTemplateId)!)}>
-                                          {isSendingTestEmail ? 'Sende...' : 'Test senden'}
-                                      </Button>
-                                  </div>
-                              </div>
-                              <div className="p-6 space-y-6">
-                                  <div>
-                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
-                                      <input 
-                                        type="text" 
-                                        value={templates.find(t => t.id === editingTemplateId)?.subject}
-                                        onChange={(e) => updateTemplate(editingTemplateId, 'subject', e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-medium"
-                                      />
-                                  </div>
-                                  <div>
-                                      <label className="block text-xs font-bold text-slate-500 uppercase mb-1">HTML Inhalt</label>
-                                      <textarea 
-                                        rows={12}
-                                        value={templates.find(t => t.id === editingTemplateId)?.body}
-                                        onChange={(e) => updateTemplate(editingTemplateId, 'body', e.target.value)}
-                                        className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-mono text-sm"
-                                      />
-                                  </div>
-                              </div>
-                          </div>
-                      ) : null}
-                  </div>
+                 {/* Partner Templates */}
+                 <div className="space-y-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Partner Kommunikation</h3>
+                    {templates.filter(t => t.category === 'PARTNER').map(template => (
+                        <div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-purple-300 transition-colors">
+                            <div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100">
+                                <div>
+                                    <h4 className="font-bold text-slate-900">{template.name}</h4>
+                                    <p className="text-xs text-slate-500 mt-1">{template.description}</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <button 
+                                      onClick={() => toggleEmailTemplate(template.id)}
+                                      className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}
+                                    >
+                                        <div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {editingTemplateId === template.id ? (
+                                <div className="p-4 space-y-4 bg-slate-50">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                        <input 
+                                            type="text" 
+                                            value={template.subject}
+                                            onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)}
+                                            className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label>
+                                        <textarea 
+                                            value={template.body}
+                                            onChange={(e) => updateTemplate(template.id, 'body', e.target.value)}
+                                            className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <span className="text-xs text-slate-400">Variablen:</span>
+                                        {template.variables.map(v => (
+                                            <span key={v} className="text-xs bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 font-mono">{v}</span>
+                                        ))}
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button>
+                                        <Button size="sm" onClick={() => setEditingTemplateId(null)}>Speichern</Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="p-4">
+                                    <div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div>
+                                    <div className="flex gap-2 justify-end">
+                                        <Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>
+                                            Test senden
+                                        </Button>
+                                        <Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>
+                                            Bearbeiten
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                 </div>
               </div>
           </div>
       )}
 
       {/* TAB: SETTINGS */}
       {activeTab === 'settings' && !selectedCustomerId && (
-          <div className="max-w-4xl animate-in fade-in slide-in-from-bottom-4 space-y-8">
-              {/* Settings... Same as before */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-6 border-b border-slate-100">
-                      <h3 className="font-bold text-slate-900 flex items-center gap-2">
-                          <Lock size={20} className="text-blue-600" /> Admin Sicherheit
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  {/* Pricing Configuration */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                          <DollarSign size={20} className="text-green-600" /> Preisgestaltung
                       </h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Preis für Neukunden (€)</label>
+                              <div className="flex gap-2">
+                                  <input 
+                                      type="number" 
+                                      step="0.01"
+                                      value={prices.new}
+                                      onChange={(e) => onUpdatePrices({...prices, new: Number(e.target.value)})}
+                                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none"
+                                  />
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1">Ändert den Preis auf der Landing Page und im Checkout.</p>
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Basispreis Bestandskunden (€)</label>
+                              <div className="flex gap-2">
+                                  <input 
+                                      type="number" 
+                                      step="0.01"
+                                      value={prices.existing}
+                                      onChange={(e) => onUpdatePrices({...prices, existing: Number(e.target.value)})}
+                                      className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none"
+                                  />
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1">Nur für die Berechnung des Umsatzes (MRR) im Dashboard, falls kein individueller Preis gespeichert ist.</p>
+                          </div>
+                          <div className="pt-2">
+                              <Button size="sm" onClick={() => {
+                                  updateSystemSettings('price_new_customers', prices.new.toString());
+                                  updateSystemSettings('price_existing_customers', prices.existing.toString());
+                                  alert("Preise gespeichert!");
+                              }}>Preise Speichern</Button>
+                          </div>
+                      </div>
                   </div>
-                  <div className="p-6 text-sm text-slate-500">
-                      Bitte nutze das Supabase Dashboard für Account-Management.
+
+                  {/* Product URLs */}
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                          <Link size={20} className="text-blue-600" /> Produkt Links
+                      </h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ResortPass Gold URL</label>
+                              <input 
+                                  type="text" 
+                                  value={productUrls.gold}
+                                  onChange={(e) => onUpdateProductUrls({...productUrls, gold: e.target.value})}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">ResortPass Silver URL</label>
+                              <input 
+                                  type="text" 
+                                  value={productUrls.silver}
+                                  onChange={(e) => onUpdateProductUrls({...productUrls, silver: e.target.value})}
+                                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm"
+                              />
+                          </div>
+                          <div className="pt-2">
+                              <Button size="sm" onClick={() => alert("Links aktualisiert (nur lokal für diese Session)")}>Links Speichern</Button>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+
+              {/* Admin Account Settings */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                 <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
+                    <Lock size={20} className="text-slate-700" /> Admin Zugang
+                 </h3>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                     {/* Change Email */}
+                     <div>
+                         <h4 className="font-bold text-sm text-slate-700 mb-3">E-Mail Adresse ändern</h4>
+                         <div className="space-y-3">
+                             <input 
+                                type="email" 
+                                placeholder="Neue E-Mail Adresse"
+                                value={adminAuth.newEmail}
+                                onChange={e => setAdminAuth({...adminAuth, newEmail: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                             />
+                             <input 
+                                type="password" 
+                                placeholder="Passwort zur Bestätigung"
+                                value={adminAuth.emailPassword}
+                                onChange={e => setAdminAuth({...adminAuth, emailPassword: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                             />
+                             <Button 
+                                size="sm" 
+                                onClick={async () => {
+                                    try {
+                                        const { error } = await supabase.auth.updateUser({ email: adminAuth.newEmail });
+                                        if (error) throw error;
+                                        alert("Bestätigungs-Mail an neue Adresse gesendet!");
+                                    } catch (e: any) { alert("Fehler: " + e.message); }
+                                }}
+                                disabled={!adminAuth.newEmail || !adminAuth.emailPassword}
+                             >
+                                E-Mail Ändern
+                             </Button>
+                         </div>
+                         <p className="text-xs text-slate-400 mt-2">Du musst die Änderung über einen Link in der E-Mail bestätigen.</p>
+                     </div>
+
+                     {/* Change Password */}
+                     <div>
+                         <h4 className="font-bold text-sm text-slate-700 mb-3">Passwort ändern</h4>
+                         <div className="space-y-3">
+                             <input 
+                                type="password" 
+                                placeholder="Neues Passwort"
+                                value={adminAuth.pwNew}
+                                onChange={e => setAdminAuth({...adminAuth, pwNew: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                             />
+                             <input 
+                                type="password" 
+                                placeholder="Neues Passwort wiederholen"
+                                value={adminAuth.pwConfirm}
+                                onChange={e => setAdminAuth({...adminAuth, pwConfirm: e.target.value})}
+                                className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                             />
+                             <Button 
+                                size="sm" 
+                                onClick={async () => {
+                                    if (adminAuth.pwNew !== adminAuth.pwConfirm) return alert("Passwörter stimmen nicht überein.");
+                                    try {
+                                        const { error } = await supabase.auth.updateUser({ password: adminAuth.pwNew });
+                                        if (error) throw error;
+                                        alert("Passwort erfolgreich geändert!");
+                                        setAdminAuth({...adminAuth, pwNew: '', pwConfirm: ''});
+                                    } catch (e: any) { alert("Fehler: " + e.message); }
+                                }}
+                                disabled={!adminAuth.pwNew || adminAuth.pwNew.length < 6}
+                             >
+                                Passwort Ändern
+                             </Button>
+                         </div>
+                     </div>
+                 </div>
+              </div>
+
+              {/* Integrations Test */}
+              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+                  <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                      <Terminal size={20} className="text-slate-600" /> Integrationen testen
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Button variant="outline" onClick={async () => {
+                          setIsTestingConnection(true);
+                          try {
+                              const res = await testBrowseAiConnection();
+                              alert(res.success ? "Browse.ai Verbunden! Robot: " + res.robotName : "Fehler: " + res.message);
+                          } catch (e: any) { alert("Test Fehlgeschlagen: " + e.message); }
+                          setIsTestingConnection(false);
+                      }} disabled={isTestingConnection}>
+                          Browse.ai Verbindung testen
+                      </Button>
+
+                      <Button variant="outline" onClick={async () => {
+                          setIsTestingConnection(true);
+                          try {
+                              const res = await testGeminiConnection();
+                              alert(res.success ? "Gemini Verbunden! " + res.message : "Fehler: " + res.message);
+                          } catch (e: any) { alert("Test Fehlgeschlagen: " + e.message); }
+                          setIsTestingConnection(false);
+                      }} disabled={isTestingConnection}>
+                          Google Gemini Verbindung testen
+                      </Button>
                   </div>
               </div>
           </div>
