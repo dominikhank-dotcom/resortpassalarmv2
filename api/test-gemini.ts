@@ -19,7 +19,7 @@ export default async function handler(req, res) {
   try {
     const ai = new GoogleGenAI({ apiKey });
     
-    // Simple test prompt
+    // Simple test prompt using the efficient flash model
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: "Antworte nur mit dem Wort: 'Erfolg'",

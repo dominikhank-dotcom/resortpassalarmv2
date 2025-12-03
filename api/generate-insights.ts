@@ -17,6 +17,8 @@ export default async function handler(req, res) {
     const ai = new GoogleGenAI({ apiKey });
 
     let prompt = "";
+    // Use a more capable model for complex tasks like creative writing or analysis
+    const model = 'gemini-3-pro-preview'; 
 
     if (type === 'marketing_copy') {
         const { platform } = stats;
@@ -46,7 +48,7 @@ export default async function handler(req, res) {
     }
 
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
+      model: model,
       contents: prompt,
     });
 

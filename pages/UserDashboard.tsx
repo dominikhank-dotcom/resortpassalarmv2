@@ -120,9 +120,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           fetchProfileAndSub();
           setIsSyncing(false);
           setSubscriptionStatus('PAID');
+          // Clear URL param without reload
+          window.history.replaceState({}, document.title, window.location.pathname);
           alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
       }).catch(() => { setIsSyncing(false); });
-      window.history.replaceState({}, document.title, window.location.pathname);
     }
     return () => clearInterval(interval);
   }, []);
@@ -183,7 +184,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Bell size={20} /></div><h3 className="font-semibold text-slate-900">Benachrichtigungen</h3></div></div>
             
-            {/* UI FIX HERE: Removed -mx-6 -mt-6 and added rounded corners */}
             {(!notifications.emailEnabled || !notifications.smsEnabled) && (
                 <div className="bg-amber-50 border-b border-amber-100 p-3 flex items-start gap-3">
                   <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} />
