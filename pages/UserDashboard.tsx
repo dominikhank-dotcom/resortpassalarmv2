@@ -60,12 +60,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   const fetchProfileAndSub = async (retryCount = 0) => {
     const { data: { user } } = await supabase.auth.getUser();
+    console.log("Dashboard: Auth User check:", user ? "Found" : "Not Found");
+
     if (user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-        
+        console.log(`Dashboard: Profile fetch attempt ${retryCount + 1}/3. Result:`, profile ? "Found" : "Null");
+
         // RETRY LOGIC: If profile is missing (race condition with DB trigger), wait and retry up to 3 times
         if (!profile && retryCount < 3) {
-            console.log(`Profile fetch failed (Race Condition?). Retrying ${retryCount + 1}/3...`);
+            console.warn(`Dashboard: Profile missing, retrying in 1s (${retryCount + 1}/3)...`);
             setTimeout(() => fetchProfileAndSub(retryCount + 1), 1000);
             return;
         }
@@ -81,12 +84,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             setTempData({ email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "" });
 
             // --- WELCOME MAIL TRIGGER (DIRECTLY HERE) ---
-            if ((profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) && !welcomeTriggered.current) {
+            const shouldSend = (profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) && !welcomeTriggered.current;
+            console.log("Dashboard: Welcome Mail Check:", {
+                alreadySentDB: profile.welcome_mail_sent,
+                refTriggered: welcomeTriggered.current,
+                shouldSend: shouldSend
+            });
+
+            if (shouldSend) {
                 welcomeTriggered.current = true;
                 const emailToSend = profile.email || user.email; // Fallback to Auth email which is guaranteed
                 
                 if (emailToSend) {
-                    console.log("Dashboard triggering welcome mail for:", emailToSend);
+                    console.log("Dashboard: TRIGGERING WELCOME API for:", emailToSend);
                     fetch('/api/trigger-welcome', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -95,13 +105,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                             email: emailToSend, 
                             firstName: profile.first_name 
                         })
-                    }).then(res => {
-                        console.log("Welcome API status:", res.status);
-                        // Optimistically update local state so it shows as sent
-                        setUserProfile((prev: any) => prev ? ({...prev, welcome_mail_sent: true}) : null);
-                    }).catch(err => console.error("Welcome trigger API failed:", err));
+                    }).then(async res => {
+                        const json = await res.json();
+                        console.log("Dashboard: Welcome API Response:", res.status, json);
+                        if (res.ok) {
+                             // Optimistically update local state so it shows as sent
+                             setUserProfile((prev: any) => prev ? ({...prev, welcome_mail_sent: true}) : null);
+                        } else {
+                             console.error("Dashboard: Welcome API returned error:", json);
+                        }
+                    }).catch(err => console.error("Dashboard: Welcome API Network Fail:", err));
                 } else {
-                    console.error("Skipping welcome mail: No email found in profile or auth.");
+                    console.error("Dashboard: Skipping welcome mail - No email found in profile or auth.");
                 }
             }
         }
