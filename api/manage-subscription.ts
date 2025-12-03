@@ -1,4 +1,9 @@
+import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2023-10-16',
+});
 
 // Init Supabase with Service Role Key to bypass RLS
 const supabase = createClient(
@@ -6,7 +11,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -60,6 +65,25 @@ export default async function handler(req, res) {
             })
             .eq('user_id', userId);
           if (error) throw error;
+      } else if (action === 'cancel_sub') {
+           // 1. Find subscription
+           const { data: sub } = await supabase.from('subscriptions').select('stripe_subscription_id').eq('user_id', userId).eq('status', 'active').single();
+           
+           if (sub && sub.stripe_subscription_id) {
+               // Cancel in Stripe
+               try {
+                   await stripe.subscriptions.cancel(sub.stripe_subscription_id);
+               } catch (e: any) {
+                   console.warn("Stripe cancel failed (maybe already canceled):", e.message);
+               }
+           }
+           
+           // Update DB
+           await supabase.from('subscriptions').update({ 
+               status: 'canceled',
+               cancel_at_period_end: false, // Immediate cancel means it's done
+               current_period_end: new Date().toISOString() // Ends now
+           }).eq('user_id', userId);
       }
 
       return res.status(200).json({ success: true });

@@ -131,7 +131,7 @@ export const testGeminiConnection = async () => {
   }
 };
 
-export const manageSubscription = async (userId: string, action: 'grant_free' | 'revoke_free') => {
+export const manageSubscription = async (userId: string, action: 'grant_free' | 'revoke_free' | 'cancel_sub') => {
   try {
     const response = await fetch('/api/manage-subscription', {
         method: 'POST',
@@ -177,6 +177,18 @@ export const updateAffiliateProfile = async (settings: any) => {
     }).eq('id', user.id);
 
     if (error) throw error;
+};
+
+export const adminUpdateCustomer = async (data: { targetUserId: string, email: string, firstName: string, lastName: string, address: any }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    const response = await fetch('/api/admin-update-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, adminId: user.id })
+    });
+    return await handleResponse(response);
 };
 
 // --- SYSTEM SETTINGS ---

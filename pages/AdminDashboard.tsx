@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
   TrendingUp, DollarSign, Activity, Database, Mail, 
-  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal
+  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete } from '../services/backendService';
+import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete, adminUpdateCustomer } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -178,10 +178,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   // Real Data State
   const [customers, setCustomers] = useState<any[]>([]);
   const [partners, setPartners] = useState<any[]>([]);
-  const [dashboardStats, setDashboardStats] = useState({ activeUsers: 0, revenue: 0, apiCalls: 142000, conversion: 4.2 });
+  const [dashboardStats, setDashboardStats] = useState({ 
+      activeUsers: 0, 
+      revenue: 0, 
+      newCustomers: 0, 
+      conversionRate: 0 
+  });
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [currentStatus, setCurrentStatus] = useState({ gold: 'unknown', silver: 'unknown', lastChecked: '' });
   
+  // Date Filter State
+  const [dateRange, setDateRange] = useState('28d'); // '7d', '28d', '90d', 'ytd', 'all'
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
   // Customer Detail State
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
   const [customerDetail, setCustomerDetail] = useState<any>(null);
@@ -208,6 +218,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       pwNew: '',
       pwConfirm: ''
   });
+
+  const calculateDateRange = () => {
+      const end = new Date();
+      let start = new Date();
+      
+      switch(dateRange) {
+          case '7d': start.setDate(end.getDate() - 7); break;
+          case '28d': start.setDate(end.getDate() - 28); break;
+          case '90d': start.setDate(end.getDate() - 90); break;
+          case 'ytd': start = new Date(new Date().getFullYear(), 0, 1); break;
+          case 'all': return { startDate: null, endDate: null };
+          default: return { startDate: null, endDate: null };
+      }
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+  };
 
   // --- FETCH REAL DATA ---
   useEffect(() => {
@@ -240,15 +265,20 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         
         if (partnerData) setPartners(partnerData);
 
-        // 4. Fetch Stats via Server API (Bypass RLS)
-        const statsRes = await fetch('/api/admin-stats');
+        // 4. Fetch Stats via Server API (Bypass RLS) with Date Range
+        const { startDate, endDate } = calculateDateRange();
+        let queryParams = '';
+        if (startDate) queryParams = `?startDate=${startDate.split('T')[0]}&endDate=${endDate?.split('T')[0]}`;
+        
+        const statsRes = await fetch(`/api/admin-stats${queryParams}`);
         if (statsRes.ok) {
             const stats = await statsRes.json();
-            setDashboardStats(prev => ({
-                ...prev,
+            setDashboardStats({
                 activeUsers: stats.activeSubs || 0,
-                revenue: stats.revenue || 0
-            }));
+                revenue: stats.revenue || 0,
+                newCustomers: stats.newCustomers || 0,
+                conversionRate: stats.conversionRate || 0
+            });
         }
 
         // 5. Fetch Current System Status (Availability)
@@ -275,7 +305,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     };
 
     fetchData();
-  }, [activeTab]);
+  }, [activeTab, dateRange]); // Refetch when dateRange changes
 
   const handleManualStatusChange = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       try {
@@ -332,18 +362,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     e.preventDefault();
     if (!customerDetail) return;
     
-    const { error } = await supabase.from('profiles').update({
-        first_name: customerDetail.firstName,
-        last_name: customerDetail.lastName,
-        street: customerDetail.address.street,
-        house_number: customerDetail.address.houseNumber,
-        zip: customerDetail.address.zip,
-        city: customerDetail.address.city,
-        country: customerDetail.address.country
-    }).eq('id', customerDetail.id);
-
-    if (error) alert("Fehler beim Speichern: " + error.message);
-    else alert("Kundendaten erfolgreich aktualisiert.");
+    try {
+        // Use the admin service to update both profile and auth securely
+        await adminUpdateCustomer({
+            targetUserId: customerDetail.id,
+            email: customerDetail.email,
+            firstName: customerDetail.firstName,
+            lastName: customerDetail.lastName,
+            address: customerDetail.address
+        });
+        alert("Kundendaten (inkl. E-Mail) erfolgreich aktualisiert.");
+    } catch (error: any) {
+        alert("Fehler beim Speichern: " + error.message);
+    }
   };
 
   const handleToggleFreeSubscription = async () => {
@@ -374,6 +405,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       }
   };
 
+  const handleCancelSubscription = async () => {
+    if (!customerDetail) return;
+    if(!confirm("Abo wirklich SOFORT beenden? Der Nutzer verliert den Zugriff und Stripe Zahlungen stoppen.")) return;
+    
+    try {
+        await manageSubscription(customerDetail.id, 'cancel_sub');
+        setCustomerDetail({
+            ...customerDetail,
+            subscription: { ...customerDetail.subscription, status: 'Canceled', endDate: new Date().toLocaleDateString() }
+        });
+        alert("Abo erfolgreich gekündigt.");
+    } catch (e: any) {
+        alert("Fehler beim Kündigen: " + e.message);
+    }
+  };
+
   const handleSaveCommission = async () => {
     try {
         await updateSystemSettings('global_commission_rate', commissionRate.toString());
@@ -382,16 +429,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         alert("Fehler beim Speichern der Provision: " + error.message);
     }
   };
-
-  const handleSavePrices = async () => {
-      try {
-          await updateSystemSettings('price_new_customers', prices.new.toString());
-          await updateSystemSettings('price_existing_customers', prices.existing.toString());
-          alert("Preise erfolgreich gespeichert.");
-      } catch (error: any) {
-          alert("Fehler beim Speichern der Preise: " + error.message);
-      }
-  }
 
   const handleMarkPayoutComplete = async (payoutId: string) => {
     if (confirm("Hast du das Geld wirklich manuell via PayPal gesendet? Diese Aktion markiert die Anfrage als erledigt.")) {
@@ -418,26 +455,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       setAiInsights("Fehler bei der Analyse.");
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  const handleTestConnection = async (service: 'email' | 'sms' | 'browseai' | 'gemini') => {
-    setIsTestingConnection(true);
-    try {
-      if (service === 'browseai') {
-         const result = await testBrowseAiConnection();
-         alert(`✅ ERFOLG: Verbindung zu Browse.ai hergestellt!\nRoboter: ${result.robotName}`);
-      } else if (service === 'gemini') {
-         const result = await testGeminiConnection();
-         alert(`✅ ERFOLG: ${result.message}`);
-      } else {
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          alert(`Test für ${service} erfolgreich initiiert. (Prüfe Vercel Logs für echte Sende-Status)`);
-      }
-    } catch (e: any) {
-      alert(`❌ FEHLER: ${e.message}`);
-    } finally {
-      setIsTestingConnection(false);
     }
   };
 
@@ -496,12 +513,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
       {/* Tabs Navigation */}
       {!selectedCustomerId && (
-        <div className="border-b border-slate-200 flex overflow-x-auto">
-            {renderTabButton('dashboard', 'Dashboard', <LayoutDashboard size={18} />)}
-            {renderTabButton('customers', 'Kunden', <Users size={18} />)}
-            {renderTabButton('partners', 'Partner', <Briefcase size={18} />)}
-            {renderTabButton('emails', 'E-Mail Management', <Mail size={18} />)}
-            {renderTabButton('settings', 'Einstellungen', <Settings size={18} />)}
+        <div className="border-b border-slate-200 flex overflow-x-auto justify-between items-center">
+            <div className="flex">
+                {renderTabButton('dashboard', 'Dashboard', <LayoutDashboard size={18} />)}
+                {renderTabButton('customers', 'Kunden', <Users size={18} />)}
+                {renderTabButton('partners', 'Partner', <Briefcase size={18} />)}
+                {renderTabButton('emails', 'E-Mail Management', <Mail size={18} />)}
+                {renderTabButton('settings', 'Einstellungen', <Settings size={18} />)}
+            </div>
+
+            {/* Date Range Selector (Only visible on Dashboard tab) */}
+            {activeTab === 'dashboard' && (
+                <div className="flex items-center gap-2 pb-2">
+                    <Calendar size={16} className="text-slate-400" />
+                    <select 
+                        value={dateRange} 
+                        onChange={(e) => setDateRange(e.target.value)}
+                        className="bg-white border border-slate-300 text-slate-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-1.5"
+                    >
+                        <option value="7d">Letzte 7 Tage</option>
+                        <option value="28d">Letzte 28 Tage</option>
+                        <option value="90d">Letzte 90 Tage</option>
+                        <option value="ytd">Dieses Jahr (YTD)</option>
+                        <option value="all">Gesamter Zeitraum</option>
+                    </select>
+                </div>
+            )}
         </div>
       )}
 
@@ -570,9 +607,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                       </div>
                   </div>
               </div>
-              <p className="text-xs text-slate-400 mt-4 text-center">
-                  Nutze diese Buttons, um die Startseite zu testen oder den Status manuell zu korrigieren, falls der Scraper ausfällt.
-              </p>
           </div>
 
           {/* KPI Cards */}
@@ -586,7 +620,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Users size={20} /></div>
               </div>
               <div className="text-xs text-green-600 flex items-center gap-1 font-medium">
-                <TrendingUp size={12} /> Live aus DB
+                <TrendingUp size={12} /> Live aus DB (Gesamt)
               </div>
             </div>
 
@@ -598,32 +632,29 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 </div>
                 <div className="bg-green-50 p-2 rounded-lg text-green-600"><DollarSign size={20} /></div>
               </div>
-              <p className="text-xs text-slate-400">Aus aktiven Abos berechnet</p>
+              <p className="text-xs text-slate-400">Aktuelles MRR (Laufend)</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-slate-500 text-sm font-medium">API Calls (Heute)</p>
-                  <h3 className="text-3xl font-bold text-slate-900">142k</h3>
+                  <p className="text-slate-500 text-sm font-medium">Neue Kunden</p>
+                  <h3 className="text-3xl font-bold text-slate-900">{isLoadingData ? '...' : dashboardStats.newCustomers}</h3>
                 </div>
-                <div className="bg-purple-50 p-2 rounded-lg text-purple-600"><Database size={20} /></div>
+                <div className="bg-purple-50 p-2 rounded-lg text-purple-600"><UserPlus size={20} /></div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-1.5 mt-2">
-                <div className="bg-purple-600 h-1.5 rounded-full" style={{ width: '65%' }}></div>
-              </div>
-              <p className="text-xs text-slate-400 mt-1">Simulierter Wert</p>
+              <p className="text-xs text-slate-400">Im gewählten Zeitraum</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="text-slate-500 text-sm font-medium">Conversion Rate</p>
-                  <h3 className="text-3xl font-bold text-slate-900">4.2%</h3>
+                  <h3 className="text-3xl font-bold text-slate-900">{isLoadingData ? '...' : dashboardStats.conversionRate}%</h3>
                 </div>
                 <div className="bg-amber-50 p-2 rounded-lg text-amber-600"><Activity size={20} /></div>
               </div>
-              <div className="text-xs text-slate-400">Simulierter Wert</div>
+              <div className="text-xs text-slate-400">Bezahlte Abos / Anmeldungen</div>
             </div>
           </div>
         </div>
@@ -710,6 +741,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                             <input type="text" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.lastName} onChange={e => setCustomerDetail({...customerDetail, lastName: e.target.value})} />
                                         </div>
                                     </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-Mail Adresse</label>
+                                        <input type="email" className="w-full px-3 py-2 border border-slate-300 rounded-lg" value={customerDetail?.email} onChange={e => setCustomerDetail({...customerDetail, email: e.target.value})} />
+                                    </div>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="flex-1">
                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Straße</label>
@@ -786,6 +821,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                     >
                                         {customerDetail?.subscription.isFree ? <><UserX size={16} className="mr-2" /> Kostenloses Abo entziehen</> : <><Gift size={16} className="mr-2" /> Kostenloses Abo geben</>}
                                     </Button>
+
+                                    {!customerDetail?.subscription.isFree && customerDetail?.subscription.status === 'Active' && (
+                                        <Button 
+                                            onClick={handleCancelSubscription}
+                                            variant="secondary"
+                                            className="w-full justify-center bg-red-50 text-red-600 border border-red-200 hover:bg-red-100"
+                                        >
+                                            <XCircle size={16} className="mr-2" /> Abo sofort kündigen
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -795,6 +840,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </>
       )}
       
+      {/* ... Other Tabs remain same ... */}
       {/* PARTNER TAB */}
       {activeTab === 'partners' && !selectedCustomerId && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
