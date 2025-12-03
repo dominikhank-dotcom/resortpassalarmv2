@@ -19,17 +19,31 @@ export default async function handler(req, res) {
   try {
     const { email, referralCode } = req.body;
 
+    console.log(`Creating checkout for ${email}. Referral Code passed: ${referralCode}`);
+
     // 1. Get User ID from Supabase
     let userId = null;
+    let safeRefCode = "";
+
     if (email) {
         const { data: user } = await supabase
             .from('profiles')
-            .select('id')
+            .select('id, referred_by')
             .eq('email', email)
             .single();
         if (user) {
             userId = user.id;
+            // Use DB stored referral code as backup if not provided in body
+            if (!referralCode && user.referred_by) {
+                safeRefCode = user.referred_by;
+                console.log(`Using DB referral code: ${safeRefCode}`);
+            }
         }
+    }
+
+    // Prioritize passed referralCode
+    if (referralCode) {
+        safeRefCode = String(referralCode);
     }
 
     // 2. Fetch Price from Database
@@ -43,21 +57,6 @@ export default async function handler(req, res) {
     const priceValue = priceSetting && priceSetting.value ? parseFloat(priceSetting.value) : 1.99;
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
-    // Ensure referralCode is a safe string
-    // If frontend didn't pass it, check DB for 'referred_by'
-    let safeRefCode = referralCode ? String(referralCode) : "";
-    
-    if (!safeRefCode && userId) {
-        const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('referred_by')
-            .eq('id', userId)
-            .single();
-        if (userProfile && userProfile.referred_by) {
-            safeRefCode = userProfile.referred_by;
-        }
-    }
-
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
       billing_address_collection: 'required',

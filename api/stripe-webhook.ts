@@ -41,14 +41,20 @@ export default async function handler(req: any, res: any) {
         const session = event.data.object;
         let userId = session.client_reference_id;
 
-        // Fallback: Try to find user by email
+        console.log(`Processing Checkout Session ${session.id} for User ${userId}`);
+
+        // Fallback: Try to find user by email if client_reference_id is missing
         if (!userId && session.customer_email) {
+            console.warn("Missing client_reference_id, looking up by email...");
             const { data: user } = await supabase
                 .from('profiles')
                 .select('id')
                 .eq('email', session.customer_email)
                 .single();
-            if (user) userId = user.id;
+            if (user) {
+                userId = user.id;
+                console.log(`Found User ID via email: ${userId}`);
+            }
         }
 
         if (userId) {
@@ -66,65 +72,92 @@ export default async function handler(req: any, res: any) {
             }
 
             // 1. ROBUST DB UPDATE (Check existing first)
-            const { data: existingSub } = await supabase
-                .from('subscriptions')
-                .select('id')
-                .eq('user_id', userId)
-                .maybeSingle();
-
-            const subData = {
-                user_id: userId,
-                stripe_customer_id: session.customer as string,
-                stripe_subscription_id: session.subscription as string,
-                status: 'active',
-                plan_type: 'premium',
-                current_period_end: currentPeriodEnd,
-                subscription_price: amount // SAVE REAL PRICE
-            };
-
-            if (existingSub) {
-                await supabase.from('subscriptions').update(subData).eq('id', existingSub.id);
-            } else {
-                await supabase.from('subscriptions').insert(subData);
-            }
-
-            // 2. HANDLE COMMISSIONS (Robust Logic)
-            const refCode = session.metadata?.referralCode;
-            if (refCode) {
-                console.log(`Processing referral for code: ${refCode}`);
-                
-                let { data: partner } = await supabase
-                    .from('profiles')
+            try {
+                const { data: existingSub } = await supabase
+                    .from('subscriptions')
                     .select('id')
-                    .eq('referral_code', refCode)
+                    .eq('user_id', userId)
                     .maybeSingle();
-                
-                if (partner) {
-                    console.log(`Partner found: ${partner.id}`);
-                    const commissionAmount = amount > 0 ? (amount * 0.5) : 0.99;
-                    
-                    const { error: commError } = await supabase.from('commissions').insert({
-                        partner_id: partner.id,
-                        source_user_id: userId,
-                        amount: commissionAmount,
-                        status: 'pending'
-                    });
-                    
-                    if (commError) console.error("Commission Insert Error:", commError);
-                    else console.log("Commission recorded successfully.");
+
+                const subData = {
+                    user_id: userId,
+                    stripe_customer_id: session.customer as string,
+                    stripe_subscription_id: session.subscription as string,
+                    status: 'active',
+                    plan_type: 'premium',
+                    current_period_end: currentPeriodEnd,
+                    subscription_price: amount // SAVE REAL PRICE
+                };
+
+                if (existingSub) {
+                    await supabase.from('subscriptions').update(subData).eq('id', existingSub.id);
                 } else {
-                    console.warn(`Referral code ${refCode} not found in database.`);
+                    await supabase.from('subscriptions').insert(subData);
                 }
+                console.log("Subscription updated in DB.");
+            } catch (dbErr) {
+                console.error("DB Update Error:", dbErr);
             }
 
-            // 3. SEND WELCOME EMAIL (Safe Mode)
+            // 2. HANDLE COMMISSIONS (Safe Logic)
+            try {
+                const refCode = session.metadata?.referralCode;
+                if (refCode) {
+                    console.log(`Processing referral for code: ${refCode}`);
+                    
+                    // Try to find partner by referral_code OR id
+                    let { data: partner } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .eq('referral_code', refCode)
+                        .maybeSingle();
+                    
+                    if (!partner) {
+                        // Fallback: Check if it's a UUID (direct ID reference)
+                        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                        if (uuidRegex.test(refCode)) {
+                             const { data: partnerById } = await supabase
+                                .from('profiles')
+                                .select('id')
+                                .eq('id', refCode)
+                                .maybeSingle();
+                             partner = partnerById;
+                        }
+                    }
+                    
+                    if (partner) {
+                        console.log(`Partner found: ${partner.id}`);
+                        const commissionAmount = amount > 0 ? (amount * 0.5) : 0.99;
+                        
+                        const { error: commError } = await supabase.from('commissions').insert({
+                            partner_id: partner.id,
+                            source_user_id: userId,
+                            amount: commissionAmount,
+                            status: 'pending'
+                        });
+                        
+                        if (commError) console.error("Commission Insert Error:", commError);
+                        else console.log("Commission recorded successfully.");
+                    } else {
+                        console.warn(`Referral code ${refCode} not found in database (checked as code and ID).`);
+                    }
+                } else {
+                    console.log("No referral code in metadata.");
+                }
+            } catch (commErr) {
+                console.error("Commission Critical Error:", commErr);
+            }
+
+            // 3. SEND CONFIRMATION EMAIL (Safe Mode)
+            // Note: Use try-catch block independently to ensure this runs even if commission failed
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 try {
+                    console.log("Attempting to send confirmation email...");
                     const resend = new Resend(process.env.RESEND_API_KEY);
                     const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                     const firstName = profile?.first_name || 'Kunde';
 
-                    await resend.emails.send({
+                    const emailResult = await resend.emails.send({
                         from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
                         to: session.customer_email,
                         subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
@@ -141,10 +174,15 @@ export default async function handler(req: any, res: any) {
                             </p>
                         `
                     });
+                    console.log("Confirmation email sent via Webhook:", emailResult);
                 } catch (emailErr) {
                     console.error("Failed to send confirmation email:", emailErr);
                 }
+            } else {
+                console.log("Skipping email: API Key or email missing.");
             }
+        } else {
+            console.error("No UserId found in session (even after lookup). Cannot process.");
         }
     }
 

@@ -81,6 +81,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   city text,
   country text DEFAULT 'Deutschland',
   referral_code text UNIQUE, -- Für Partner: Ihr eigener Code
+  referred_by text, -- Code des Partners, der diesen User geworben hat
   website text, -- Partner Webseite
   paypal_email text, -- Für Partner Auszahlungen
   stripe_account_id text, -- Für Stripe Connect Auszahlungen
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 -- Spalten nachträglich hinzufügen (Falls Tabelle schon da war)
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS website text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referral_code text;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS referred_by text;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email_enabled boolean DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS sms_enabled boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS phone text; -- Für SMS
@@ -214,7 +216,7 @@ BEGIN
   -- Schneidet den Code bei 15 Zeichen ab, damit er nicht zu lang wird
   final_code := substring(base_code from 1 for 15) || '-' || floor(random() * 1000)::text;
 
-  INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code)
+  INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code, referred_by)
   VALUES (
     new.id, 
     new.email, 
@@ -222,7 +224,8 @@ BEGIN
     new.raw_user_meta_data->>'last_name', 
     COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'),
     website_input,
-    final_code
+    final_code,
+    new.raw_user_meta_data->>'referred_by'
   );
   RETURN new;
 END;

@@ -51,6 +51,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [errors, setErrors] = useState({ email: '', sms: '' });
   const [personalData, setPersonalData] = useState({ firstName: '', lastName: '', street: '', houseNumber: '', zip: '', city: '', country: 'Deutschland', email: "" });
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
@@ -59,6 +60,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     if (user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         if (profile) {
+            setUserProfile(profile);
             setPersonalData({
                 firstName: profile.first_name || '', lastName: profile.last_name || '', street: profile.street || '', houseNumber: profile.house_number || '', zip: profile.zip || '', city: profile.city || '', country: profile.country || 'Deutschland', email: profile.email || user.email || ''
             });
@@ -120,7 +122,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           fetchProfileAndSub();
           setIsSyncing(false);
           setSubscriptionStatus('PAID');
-          // Clear URL param without reload
           window.history.replaceState({}, document.title, window.location.pathname);
           alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
       }).catch(() => { setIsSyncing(false); });
@@ -161,7 +162,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           alert("Test verschickt!"); 
       } catch (error) { alert("Fehler: " + error); } finally { setIsSendingAlarm(false); } 
   };
-  const handleSubscribe = async () => { await createCheckoutSession(personalData.email); };
+
+  const handleSubscribe = async () => { 
+      // Ensure we pass the referral code explicitly!
+      // 1. Try local storage (Most reliable for immediate conversion)
+      const localReferral = localStorage.getItem('resortpass_referral');
+      // 2. Try DB (if they signed up days ago)
+      const dbReferral = userProfile?.referred_by;
+      
+      const referralCode = localReferral || dbReferral;
+      console.log("Starting subscription with referral:", referralCode);
+
+      await createCheckoutSession(personalData.email, referralCode); 
+  };
+  
   const handleManageBilling = async () => { await createPortalSession(); }
 
   const StatusCard = ({ title, type, monitor }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus }) => { const isLoading = isChecking === type; return (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full"><div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-2"><Ticket className={type === 'gold' ? 'text-yellow-500' : 'text-slate-400'} fill="currentColor" size={20} /><h2 className="font-bold text-slate-900">{title}</h2></div><div className="flex items-center gap-2 text-xs text-slate-500 font-mono"><RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />{isLoading ? "Prüfe..." : monitor.lastChecked}</div></div><div className={`flex-1 p-6 flex flex-col items-center justify-center text-center transition-all duration-500 ${monitor.isAvailable ? 'bg-green-50/50' : 'bg-white'}`}>{monitor.isAvailable ? (<div className="space-y-4 animate-in fade-in zoom-in w-full"><div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600"><CheckCircle size={32} /></div><div><h3 className="text-xl font-bold text-green-800">VERFÜGBAR!</h3><p className="text-green-700 text-sm">Schnell sein!</p></div></div>) : (<div className="space-y-4 w-full"><div className="relative mx-auto w-16 h-16 flex items-center justify-center"><div className="absolute inset-0 bg-red-100 rounded-full opacity-50 animate-pulse"></div><div className="relative bg-red-50 w-full h-full rounded-full flex items-center justify-center text-red-500 z-10 border border-red-100"><XCircle size={32} /></div></div><div><h3 className="text-lg font-bold text-red-600">Ausverkauft</h3><p className="text-slate-500 text-sm">Momentan keine Kontingente.</p></div></div>)}</div><div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center"><Button onClick={() => handleManualCheck(type)} variant="secondary" size="sm" className="w-full justify-center bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 mb-3" disabled={isLoading}><RefreshCw size={14} className={isLoading ? "animate-spin mr-2" : "mr-2"} />{isLoading ? "Wird geprüft..." : "Manuell Prüfen"}</Button><a href={monitor.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#00305e] hover:underline transition-colors"><ExternalLink size={12} />Zum Europa-Park Shop</a></div></div>); };

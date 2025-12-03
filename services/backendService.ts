@@ -32,15 +32,15 @@ export const sendTestAlarm = async (email: string, phone: string, sendEmail: boo
   }
 };
 
-export const createCheckoutSession = async (email: string) => {
+export const createCheckoutSession = async (email: string, referralCode?: string | null) => {
   try {
-    // Check for referral code in local storage
-    const referralCode = localStorage.getItem('resortpass_referral');
+    // Check for referral code in local storage if not provided
+    const finalReferralCode = referralCode || localStorage.getItem('resortpass_referral');
 
     const response = await fetch('/api/create-checkout-session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, referralCode })
+      body: JSON.stringify({ email, referralCode: finalReferralCode })
     });
 
     const data = await handleResponse(response);
