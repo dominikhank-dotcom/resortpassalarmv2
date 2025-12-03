@@ -7,6 +7,9 @@ const supabase = createClient(
 );
 
 export default async function handler(req: any, res: any) {
+  // START LOG
+  console.log("START: api/trigger-welcome called");
+
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }

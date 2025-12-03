@@ -58,10 +58,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
-  const fetchProfileAndSub = async () => {
+  const fetchProfileAndSub = async (retryCount = 0) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        
+        // RETRY LOGIC: If profile is missing (race condition with DB trigger), wait and retry up to 3 times
+        if (!profile && retryCount < 3) {
+            console.log(`Profile fetch failed (Race Condition?). Retrying ${retryCount + 1}/3...`);
+            setTimeout(() => fetchProfileAndSub(retryCount + 1), 1000);
+            return;
+        }
+
         if (profile) {
             setUserProfile(profile);
             setPersonalData({
