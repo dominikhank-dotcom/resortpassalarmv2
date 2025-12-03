@@ -16,7 +16,7 @@ export default async function handler(req: any, res: any) {
   console.log(`[Welcome Trigger] Request received for: ${email} (ID: ${userId})`);
 
   if (!userId || !email) {
-      console.error("[Welcome Trigger] Missing userId or email");
+      console.error("[Welcome Trigger] REJECTED: Missing userId or email", req.body);
       return res.status(400).json({ error: 'Missing userId or email' });
   }
 
@@ -30,7 +30,6 @@ export default async function handler(req: any, res: any) {
     
     if (dbError) {
         console.error("[Welcome Trigger] DB Error fetching profile:", dbError);
-        // Continue anyway to try sending mail, but log it
     }
 
     if (profile && profile.welcome_mail_sent) {

@@ -71,6 +71,31 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "", emailEnabled: profile.email_enabled !== false, smsEnabled: profile.sms_enabled === true
             });
             setTempData({ email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "" });
+
+            // --- WELCOME MAIL TRIGGER (DIRECTLY HERE) ---
+            if ((profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) && !welcomeTriggered.current) {
+                welcomeTriggered.current = true;
+                const emailToSend = profile.email || user.email; // Fallback to Auth email which is guaranteed
+                
+                if (emailToSend) {
+                    console.log("Dashboard triggering welcome mail for:", emailToSend);
+                    fetch('/api/trigger-welcome', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ 
+                            userId: user.id, 
+                            email: emailToSend, 
+                            firstName: profile.first_name 
+                        })
+                    }).then(res => {
+                        console.log("Welcome API status:", res.status);
+                        // Optimistically update local state so it shows as sent
+                        setUserProfile((prev: any) => prev ? ({...prev, welcome_mail_sent: true}) : null);
+                    }).catch(err => console.error("Welcome trigger API failed:", err));
+                } else {
+                    console.error("Skipping welcome mail: No email found in profile or auth.");
+                }
+            }
         }
 
         const { data: logs } = await supabase.from('notification_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
@@ -103,28 +128,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   };
 
   useEffect(() => { fetchProfileAndSub(); }, [prices.existing]);
-
-  // Welcome Mail Trigger Logic - Runs when profile is loaded
-  useEffect(() => {
-    if (userProfile && (userProfile.welcome_mail_sent === false || userProfile.welcome_mail_sent === null) && !welcomeTriggered.current) {
-        welcomeTriggered.current = true;
-        console.log("Dashboard detected missing welcome mail. Triggering now...");
-        
-        fetch('/api/trigger-welcome', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ 
-                userId: userProfile.id, 
-                email: userProfile.email || personalData.email, 
-                firstName: userProfile.first_name 
-            })
-        }).then(res => {
-             console.log("Welcome trigger API result:", res.status);
-             // Optimistically update local state to ensure UI consistency if we re-render
-             setUserProfile((prev: any) => ({...prev, welcome_mail_sent: true}));
-        }).catch(err => console.error("Welcome trigger API failed:", err));
-    }
-  }, [userProfile]);
 
   const fetchSystemStatus = async () => {
       try {
