@@ -326,15 +326,16 @@ const App: React.FC = () => {
             if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
             
             // CHECK WELCOME MAIL: Send if not sent yet
-            if (profile.welcome_mail_sent === false && profile.role === 'CUSTOMER') {
-               console.log("Welcome mail not sent yet. Triggering...");
+            // Robust check: if explicit false OR null
+            if ((profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) && profile.role === 'CUSTOMER') {
+               console.log("Welcome mail check triggered. Status:", profile.welcome_mail_sent);
                try {
                   fetch('/api/trigger-welcome', {
                       method: 'POST',
                       headers: {'Content-Type': 'application/json'},
                       body: JSON.stringify({ userId: session.user.id, email: session.user.email, firstName: profile.first_name })
-                  });
-               } catch (e) { console.error(e); }
+                  }).then(res => console.log("Welcome trigger response:", res.status));
+               } catch (e) { console.error("Welcome trigger failed:", e); }
             }
 
             // Only redirect if we are not already on a specific intended page
@@ -366,7 +367,8 @@ const App: React.FC = () => {
                     if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
                     
                     // Welcome Mail Check on fresh login
-                    if (data.welcome_mail_sent === false && data.role === 'CUSTOMER') {
+                    if ((data.welcome_mail_sent === false || data.welcome_mail_sent === null) && data.role === 'CUSTOMER') {
+                       console.log("Welcome mail check (onAuth) triggered.");
                        fetch('/api/trigger-welcome', {
                           method: 'POST',
                           headers: {'Content-Type': 'application/json'},

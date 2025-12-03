@@ -101,7 +101,19 @@ export default async function handler(req: any, res: any) {
 
             // 2. HANDLE COMMISSIONS (Safe Logic)
             try {
-                const refCode = session.metadata?.referralCode;
+                let refCode = session.metadata?.referralCode;
+                
+                // --- CRITICAL FIX FOR TRACKING ---
+                // If metadata is missing or empty, check the user's profile for 'referred_by'
+                if (!refCode || refCode.trim() === "") {
+                    console.log("No referral code in metadata. Checking user profile fallback...");
+                    const { data: userProfile } = await supabase.from('profiles').select('referred_by').eq('id', userId).single();
+                    if (userProfile && userProfile.referred_by) {
+                        refCode = userProfile.referred_by;
+                        console.log(`Found fallback referral code in DB: "${refCode}"`);
+                    }
+                }
+
                 if (refCode) {
                     console.log(`Processing referral for code: "${refCode}"`);
                     
@@ -143,14 +155,14 @@ export default async function handler(req: any, res: any) {
                         console.warn(`Referral code "${refCode}" not found in database (checked as code and ID).`);
                     }
                 } else {
-                    console.log("No referral code in metadata.");
+                    console.log("No referral code found anywhere (Metadata or Profile). Skipping commission.");
                 }
             } catch (commErr) {
                 console.error("Commission Critical Error:", commErr);
             }
 
-            // 3. SEND CONFIRMATION EMAIL (Safe Mode)
-            // Note: Use try-catch block independently to ensure this runs even if commission failed
+            // 3. SEND CONFIRMATION EMAIL (Independent Safe Mode)
+            // Separate try-catch ensures this runs even if commission logic fails
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 try {
                     console.log(`Attempting to send confirmation email to ${session.customer_email}...`);
@@ -179,7 +191,7 @@ export default async function handler(req: any, res: any) {
                     if (emailResult.error) {
                         console.error("Resend API Error:", emailResult.error);
                     } else {
-                        console.log("Confirmation email sent via Webhook:", emailResult.data?.id);
+                        console.log("Confirmation email sent successfully via Webhook ID:", emailResult.data?.id);
                     }
                 } catch (emailErr) {
                     console.error("Failed to execute send email logic:", emailErr);

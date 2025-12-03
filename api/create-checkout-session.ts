@@ -19,16 +19,16 @@ export default async function handler(req, res) {
   try {
     const { email, referralCode } = req.body;
 
-    console.log(`Creating checkout for ${email}. Referral Code passed: ${referralCode}`);
+    // Sanitize Referral Code
+    let safeRefCode = "";
+    if (referralCode && typeof referralCode === 'string') {
+        safeRefCode = referralCode.trim();
+    }
+
+    console.log(`Creating checkout for ${email}. Referral Code: "${safeRefCode}"`);
 
     // 1. Get User ID from Supabase
     let userId = null;
-    let safeRefCode = "";
-
-    // Prioritize passed referralCode
-    if (referralCode) {
-        safeRefCode = String(referralCode).trim();
-    }
 
     if (email) {
         const { data: user } = await supabase
@@ -38,10 +38,10 @@ export default async function handler(req, res) {
             .single();
         if (user) {
             userId = user.id;
-            // Use DB stored referral code as backup if not provided in body AND body was empty
+            // Backup: Use DB stored referral code if not provided in request
             if (!safeRefCode && user.referred_by) {
                 safeRefCode = user.referred_by.trim();
-                console.log(`Using DB referral code: ${safeRefCode}`);
+                console.log(`Using DB fallback referral code: ${safeRefCode}`);
             }
         }
     }
