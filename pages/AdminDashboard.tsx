@@ -277,9 +277,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     fetchData();
   }, [activeTab]);
 
-  // ... (Rest of the component remains unchanged, but providing full file for completeness is preferred if changes are small, but to save tokens I will only include what I have so far as XML only requires changes. The changes are minor in useEffect but critical) ...
-  // Wait, I need to provide full content according to instructions.
-  
   const handleManualStatusChange = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       try {
           await updateSystemStatus(type, status);
@@ -319,7 +316,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 isFree: sub ? sub.plan_type === 'Manuell (Gratis)' : false,
                 paymentMethod: sub ? 'Stripe' : '–'
             },
-            referrer: null,
+            referrer: profile.referred_by || null,
             transactions: []
         };
         setCustomerDetail(details);
@@ -468,16 +465,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     }
   };
 
-  const handleUpdateAdminPassword = (e: React.FormEvent) => {
-      e.preventDefault();
-      alert("Funktion in dieser Version deaktiviert (Auth via Supabase Dashboard empfohlen).");
-  };
-
-  const handleUpdateAdminEmail = (e: React.FormEvent) => {
-      e.preventDefault();
-      alert("Funktion in dieser Version deaktiviert (Auth via Supabase Dashboard empfohlen).");
-  };
-
   const renderTabButton = (id: typeof activeTab, label: string, icon: React.ReactNode) => (
     <button
       onClick={() => setActiveTab(id)}
@@ -490,16 +477,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {icon}
       {label}
     </button>
-  );
-
-  const EnvVarRow = ({ name, description }: { name: string, description: string }) => (
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 font-mono text-xs mb-2 flex flex-col md:flex-row gap-2 justify-between items-start md:items-center">
-          <div className="flex items-center gap-2 text-slate-700 font-bold overflow-hidden break-all">
-              <Key size={12} className="shrink-0 text-slate-400" />
-              {name}
-          </div>
-          <div className="text-slate-500 text-xs text-right">{description}</div>
-      </div>
   );
 
   return (
@@ -649,14 +626,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
               <div className="text-xs text-slate-400">Simulierter Wert</div>
             </div>
           </div>
-
-          {/* Placeholder Chart */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[400px] flex items-center justify-center">
-            <div className="text-center">
-                <h3 className="text-lg font-bold text-slate-900 mb-2">Wachstum & Umsatz</h3>
-                <p className="text-slate-500 max-w-md">Historische Daten werden gesammelt. Diagramm wird verfügbar sein, sobald genügend Datenpunkte vorhanden sind.</p>
-            </div>
-          </div>
         </div>
       )}
 
@@ -769,6 +738,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                                             <option>Schweiz</option>
                                         </select>
                                     </div>
+                                    
+                                    {customerDetail?.referrer && (
+                                        <div className="pt-2 border-t border-slate-100 mt-2">
+                                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geworben von (Ref Code)</label>
+                                             <div className="text-sm font-mono bg-slate-50 p-2 rounded text-blue-600">{customerDetail.referrer}</div>
+                                        </div>
+                                    )}
+
                                     <div className="flex justify-end pt-2">
                                         <Button type="submit" size="sm" variant="outline">
                                             <Save size={14} className="mr-2" /> Änderungen speichern
@@ -910,6 +887,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                     <th className="px-6 py-3">#</th>
                     <th className="px-6 py-3">Name</th>
                     <th className="px-6 py-3">Email</th>
+                    <th className="px-6 py-3">Code</th>
                     <th className="px-6 py-3 text-right">Registriert</th>
                   </tr>
                 </thead>
@@ -919,12 +897,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                       <td className="px-6 py-3 text-slate-500 font-mono text-xs">{index + 1}</td>
                       <td className="px-6 py-3 font-medium text-slate-900">{partner.first_name} {partner.last_name}</td>
                       <td className="px-6 py-3 text-slate-600">{partner.email}</td>
+                      <td className="px-6 py-3">
+                          <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 block w-fit">
+                            {partner.referral_code || '—'}
+                          </span>
+                      </td>
                       <td className="px-6 py-3 text-right text-slate-700">{new Date(partner.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                    {partners.length === 0 && !isLoadingData && (
                         <tr>
-                            <td colSpan={4} className="px-6 py-8 text-center text-slate-500">Keine Partner gefunden.</td>
+                            <td colSpan={5} className="px-6 py-8 text-center text-slate-500">Keine Partner gefunden.</td>
                         </tr>
                     )}
                 </tbody>
@@ -953,16 +936,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </div>
       )}
 
-      {/* TAB: EMAILS & SETTINGS OMITTED FOR BREVITY as they are handled in same file above */}
-      {/* ... (Previous code for Emails & Settings Tabs is reused here) ... */}
-      {(activeTab === 'emails' || activeTab === 'settings') && !selectedCustomerId && (
-          <div className="text-center py-12 text-slate-400">
-              <p>Einstellungen werden geladen...</p>
-              {/* Note: This block is just a placeholder because I cannot output the entire file due to token limits, but the key changes were in the useEffect for data fetching. In a real update, I would include the full file content. */}
-              {/* To ensure correctness, I will include the full file content for Settings tab as well, assuming it's part of the same file. */}
-          </div>
-      )}
-      {/* RE-INSERTING FULL SETTINGS TAB CONTENT FOR CORRECTNESS */}
       {/* TAB: EMAILS */}
       {activeTab === 'emails' && !selectedCustomerId && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
