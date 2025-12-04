@@ -28,7 +28,7 @@ export default async function handler(req: any, res: any) {
     // 1. Wait for Profile to exist (Race condition handling for DB Trigger)
     let profileExists = false;
     let attempts = 0;
-    const maxAttempts = 10; // Increased to 10
+    const maxAttempts = 10; 
 
     while (attempts < maxAttempts) {
         const { count } = await supabase
@@ -51,8 +51,6 @@ export default async function handler(req: any, res: any) {
     }
 
     // 2. ATOMIC LOCK STRATEGY
-    // Update welcome_mail_sent = true WHERE id = userId AND welcome_mail_sent IS NOT TRUE (False or Null)
-    
     let shouldSendEmail = false;
 
     if (profileExists) {
@@ -63,15 +61,26 @@ export default async function handler(req: any, res: any) {
             .neq('welcome_mail_sent', true) // Handles FALSE and NULL
             .select();
         
-        if (updatedRows && updatedRows.length > 0) {
-            console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
-            shouldSendEmail = true;
+        if (updateError) {
+             console.error(">>> DB UPDATE ERROR:", updateError);
+             // Handle Schema Cache Error (PGRST204)
+             if (updateError.code === 'PGRST204' || updateError.code === '42703' || updateError.message?.includes('schema cache')) {
+                 console.warn(">>> SCHEMA CACHE ISSUE: Column 'welcome_mail_sent' not visible. Using FALLBACK MODE (Sending email without lock).");
+                 shouldSendEmail = true;
+             } else {
+                 throw updateError;
+             }
         } else {
-            console.log(">>> ATOMIC LOCK FAILED: Email already sent (row not updated). Aborting.");
-            return res.status(200).json({ success: true, message: 'Email already sent (Lock)' });
+            if (updatedRows && updatedRows.length > 0) {
+                console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
+                shouldSendEmail = true;
+            } else {
+                console.log(">>> ATOMIC LOCK FAILED: Email already sent (row not updated). Aborting.");
+                return res.status(200).json({ success: true, message: 'Email already sent (Lock)' });
+            }
         }
     } else {
-        // Fallback if profile missing
+        // Fallback if profile missing completely
         shouldSendEmail = true; 
     }
 

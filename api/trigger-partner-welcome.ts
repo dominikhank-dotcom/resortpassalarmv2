@@ -44,7 +44,8 @@ export default async function handler(req: any, res: any) {
     }
 
     // 2. ATOMIC LOCK: Try to set partner_welcome_sent = true where it is NOT TRUE (handles false and null)
-    // This query says: "Update to TRUE, but ONLY IF it is NOT ALREADY TRUE"
+    let lockAcquired = false;
+
     const { data: updatedRows, error: updateError } = await supabase
         .from('profiles')
         .update({ partner_welcome_sent: true })
@@ -54,44 +55,54 @@ export default async function handler(req: any, res: any) {
 
     if (updateError) {
         console.error(">>> DB UPDATE ERROR:", updateError);
-        throw updateError;
-    }
-
-    // If 0 rows updated, it means it was ALREADY true (race condition lost or already processed)
-    if (!updatedRows || updatedRows.length === 0) {
-        console.log(">>> SKIPPED: Email already sent or profile missing (Lock failed).");
-        return res.status(200).json({ success: true, message: 'Already sent or profile missing' });
-    }
-
-    console.log(">>> LOCK ACQUIRED. Sending email...");
-
-    // 3. Send Email
-    if (process.env.RESEND_API_KEY) {
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        // Ensure origin is valid or fallback
-        const origin = req.headers.origin || 'https://resortpassalarm.com';
-        const dashboardLink = `${origin}/affiliate`;
         
-        const { data, error } = await resend.emails.send({
-            from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-            to: email,
-            subject: 'Willkommen im Partnerprogramm',
-            html: `<h1>Hallo ${firstName || 'Partner'},</h1>
-            <p>Wir freuen uns sehr, dich als Partner begrüßen zu dürfen.</p>
-            <p>Du verdienst ab sofort 50% an jedem vermittelten Nutzer. Deinen persönlichen Empfehlungslink findest du in deinem Dashboard.</p>
-            <p><a href="${dashboardLink}">Zum Partner-Dashboard</a></p>
-            <p>Auf gute Zusammenarbeit!</p>`
-        });
-
-        if (error) {
-            console.error(">>> RESEND ERROR:", error);
-            // We logged the error, but the lock was already acquired. 
-            // We could revert the lock, but let's assume manual intervention or support if email fails.
-            return res.status(500).json({ error: error.message });
+        // Handle Schema Cache Error (PGRST204) or Undefined Column (42703) gracefully
+        // This happens if the column was just added and PostgREST cache hasn't refreshed yet
+        if (updateError.code === 'PGRST204' || updateError.code === '42703' || updateError.message?.includes('schema cache')) {
+            console.warn(">>> SCHEMA CACHE ISSUE: Column 'partner_welcome_sent' not visible yet. Using FALLBACK MODE (Sending email without lock).");
+            lockAcquired = true; // Force send
+        } else {
+            throw updateError;
         }
-        console.log(">>> EMAIL SENT. ID:", data?.id);
     } else {
-        console.warn(">>> RESEND KEY MISSING");
+        // Normal behavior: If rows updated, we won the race. If 0, it was already sent.
+        if (updatedRows && updatedRows.length > 0) {
+            lockAcquired = true;
+        } else {
+            console.log(">>> SKIPPED: Email already sent or profile missing (Lock failed).");
+            return res.status(200).json({ success: true, message: 'Already sent or profile missing' });
+        }
+    }
+
+    if (lockAcquired) {
+        console.log(">>> LOCK ACQUIRED (or Fallback). Sending email...");
+
+        // 3. Send Email
+        if (process.env.RESEND_API_KEY) {
+            const resend = new Resend(process.env.RESEND_API_KEY);
+            // Ensure origin is valid or fallback
+            const origin = req.headers.origin || 'https://resortpassalarm.com';
+            const dashboardLink = `${origin}/affiliate`;
+            
+            const { data, error } = await resend.emails.send({
+                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                to: email,
+                subject: 'Willkommen im Partnerprogramm',
+                html: `<h1>Hallo ${firstName || 'Partner'},</h1>
+                <p>Wir freuen uns sehr, dich als Partner begrüßen zu dürfen.</p>
+                <p>Du verdienst ab sofort 50% an jedem vermittelten Nutzer. Deinen persönlichen Empfehlungslink findest du in deinem Dashboard.</p>
+                <p><a href="${dashboardLink}">Zum Partner-Dashboard</a></p>
+                <p>Auf gute Zusammenarbeit!</p>`
+            });
+
+            if (error) {
+                console.error(">>> RESEND ERROR:", error);
+                return res.status(500).json({ error: error.message });
+            }
+            console.log(">>> EMAIL SENT. ID:", data?.id);
+        } else {
+            console.warn(">>> RESEND KEY MISSING");
+        }
     }
 
     return res.status(200).json({ success: true });
