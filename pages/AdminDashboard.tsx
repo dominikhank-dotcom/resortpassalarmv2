@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
   TrendingUp, DollarSign, Activity, Database, Mail, 
-  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle, Wrench
+  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle, Wrench, PiggyBank
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
@@ -181,6 +181,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [dashboardStats, setDashboardStats] = useState({ 
       activeUsers: 0, 
       revenue: 0, 
+      profit: 0,
       newCustomers: 0, 
       conversionRate: 0 
   });
@@ -275,9 +276,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         if (statsRes.ok) {
             const stats = await statsRes.json();
             setDashboardStats({
-                activeUsers: stats.activeUsers || 0, // Fix: API returns activeUsers, not activeSubs
+                activeUsers: stats.activeUsers || 0, 
                 revenue: stats.revenue || 0,
-                newCustomers: stats.newCustomers || 0, // Now represents New Subscriptions
+                profit: stats.profit || 0,
+                newCustomers: stats.newCustomers || 0, 
                 conversionRate: stats.conversionRate || 0
             });
         }
@@ -633,7 +635,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           </div>
 
           {/* KPI Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
               <div className="flex justify-between items-start mb-4">
                 <div>
@@ -656,6 +658,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 <div className="bg-green-50 p-2 rounded-lg text-green-600"><DollarSign size={20} /></div>
               </div>
               <p className="text-xs text-slate-400">Aktuelles MRR (Laufend)</p>
+            </div>
+
+            {/* Profit Card */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <p className="text-slate-500 text-sm font-medium">Gewinn / Monat</p>
+                  <h3 className="text-3xl font-bold text-green-700">{isLoadingData ? '...' : dashboardStats.profit.toFixed(2)} €</h3>
+                </div>
+                <div className="bg-emerald-50 p-2 rounded-lg text-emerald-600"><PiggyBank size={20} /></div>
+              </div>
+              <p className="text-xs text-slate-400">Netto (nach Provisionen)</p>
             </div>
 
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">

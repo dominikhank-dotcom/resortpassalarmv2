@@ -13,44 +13,59 @@ export default async function handler(req: any, res: any) {
   // Check if Service Role Key is available
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error("CRITICAL: SUPABASE_SERVICE_ROLE_KEY missing in api/admin-stats.ts");
-      return res.status(200).json({ activeUsers: 0, revenue: 0, newCustomers: 0, conversionRate: 0, error: 'Config Missing' });
+      return res.status(200).json({ activeUsers: 0, revenue: 0, profit: 0, newCustomers: 0, conversionRate: 0, error: 'Config Missing' });
   }
 
   try {
     const { startDate, endDate } = req.query;
 
-    // --- 1. GLOBAL STATS (Total MRR & Total Active Users) ---
+    // --- 1. GLOBAL SETTINGS ---
+    const { data: settings } = await supabase
+        .from('system_settings')
+        .select('key, value')
+        .in('key', ['price_existing_customers', 'global_commission_rate']);
+    
+    const priceSetting = settings?.find(s => s.key === 'price_existing_customers');
+    const commSetting = settings?.find(s => s.key === 'global_commission_rate');
+    
+    const fallbackPrice = priceSetting ? parseFloat(priceSetting.value) : 1.99;
+    const commissionRate = commSetting ? parseFloat(commSetting.value) / 100 : 0.5; // Default 50%
+
+    // --- 2. GLOBAL STATS (Total MRR, Commission Liability, Profit) ---
     // Count ALL subscriptions that are currently providing access
-    // We check for various status spellings to be robust using .in()
+    // Join with profiles to check if the user was referred
     const { data: allActiveSubs, error: subError } = await supabase
       .from('subscriptions')
-      .select('subscription_price, plan_type, status')
+      .select('subscription_price, plan_type, status, user_id, profiles:user_id(referred_by)')
       .in('status', ['active', 'trialing', 'Active']);
 
     if (subError) throw subError;
 
-    // Calculate Global MRR
     let currentMRR = 0;
-    
-    const { data: priceSetting } = await supabase
-        .from('system_settings')
-        .select('value')
-        .eq('key', 'price_existing_customers')
-        .single();
-    const fallbackPrice = priceSetting ? parseFloat(priceSetting.value) : 1.99;
+    let currentCommissionCost = 0;
 
     if (allActiveSubs) {
         allActiveSubs.forEach(sub => {
             if (sub.plan_type === 'Manuell (Gratis)') return;
+            
             // Ensure we handle numbers correctly
             const price = sub.subscription_price !== null ? Number(sub.subscription_price) : fallbackPrice;
             currentMRR += price;
+
+            // Check if referred (profiles might be an array or object depending on join, usually object for foreign key)
+            // Supabase returns an object if it's a single relation, but types can be tricky. Safe check.
+            const profile = Array.isArray(sub.profiles) ? sub.profiles[0] : sub.profiles;
+            
+            if (profile && profile.referred_by) {
+                currentCommissionCost += (price * commissionRate);
+            }
         });
     }
 
     const totalActiveUsers = allActiveSubs ? allActiveSubs.length : 0;
+    const currentProfit = currentMRR - currentCommissionCost;
 
-    // --- 2. PERIOD STATS ---
+    // --- 3. PERIOD STATS ---
     
     // A. New Registrations (Profiles) - for Conversion Rate denominator
     let registrationsQuery = supabase
@@ -89,6 +104,7 @@ export default async function handler(req: any, res: any) {
     return res.status(200).json({
       activeUsers: totalActiveUsers,
       revenue: currentMRR,
+      profit: currentProfit,
       newCustomers: validNewSubs, // Return count of new SUBSCRIPTIONS
       conversionRate: parseFloat(conversionRate.toFixed(2))
     });
