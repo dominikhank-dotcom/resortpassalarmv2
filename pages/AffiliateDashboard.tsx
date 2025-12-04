@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet } from 'lucide-react';
 import { AffiliateStats } from '../types';
@@ -30,6 +30,9 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
   const [stripeConnected, setStripeConnected] = useState(false);
   const [isPayoutLoading, setIsPayoutLoading] = useState(false);
 
+  // Welcome Mail Ref
+  const welcomeTriggeredRef = useRef(false);
+
   // Settings Form State
   const [settings, setSettings] = useState({
     firstName: '',
@@ -58,6 +61,24 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     const loadProfile = async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+            
+            // --- TRIGGER WELCOME MAIL (Partner) ---
+            const sessionKey = `partner_welcome_sent_${user.id}`;
+            if (!welcomeTriggeredRef.current && !sessionStorage.getItem(sessionKey)) {
+                welcomeTriggeredRef.current = true;
+                sessionStorage.setItem(sessionKey, 'true');
+                
+                fetch('/api/trigger-partner-welcome', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        userId: user.id, 
+                        email: user.email, 
+                        firstName: user.user_metadata?.first_name 
+                    })
+                }).catch(e => console.error("Welcome trigger failed:", e));
+            }
+
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('*')

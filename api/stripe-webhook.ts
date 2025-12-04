@@ -36,6 +36,8 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
+    const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+
     // --- 1. HANDLE CHECKOUT COMPLETED (Update Subscription & Welcome Email) ---
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
@@ -99,9 +101,8 @@ export default async function handler(req: any, res: any) {
             }
 
             // SEND CONFIRMATION EMAIL
-            if (process.env.RESEND_API_KEY && session.customer_email) {
+            if (resend && session.customer_email) {
                 try {
-                    const resend = new Resend(process.env.RESEND_API_KEY);
                     const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                     const firstName = profile?.first_name || 'Kunde';
 
@@ -169,8 +170,6 @@ export default async function handler(req: any, res: any) {
 
                 if (userProfile && userProfile.referred_by) {
                     const refCode = userProfile.referred_by;
-                    console.log(`User ${userId} was referred by "${refCode}". Processing commission...`);
-
                     // Resolve Partner
                     let { data: partner } = await supabase
                         .from('profiles')
@@ -188,10 +187,6 @@ export default async function handler(req: any, res: any) {
                         // Calculate Commission (50%)
                         const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
 
-                        // INSERT COMMISSION
-                        // We do not check for duplicates here strictly, because every invoice (monthly) generates a new commission.
-                        // Ideally we would store the invoice_id in commissions table to be 100% safe, 
-                        // but simple insert works for now as invoice_succeeded usually fires once per cycle.
                         const { error: commError } = await supabase.from('commissions').insert({
                             partner_id: partner.id,
                             source_user_id: userId,
@@ -201,8 +196,6 @@ export default async function handler(req: any, res: any) {
 
                         if (commError) console.error("Commission Insert Error:", commError);
                         else console.log(`Commission of ${commissionAmount}€ added for partner ${partner.id}`);
-                    } else {
-                        console.warn(`Referral code "${refCode}" found in profile but no matching partner account.`);
                     }
                 }
             } catch (commErr) {
@@ -211,6 +204,28 @@ export default async function handler(req: any, res: any) {
         }
     }
 
+    // --- 3. HANDLE PAYMENT FAILED ---
+    if (event.type === 'invoice.payment_failed') {
+        const invoice = event.data.object;
+        console.log(`Payment failed for invoice ${invoice.id}`);
+        
+        if (invoice.customer_email && resend) {
+            await resend.emails.send({
+                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                to: invoice.customer_email,
+                subject: 'Wichtig: Zahlung fehlgeschlagen ⚠️',
+                html: `
+                    <p>Hallo,</p>
+                    <p>Leider konnten wir dein Abo für den ResortPassAlarm nicht verlängern. Die Zahlung ist fehlgeschlagen.</p>
+                    <p><strong>Deine Überwachung ist aktuell gefährdet.</strong></p>
+                    <p>Bitte überprüfe deine Zahlungsmethode, um den Schutz aufrechtzuerhalten:</p>
+                    <p><a href="https://resortpassalarm.com/dashboard">Zahlungsdaten prüfen</a></p>
+                `
+            });
+        }
+    }
+
+    // --- 4. HANDLE SUBSCRIPTION UPDATED / DELETED ---
     if (event.type === 'customer.subscription.updated') {
         const subscription = event.data.object;
         await supabase.from('subscriptions').update({ 
@@ -221,7 +236,28 @@ export default async function handler(req: any, res: any) {
 
     if (event.type === 'customer.subscription.deleted') {
         const subscription = event.data.object;
+        
+        // Update DB
         await supabase.from('subscriptions').update({ status: 'canceled' }).eq('stripe_subscription_id', subscription.id);
+        
+        // Get User Email to notify
+        const { data: sub } = await supabase.from('subscriptions').select('user_id').eq('stripe_subscription_id', subscription.id).single();
+        if (sub && sub.user_id && resend) {
+             const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', sub.user_id).single();
+             if (profile && profile.email) {
+                 await resend.emails.send({
+                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    to: profile.email,
+                    subject: 'Dein Abo wurde beendet',
+                    html: `
+                        <p>Hallo ${profile.first_name || ''},</p>
+                        <p>Dein ResortPassAlarm Abo ist nun ausgelaufen und wurde beendet.</p>
+                        <p>Du erhältst ab sofort keine Alarme mehr.</p>
+                        <p>Du kannst jederzeit zurückkehren: <a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
+                    `
+                });
+             }
+        }
     }
 
     res.status(200).json({ received: true });
