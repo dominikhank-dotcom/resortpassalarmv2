@@ -95,54 +95,53 @@ export default async function handler(req, res) {
     const logs = [];
     const stats = { sent: 0, failed: 0, skipped: 0 };
 
-    // Batch Processing with Delay
-    const BATCH_SIZE = 5;
-    
-    const processBatch = async (batch) => {
-        const promises = batch.map(async (user) => {
-            const targetEmail = user.notification_email || user.email;
-            const firstName = user.first_name || 'Fan';
-            
-            if (!targetEmail) {
-                stats.skipped++;
-                logs.push({ user: user.id, status: 'skipped', reason: 'no_email' });
-                return;
-            }
+    // --- EMAIL BATCHING (Resend) ---
+    if (resend) {
+        const validProfiles = profiles.filter(user => {
+            const hasEmail = !!(user.notification_email || user.email);
+            const enabled = user.email_enabled !== false;
+            return hasEmail && enabled;
+        });
 
-            if (user.email_enabled === false) {
-                stats.skipped++;
-                logs.push({ user: user.id, status: 'skipped', reason: 'disabled' });
-                return;
-            }
-            
-            let sent = false;
-            // EMAIL
-            if (resend) {
-                try {
-                    await resend.emails.send({
-                        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-                        to: targetEmail,
-                        subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
-                        html: `
-                          <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
-                          <p>Hallo ${firstName},</p>
-                          <p>Unser System hat soeben freie Kontingente für <strong>ResortPass ${productName}</strong> gefunden!</p>
-                          <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
-                          <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
-                          <p>Oder kopiere diesen Link: ${link}</p>
-                          <p>Viel Erfolg!<br>Dein Wächter</p>
-                        `
-                    });
-                    sent = true;
-                } catch (e) {
-                    console.error(`Failed to email user ${user.id}:`, e);
-                    logs.push({ user: user.id, status: 'failed', error: e.message });
-                    stats.failed++;
-                }
-            }
+        const BATCH_SIZE = 100;
+        
+        for (let i = 0; i < validProfiles.length; i += BATCH_SIZE) {
+            const batch = validProfiles.slice(i, i + BATCH_SIZE);
+            const payloads = batch.map(user => ({
+                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                to: user.notification_email || user.email,
+                subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
+                html: `
+                  <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
+                  <p>Hallo ${user.first_name || 'Fan'},</p>
+                  <p>Unser System hat soeben freie Kontingente für <strong>ResortPass ${productName}</strong> gefunden!</p>
+                  <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
+                  <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
+                  <p>Oder kopiere diesen Link: ${link}</p>
+                  <p>Viel Erfolg!<br>Dein Wächter</p>
+                `
+            }));
 
-            // SMS
-            if (user.sms_enabled && user.phone && twilioClient) {
+            try {
+                const { error } = await resend.batch.send(payloads);
+                if (error) throw error;
+                stats.sent += batch.length;
+            } catch (e) {
+                console.error(`Batch email failed:`, e);
+                stats.failed += batch.length;
+                logs.push({ error: e.message, batchIndex: i });
+            }
+        }
+    }
+
+    // --- SMS SENDING ---
+    if (twilioClient) {
+        const smsUsers = profiles.filter(u => u.sms_enabled && u.phone);
+        const SMS_BATCH_SIZE = 20;
+        
+        for (let i = 0; i < smsUsers.length; i += SMS_BATCH_SIZE) {
+            const batch = smsUsers.slice(i, i + SMS_BATCH_SIZE);
+            await Promise.all(batch.map(async (user) => {
                 try {
                     await twilioClient.messages.create({
                         body: `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: ${link}`,
@@ -152,19 +151,8 @@ export default async function handler(req, res) {
                 } catch (e) {
                     console.error(`Failed to sms user ${user.id}:`, e);
                 }
-            }
-            
-            if (sent) stats.sent++;
-        });
-        
-        await Promise.all(promises);
-    };
-
-    for (let i = 0; i < profiles.length; i += BATCH_SIZE) {
-        const batch = profiles.slice(i, i + BATCH_SIZE);
-        await processBatch(batch);
-        // Delay to prevent rate limits
-        if (i + BATCH_SIZE < profiles.length) await new Promise(r => setTimeout(r, 1000));
+            }));
+        }
     }
 
     res.status(200).json({ success: true, message: `Alarms sent for ${productName}`, stats, logs });

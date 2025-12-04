@@ -13,7 +13,6 @@ export default async function handler(req: any, res: any) {
 
   try {
       const now = new Date().toISOString();
-      // Update System Settings
       await supabase.from('system_settings').upsert({ key: type === 'gold' ? 'status_gold' : 'status_silver', value: status, updated_at: now });
       await supabase.from('system_settings').upsert({ key: 'last_checked', value: now, updated_at: now });
 
@@ -29,17 +28,13 @@ export default async function handler(req: any, res: any) {
       let logs: any[] = [];
 
       if (status === 'available') {
-          // 1. Get Active Subscriptions (Case Insensitive Check done by OR logic in application if needed, or rely on consistent DB status)
-          // Using .in() with various casings to be safe
           const { data: subs } = await supabase
             .from('subscriptions')
-            .select('user_id, status')
+            .select('user_id')
             .in('status', ['active', 'trialing', 'Active', 'Trialing']);
             
           if (subs && subs.length > 0) {
               stats.found_subs = subs.length;
-              
-              // Get unique User IDs
               const userIds = [...new Set(subs.map(s => s.user_id))];
               
               const { data: profiles } = await supabase
@@ -64,87 +59,79 @@ export default async function handler(req: any, res: any) {
                 ? (goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold")
                 : (silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver");
 
-              // HELPER: Send Single Batch
-              const processBatch = async (batch: any[]) => {
-                  const promises = batch.map(async (p) => {
-                      const targetEmail = p.notification_email || p.email;
-                      const firstName = p.first_name || 'Fan';
+              // --- EMAIL BATCH SENDING ---
+              const validProfilesForEmail = (profiles || []).filter(p => {
+                  const hasEmail = !!(p.notification_email || p.email);
+                  const enabled = p.email_enabled !== false;
+                  
+                  if (!hasEmail) {
+                      stats.skipped_no_email++;
+                      logs.push({ email: 'unknown', id: p.id, status: 'SKIPPED', reason: 'No Email' });
+                  } else if (!enabled) {
+                      stats.skipped_disabled++;
+                      logs.push({ email: p.notification_email || p.email, id: p.id, status: 'SKIPPED', reason: 'Disabled' });
+                  }
+                  return hasEmail && enabled;
+              });
+
+              if (resend && validProfilesForEmail.length > 0) {
+                  // Resend Batch Limit is 100
+                  const EMAIL_BATCH_SIZE = 100;
+                  
+                  for (let i = 0; i < validProfilesForEmail.length; i += EMAIL_BATCH_SIZE) {
+                      const chunk = validProfilesForEmail.slice(i, i + EMAIL_BATCH_SIZE);
                       
-                      // LOGIC: Check why we might skip
-                      if (!targetEmail) {
-                          stats.skipped_no_email++;
-                          logs.push({ email: 'unknown', id: p.id, status: 'SKIPPED', reason: 'No Email in Profile' });
-                          return;
-                      }
+                      const emailPayloads = chunk.map(p => ({
+                          from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                          to: p.notification_email || p.email,
+                          subject: `🚨 ${productName} VERFÜGBAR! SCHNELL SEIN!`,
+                          html: `
+                            <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
+                            <p>Hallo ${p.first_name || 'Fan'},</p>
+                            <p>Unser System hat soeben freie Kontingente für <strong>${productName}</strong> gefunden!</p>
+                            <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
+                            <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
+                            <p>Oder kopiere diesen Link: ${link}</p>
+                            <p>Viel Erfolg!<br>Dein Wächter</p>
+                          `
+                      }));
 
-                      if (p.email_enabled === false) {
-                          stats.skipped_disabled++;
-                          logs.push({ email: targetEmail, id: p.id, status: 'SKIPPED', reason: 'Email Disabled by User' });
-                          return;
-                      }
-
-                      let sentEmail = false;
-                      let sentSms = false;
-
-                      // Send Email
-                      if (resend) {
-                          try { 
-                              await resend.emails.send({ 
-                                  from: 'ResortPass Alarm <alarm@resortpassalarm.com>', 
-                                  to: targetEmail, 
-                                  subject: `🚨 ${productName} VERFÜGBAR! SCHNELL SEIN!`, 
-                                  html: `
-                                    <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
-                                    <p>Hallo ${firstName},</p>
-                                    <p>Unser System hat soeben freie Kontingente für <strong>${productName}</strong> gefunden!</p>
-                                    <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
-                                    <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
-                                    <p>Oder kopiere diesen Link: ${link}</p>
-                                    <p>Viel Erfolg!<br>Dein Wächter</p>
-                                  ` 
-                              }); 
-                              sentEmail = true;
-                          } catch (e: any) {
-                              console.error(`Email send failed for ${p.id}`, e);
-                              logs.push({ email: targetEmail, id: p.id, status: 'ERROR', reason: `Resend: ${e.message}` });
-                              stats.errors++;
+                      try {
+                          const { data, error } = await resend.batch.send(emailPayloads);
+                          
+                          if (error) {
+                              throw error;
                           }
+                          
+                          stats.sent += chunk.length;
+                          chunk.forEach(p => logs.push({ email: p.notification_email || p.email, id: p.id, status: 'SENT', type: 'Email (Batch)' }));
+                          
+                      } catch (e: any) {
+                          console.error("Batch Email Error:", e);
+                          stats.errors += chunk.length;
+                          chunk.forEach(p => logs.push({ email: p.notification_email || p.email, id: p.id, status: 'ERROR', reason: e.message || 'Batch Failed' }));
                       }
+                  }
+              }
 
-                      // Send SMS
-                      if (p.sms_enabled && p.phone && twilioClient) {
-                          try { 
+              // --- SMS BATCH SENDING (Manual Loop) ---
+              if (twilioClient) {
+                  const smsProfiles = (profiles || []).filter(p => p.sms_enabled && p.phone);
+                  const SMS_BATCH_SIZE = 20; 
+                  
+                  for (let i = 0; i < smsProfiles.length; i += SMS_BATCH_SIZE) {
+                      const chunk = smsProfiles.slice(i, i + SMS_BATCH_SIZE);
+                      await Promise.all(chunk.map(async (p) => {
+                          try {
                               await twilioClient.messages.create({ 
                                   body: `🚨 ALARM: ${productName} ist VERFÜGBAR! Schnell: ${link}`, 
                                   from: process.env.TWILIO_PHONE_NUMBER, 
                                   to: p.phone 
-                              }); 
-                              sentSms = true;
+                              });
                           } catch (e: any) {
-                              console.error(`SMS send failed for ${p.id}`, e);
-                              // We don't fail the whole log if SMS fails but Email worked
+                              console.error(`SMS failed for ${p.id}`, e);
                           }
-                      }
-                      
-                      if(sentEmail) {
-                          stats.sent++;
-                          logs.push({ email: targetEmail, id: p.id, status: 'SENT', type: sentSms ? 'Email+SMS' : 'Email' });
-                      }
-                  });
-                  await Promise.all(promises);
-              };
-
-              // Process in SMALLER chunks (5) with DELAY to prevent rate limits
-              const BATCH_SIZE = 5;
-              const allProfiles = profiles || [];
-              
-              for (let i = 0; i < allProfiles.length; i += BATCH_SIZE) {
-                  const batch = allProfiles.slice(i, i + BATCH_SIZE);
-                  await processBatch(batch);
-                  
-                  // 1 Second Delay between batches
-                  if (i + BATCH_SIZE < allProfiles.length) {
-                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      }));
                   }
               }
           }
