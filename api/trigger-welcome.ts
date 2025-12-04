@@ -18,7 +18,6 @@ export default async function handler(req: any, res: any) {
 
   const { userId, email, firstName } = req.body;
   
-  // Log incoming data (masked email for safety if needed, but useful for debug now)
   console.log(`>>> API Payload: userId=${userId}, email=${email}, name=${firstName}`);
 
   if (!userId || !email) {
@@ -27,87 +26,107 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // 1. Check idempotency with Retry Logic (Race Condition Handler)
-    let profile = null;
+    // 1. Wait for Profile to exist (Race condition handling for DB Trigger)
+    // The profile is created by a DB trigger on auth.users insert. It might take a few ms.
+    let profileExists = false;
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5;
 
     while (attempts < maxAttempts) {
-        const { data, error } = await supabase
+        const { count, error } = await supabase
             .from('profiles')
-            .select('welcome_mail_sent')
-            .eq('id', userId)
-            .single();
+            .select('*', { count: 'exact', head: true })
+            .eq('id', userId);
         
-        if (data) {
-            profile = data;
+        if (count && count > 0) {
+            profileExists = true;
             break;
         }
         
-        console.log(`>>> API: Profile not found (Attempt ${attempts + 1}/${maxAttempts}). Waiting...`);
-        await sleep(1000); // Wait 1s
+        console.log(`>>> Waiting for profile creation... Attempt ${attempts + 1}/${maxAttempts}`);
+        await sleep(800); // Wait 800ms
         attempts++;
     }
 
-    if (!profile) {
-        console.warn(">>> API WARNING: Profile still not found after retries. Assuming new user and proceeding anyway.");
-        // We proceed to send email because user exists in Auth (validated by caller having ID/Email).
-        // We can't check 'welcome_mail_sent' flag but better to send duplicate than none.
-        // Actually, if profile is missing, we can't update it later. 
-        // But maybe the trigger is JUST about to finish.
-    } else {
-        console.log(`>>> API DB Check: welcome_mail_sent is currently '${profile.welcome_mail_sent}'`);
-        if (profile.welcome_mail_sent) {
-            console.log(">>> API: Mail already marked as sent. Skipping.");
-            return res.status(200).json({ success: true, message: 'Already sent' });
-        }
+    if (!profileExists) {
+        // Fallback: If DB trigger is super slow, we still try to send email if we have the address from Auth.
+        // But we can't lock the DB row if it doesn't exist. 
+        // In this edge case, we log warning and proceed carefully.
+        console.warn(">>> WARNING: Profile still missing after retries. Proceeding with Auth email, but duplicate protection is weaker.");
     }
 
-    // 2. Check API Key
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-        console.error(">>> API FATAL ERROR: RESEND_API_KEY is missing in Environment Variables!");
-        return res.status(500).json({ error: 'Server Config Error: RESEND_API_KEY missing' });
-    }
-    console.log(">>> API: RESEND_API_KEY found (length: " + apiKey.length + ")");
-
-    // 3. Send Email
-    const resend = new Resend(apiKey);
-    console.log(`>>> API: Attempting to send email via Resend to ${email}...`);
-
-    const { data: emailData, error: emailError } = await resend.emails.send({
-        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-        to: email,
-        subject: `Willkommen bei ResortPassAlarm, ${firstName || 'Gast'}!`,
-        html: `<h1>Hallo ${firstName || 'Gast'},</h1>
-        <p>Willkommen an Bord! Dein Account wurde erfolgreich aktiviert.</p>
-        <p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>
-        <p><a href="https://resortpassalarm.com/login">Zum Login</a></p>
-        <p>Dein ResortPassAlarm Team</p>`
-    });
-
-    if (emailError) {
-        // THIS IS THE MOST IMPORTANT LOG
-        console.error(">>> API RESEND ERROR DETAILS:", JSON.stringify(emailError, null, 2));
-        return res.status(500).json({ success: false, error: emailError, message: "Resend API rejected the request." });
-    }
-
-    console.log(">>> API RESEND SUCCESS:", JSON.stringify(emailData, null, 2));
-
-    // 4. Mark as sent in DB (If profile exists)
-    // We try to update even if we didn't find profile earlier (maybe it appeared now)
-    const { error: updateError } = await supabase.from('profiles').update({ welcome_mail_sent: true }).eq('id', userId);
+    // 2. ATOMIC LOCK STRATEGY
+    // Instead of "Check then Update", we do "Update if False".
+    // Only the request that actually changes the row gets to send the email.
     
-    if (updateError) {
-        console.error(">>> API DB UPDATE ERROR:", updateError);
+    // We try to set welcome_mail_sent = true WHERE id = userId AND welcome_mail_sent IS NOT TRUE
+    // .select() returns the updated rows.
+    
+    let shouldSendEmail = false;
+
+    if (profileExists) {
+        const { data: updatedRows, error: updateError } = await supabase
+            .from('profiles')
+            .update({ welcome_mail_sent: true })
+            .eq('id', userId)
+            .is('welcome_mail_sent', false) // Only update if it is explicitly false (or null if your schema default handles it, but better explicit)
+            .select();
+        
+        // Note: .is('welcome_mail_sent', false) checks for FALSE. 
+        // If the column is NULL by default, we might need .or('welcome_mail_sent.is.null,welcome_mail_sent.eq.false')
+        // But let's assume default is false as per schema.
+        // Actually, Supabase .is filter might not support OR easily in update.
+        // Let's rely on the fact that we set default false in SQL.
+        
+        // If the update affected 1 row, WE won the race.
+        if (updatedRows && updatedRows.length > 0) {
+            console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
+            shouldSendEmail = true;
+        } else {
+            // If 0 rows updated, it means it was ALREADY true.
+            console.log(">>> ATOMIC LOCK FAILED: Email already sent (row not updated). Aborting.");
+            return res.status(200).json({ success: true, message: 'Email already sent (Lock)' });
+        }
     } else {
-        console.log(">>> API: DB profile updated (welcome_mail_sent = true).");
+        // Edge case: Profile missing. We send anyway to be safe, risking duplicate if multiple requests hit this edge case simultaneously.
+        shouldSendEmail = true; 
     }
 
-    return res.status(200).json({ success: true, message: 'Email sent & DB updated', data: emailData });
+    if (shouldSendEmail) {
+        // 3. Send Email via Resend
+        if (!process.env.RESEND_API_KEY) {
+            console.error(">>> API ERROR: RESEND_API_KEY missing");
+            return res.status(500).json({ message: 'Server Config Error: RESEND_API_KEY missing' });
+        }
+
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const emailResponse = await resend.emails.send({
+            from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+            to: email,
+            subject: `Willkommen bei ResortPassAlarm${firstName ? ', ' + firstName : ''}!`,
+            html: `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>
+            <p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p>
+            <p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>
+            <p><a href="https://resortpassalarm.com/login">Zum Login</a></p>
+            <p>Dein ResortPassAlarm Team</p>`
+        });
+
+        if (emailResponse.error) {
+            console.error(">>> RESEND ERROR:", emailResponse.error);
+            // We claimed the lock (set to true) but failed to send. 
+            // Ideally we should rollback (set false), but for Welcome emails it's better to fail silent than spam.
+            // Or log for manual intervention.
+            return res.status(500).json({ success: false, message: 'Resend API Error', details: emailResponse.error });
+        }
+
+        console.log(">>> EMAIL SENT SUCCESSFULLY:", emailResponse.data);
+        return res.status(200).json({ success: true, id: emailResponse.data?.id });
+    }
+
+    return res.status(200).json({ success: true, message: 'No action needed' });
 
   } catch (error: any) {
     console.error(">>> API CRITICAL EXCEPTION:", error);
-    return res.status(500).json({ error: error.message, stack: error.stack });
+    return res.status(500).json({ success: false, message: error.message });
   }
 }

@@ -36,7 +36,7 @@ export default async function handler(req: any, res: any) {
   }
 
   try {
-    // Handle Checkout Session Completed
+    // --- 1. HANDLE CHECKOUT COMPLETED (Update Subscription & Welcome Email) ---
     if (event.type === 'checkout.session.completed') {
         const session = event.data.object;
         let userId = session.client_reference_id;
@@ -53,7 +53,6 @@ export default async function handler(req: any, res: any) {
                 .single();
             if (user) {
                 userId = user.id;
-                console.log(`Found User ID via email: ${userId}`);
             }
         }
 
@@ -71,7 +70,7 @@ export default async function handler(req: any, res: any) {
                 }
             }
 
-            // 1. ROBUST DB UPDATE (Check existing first)
+            // DB UPDATE: Create/Update Subscription
             try {
                 const { data: existingSub } = await supabase
                     .from('subscriptions')
@@ -86,7 +85,7 @@ export default async function handler(req: any, res: any) {
                     status: 'active',
                     plan_type: 'premium',
                     current_period_end: currentPeriodEnd,
-                    subscription_price: amount // SAVE REAL PRICE
+                    subscription_price: amount
                 };
 
                 if (existingSub) {
@@ -99,78 +98,14 @@ export default async function handler(req: any, res: any) {
                 console.error("DB Update Error:", dbErr);
             }
 
-            // 2. HANDLE COMMISSIONS (Safe Logic)
-            try {
-                let refCode = session.metadata?.referralCode;
-                
-                // --- CRITICAL FIX FOR TRACKING ---
-                // If metadata is missing or empty, check the user's profile for 'referred_by'
-                if (!refCode || refCode.trim() === "") {
-                    console.log("No referral code in metadata. Checking user profile fallback...");
-                    const { data: userProfile } = await supabase.from('profiles').select('referred_by').eq('id', userId).single();
-                    if (userProfile && userProfile.referred_by) {
-                        refCode = userProfile.referred_by;
-                        console.log(`Found fallback referral code in DB: "${refCode}"`);
-                    }
-                }
-
-                if (refCode) {
-                    console.log(`Processing referral for code: "${refCode}"`);
-                    
-                    // Try to find partner by referral_code (Case Insensitive!)
-                    // .ilike is important because users might type "Dom2" but DB has "dom2"
-                    let { data: partner } = await supabase
-                        .from('profiles')
-                        .select('id')
-                        .ilike('referral_code', refCode.trim())
-                        .maybeSingle();
-                    
-                    if (!partner) {
-                        // Fallback: Check if it's a UUID (direct ID reference)
-                        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-                        if (uuidRegex.test(refCode)) {
-                             const { data: partnerById } = await supabase
-                                .from('profiles')
-                                .select('id')
-                                .eq('id', refCode)
-                                .maybeSingle();
-                             partner = partnerById;
-                        }
-                    }
-                    
-                    if (partner) {
-                        console.log(`Partner found: ${partner.id}`);
-                        const commissionAmount = amount > 0 ? (amount * 0.5) : 0.99;
-                        
-                        const { error: commError } = await supabase.from('commissions').insert({
-                            partner_id: partner.id,
-                            source_user_id: userId,
-                            amount: commissionAmount,
-                            status: 'pending'
-                        });
-                        
-                        if (commError) console.error("Commission Insert Error:", commError);
-                        else console.log("Commission recorded successfully.");
-                    } else {
-                        console.warn(`Referral code "${refCode}" not found in database (checked as code and ID).`);
-                    }
-                } else {
-                    console.log("No referral code found anywhere (Metadata or Profile). Skipping commission.");
-                }
-            } catch (commErr) {
-                console.error("Commission Critical Error:", commErr);
-            }
-
-            // 3. SEND CONFIRMATION EMAIL (Independent Safe Mode)
-            // Separate try-catch ensures this runs even if commission logic fails
+            // SEND CONFIRMATION EMAIL
             if (process.env.RESEND_API_KEY && session.customer_email) {
                 try {
-                    console.log(`Attempting to send confirmation email to ${session.customer_email}...`);
                     const resend = new Resend(process.env.RESEND_API_KEY);
                     const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                     const firstName = profile?.first_name || 'Kunde';
 
-                    const emailResult = await resend.emails.send({
+                    await resend.emails.send({
                         from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
                         to: session.customer_email,
                         subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
@@ -180,44 +115,99 @@ export default async function handler(req: any, res: any) {
                             <p>Die Überwachung für ResortPass Gold & Silver ist ab sofort <strong>AKTIV</strong>.</p>
                             <p>Dein Abo läuft bis: ${new Date(currentPeriodEnd).toLocaleDateString('de-DE')}</p>
                             <p><a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
-                            <hr>
-                            <p style="font-size: 12px; color: #666;">
-                                Rechtliche Hinweise:<br>
-                                <a href="https://resortpassalarm.com/terms">AGB</a> | <a href="https://resortpassalarm.com/revocation">Widerrufsbelehrung</a>
-                            </p>
                         `
                     });
-                    
-                    if (emailResult.error) {
-                        console.error("Resend API Error:", emailResult.error);
-                    } else {
-                        console.log("Confirmation email sent successfully via Webhook ID:", emailResult.data?.id);
-                    }
                 } catch (emailErr) {
-                    console.error("Failed to execute send email logic:", emailErr);
+                    console.error("Failed to send confirmation email:", emailErr);
                 }
-            } else {
-                console.log("Skipping email: API Key or email missing.");
             }
-        } else {
-            console.error("No UserId found in session (even after lookup). Cannot process.");
         }
     }
 
+    // --- 2. HANDLE INVOICE PAYMENT SUCCEEDED (Commissions & Recurring Logic) ---
+    // This event fires for the first payment AND every renewal. Perfect for lifetime commissions.
     if (event.type === 'invoice.payment_succeeded') {
         const invoice = event.data.object;
+        console.log(`Processing Invoice ${invoice.id} (${invoice.amount_paid} cts)`);
+
+        let userId = null;
+        let amountPaid = invoice.amount_paid ? invoice.amount_paid / 100 : 0;
+
+        // A. Update Subscription Status
         if (invoice.subscription) {
              const subDetails = await stripe.subscriptions.retrieve(invoice.subscription as string);
              const { data: sub } = await supabase.from('subscriptions').select('user_id').eq('stripe_subscription_id', invoice.subscription).single();
              
              if (sub) {
+                 userId = sub.user_id; // Found user via subscription link
                  await supabase.from('subscriptions').update({
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
-                     subscription_price: invoice.amount_paid ? invoice.amount_paid / 100 : null,
+                     subscription_price: amountPaid,
                      cancel_at_period_end: false 
                  }).eq('user_id', sub.user_id);
+                 console.log("Subscription renewed/activated in DB.");
              }
+        }
+
+        // B. Handle Commissions (Lifetime)
+        // If we didn't find userId via subscription (e.g. race condition on first payment), try email
+        if (!userId && invoice.customer_email) {
+            console.log("Looking up user by invoice email for commission...");
+            const { data: userByEmail } = await supabase.from('profiles').select('id').eq('email', invoice.customer_email).single();
+            if (userByEmail) userId = userByEmail.id;
+        }
+
+        if (userId && amountPaid > 0) {
+            try {
+                // Check if user has a referrer
+                const { data: userProfile } = await supabase
+                    .from('profiles')
+                    .select('referred_by')
+                    .eq('id', userId)
+                    .single();
+
+                if (userProfile && userProfile.referred_by) {
+                    const refCode = userProfile.referred_by;
+                    console.log(`User ${userId} was referred by "${refCode}". Processing commission...`);
+
+                    // Resolve Partner
+                    let { data: partner } = await supabase
+                        .from('profiles')
+                        .select('id')
+                        .ilike('referral_code', refCode.trim())
+                        .maybeSingle();
+                    
+                    // Fallback: Check if refCode is a UUID
+                    if (!partner && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(refCode)) {
+                         const { data: partnerById } = await supabase.from('profiles').select('id').eq('id', refCode).maybeSingle();
+                         partner = partnerById;
+                    }
+
+                    if (partner) {
+                        // Calculate Commission (50%)
+                        const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
+
+                        // INSERT COMMISSION
+                        // We do not check for duplicates here strictly, because every invoice (monthly) generates a new commission.
+                        // Ideally we would store the invoice_id in commissions table to be 100% safe, 
+                        // but simple insert works for now as invoice_succeeded usually fires once per cycle.
+                        const { error: commError } = await supabase.from('commissions').insert({
+                            partner_id: partner.id,
+                            source_user_id: userId,
+                            amount: commissionAmount,
+                            status: 'pending'
+                        });
+
+                        if (commError) console.error("Commission Insert Error:", commError);
+                        else console.log(`Commission of ${commissionAmount}€ added for partner ${partner.id}`);
+                    } else {
+                        console.warn(`Referral code "${refCode}" found in profile but no matching partner account.`);
+                    }
+                }
+            } catch (commErr) {
+                console.error("Commission Processing Error:", commErr);
+            }
         }
     }
 

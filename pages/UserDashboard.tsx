@@ -53,8 +53,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Prevent double firing of welcome mail
-  const welcomeTriggered = useRef(false);
+  // Prevent double firing of welcome mail in React lifecycle
+  const welcomeTriggeredRef = useRef(false);
 
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
@@ -63,11 +63,17 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     console.log("Dashboard: Auth User check:", user ? "Found" : "Not Found");
 
     if (user) {
-        // --- WELCOME MAIL TRIGGER (Backend First Strategy) ---
-        // We trigger this immediately if we have a user, regardless of profile loading state.
-        // The API will handle the check if it was already sent.
-        if (!welcomeTriggered.current) {
-            welcomeTriggered.current = true;
+        // --- WELCOME MAIL TRIGGER (Backend First + Atomic Lock + Session Storage) ---
+        // 1. Check React Ref (for current component mount)
+        // 2. Check Session Storage (for browser session reload protection)
+        const sessionKey = `welcome_sent_${user.id}`;
+        const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
+
+        if (!welcomeTriggeredRef.current && !alreadyTriggeredSession) {
+            welcomeTriggeredRef.current = true;
+            // Set flag immediately to prevent other calls
+            sessionStorage.setItem(sessionKey, 'true');
+            
             console.log("Dashboard: Initiating Welcome Mail Check via API for:", user.email);
             
             fetch('/api/trigger-welcome', {
@@ -76,13 +82,18 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 body: JSON.stringify({ 
                     userId: user.id, 
                     email: user.email,
-                    // We pass metadata if available, but API can also fetch profile
                     firstName: user.user_metadata?.first_name 
                 })
             }).then(async res => {
                 const json = await res.json();
                 console.log("Dashboard: Welcome API Response:", res.status, json);
-            }).catch(err => console.error("Dashboard: Welcome API Network Fail:", err));
+            }).catch(err => {
+                console.error("Dashboard: Welcome API Network Fail:", err);
+                // On network fail, maybe remove session key to retry later? 
+                // For now, safety first: don't spam.
+            });
+        } else {
+            console.log("Dashboard: Welcome mail check skipped (Already triggered in this session).");
         }
 
         // --- FETCH PROFILE ---

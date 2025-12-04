@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
   TrendingUp, DollarSign, Activity, Database, Mail, 
-  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle
+  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle, Wrench
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
@@ -201,6 +201,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   const [aiInsights, setAiInsights] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [pendingPayouts, setPendingPayouts] = useState<any[]>([]);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
 
@@ -440,6 +441,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             alert("Fehler: " + e.message);
         }
     }
+  }
+
+  const handleRepairCommissions = async () => {
+      setIsRepairing(true);
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          const response = await fetch('/api/admin-fix-commissions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user?.id })
+          });
+          const result = await response.json();
+          if (result.success) {
+              alert(`Erfolgreich! ${result.fixed} fehlende Provisionen wurden nachgebucht.\nLogs: ${result.logs?.join('\n') || 'Keine Details'}`);
+          } else {
+              alert("Fehler: " + result.error);
+          }
+      } catch (e: any) {
+          alert("Fehler: " + e.message);
+      } finally {
+          setIsRepairing(false);
+      }
   }
 
   const handleAnalyze = async () => {
@@ -840,16 +863,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </>
       )}
       
-      {/* ... Other Tabs remain same ... */}
       {/* PARTNER TAB */}
       {activeTab === 'partners' && !selectedCustomerId && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
           
           {/* Commission Settings Block */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                <Settings size={20} className="text-blue-600" /> Programm Konfiguration
-             </h3>
+             <div className="flex justify-between items-start mb-4">
+                <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <Settings size={20} className="text-blue-600" /> Programm Konfiguration
+                </h3>
+                <Button onClick={handleRepairCommissions} disabled={isRepairing} size="sm" variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200">
+                    <Wrench size={16} className={isRepairing ? "animate-spin mr-2" : "mr-2"} />
+                    {isRepairing ? "Prüfe..." : "Provisionen Reparieren"}
+                </Button>
+             </div>
+             
              <div className="flex items-end gap-4">
                 <div className="flex-1 max-w-xs">
                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Globale Provision (%)</label>
