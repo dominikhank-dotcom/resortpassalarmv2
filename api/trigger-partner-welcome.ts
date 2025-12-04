@@ -6,6 +6,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ message: 'Method not allowed' });
 
@@ -13,7 +15,31 @@ export default async function handler(req: any, res: any) {
   if (!userId || !email) return res.status(400).json({ error: 'Missing userId or email' });
 
   try {
-    // 1. ATOMIC LOCK: Try to set partner_welcome_sent = true where it is false
+    // 1. Wait for Profile to exist (Race condition handling for DB Trigger)
+    let profileExists = false;
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+        const { count } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .eq('id', userId);
+        
+        if (count && count > 0) {
+            profileExists = true;
+            break;
+        }
+        
+        await sleep(800); // Wait 800ms
+        attempts++;
+    }
+
+    if (!profileExists) {
+        console.warn("Partner Profile not found after retries. Proceeding anyway to attempt lock.");
+    }
+
+    // 2. ATOMIC LOCK: Try to set partner_welcome_sent = true where it is false
     const { data: updatedRows } = await supabase
         .from('profiles')
         .update({ partner_welcome_sent: true })
@@ -22,14 +48,14 @@ export default async function handler(req: any, res: any) {
         .select();
 
     if (!updatedRows || updatedRows.length === 0) {
-        return res.status(200).json({ success: true, message: 'Already sent' });
+        return res.status(200).json({ success: true, message: 'Already sent or profile missing' });
     }
 
-    // 2. Send Email
+    // 3. Send Email
     if (process.env.RESEND_API_KEY) {
         const resend = new Resend(process.env.RESEND_API_KEY);
-        // This content mirrors the "part_register" template
         const dashboardLink = `${req.headers.origin}/affiliate`;
+        
         await resend.emails.send({
             from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
             to: email,
