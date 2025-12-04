@@ -1,8 +1,7 @@
 import Stripe from 'stripe';
-// @ts-ignore
-import { buffer } from 'micro';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { Buffer } from 'buffer';
 
 export const config = {
   api: {
@@ -19,6 +18,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+// Native Buffer Helper to replace 'micro'
+async function getRawBody(readable: any): Promise<Buffer> {
+  const chunks = [];
+  for await (const chunk of readable) {
+    chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
+  }
+  return Buffer.concat(chunks);
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).send('Method not allowed');
@@ -28,13 +36,18 @@ export default async function handler(req: any, res: any) {
   let event;
 
   try {
-    const buf = await buffer(req);
+    const buf = await getRawBody(req);
     event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
-    console.error(`Webhook Error: ${err.message}`);
+    console.error(`Webhook Signature Error: ${err.message}`);
+    // 400 is correct here: The request was invalid (bad signature), so Stripe SHOULD know it failed.
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // --- FAIL-SAFE LOGIC WRAPPER ---
+  // We wrap the entire business logic in a try-catch.
+  // If ANYTHING fails (DB connection, Email sending, Logic bug), we catch it,
+  // LOG IT (so you see it in Vercel), but return 200 to Stripe to stop the retries.
   try {
     const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
@@ -126,7 +139,6 @@ export default async function handler(req: any, res: any) {
     }
 
     // --- 2. HANDLE INVOICE PAYMENT SUCCEEDED (Commissions & Recurring Logic) ---
-    // This event fires for the first payment AND every renewal. Perfect for lifetime commissions.
     if (event.type === 'invoice.payment_succeeded') {
         const invoice = event.data.object;
         console.log(`Processing Invoice ${invoice.id} (${invoice.amount_paid} cts)`);
@@ -140,7 +152,7 @@ export default async function handler(req: any, res: any) {
              const { data: sub } = await supabase.from('subscriptions').select('user_id').eq('stripe_subscription_id', invoice.subscription).single();
              
              if (sub) {
-                 userId = sub.user_id; // Found user via subscription link
+                 userId = sub.user_id; 
                  await supabase.from('subscriptions').update({
                      status: 'active',
                      current_period_end: new Date(subDetails.current_period_end * 1000).toISOString(),
@@ -152,7 +164,6 @@ export default async function handler(req: any, res: any) {
         }
 
         // B. Handle Commissions (Lifetime)
-        // If we didn't find userId via subscription (e.g. race condition on first payment), try email
         if (!userId && invoice.customer_email) {
             console.log("Looking up user by invoice email for commission...");
             const { data: userByEmail } = await supabase.from('profiles').select('id').eq('email', invoice.customer_email).single();
@@ -177,14 +188,13 @@ export default async function handler(req: any, res: any) {
                         .ilike('referral_code', refCode.trim())
                         .maybeSingle();
                     
-                    // Fallback: Check if refCode is a UUID
+                    // Fallback
                     if (!partner && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(refCode)) {
                          const { data: partnerById } = await supabase.from('profiles').select('id').eq('id', refCode).maybeSingle();
                          partner = partnerById;
                     }
 
                     if (partner) {
-                        // Calculate Commission (50%)
                         const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
 
                         const { error: commError } = await supabase.from('commissions').insert({
@@ -210,18 +220,22 @@ export default async function handler(req: any, res: any) {
         console.log(`Payment failed for invoice ${invoice.id}`);
         
         if (invoice.customer_email && resend) {
-            await resend.emails.send({
-                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-                to: invoice.customer_email,
-                subject: 'Wichtig: Zahlung fehlgeschlagen ⚠️',
-                html: `
-                    <p>Hallo,</p>
-                    <p>Leider konnten wir dein Abo für den ResortPassAlarm nicht verlängern. Die Zahlung ist fehlgeschlagen.</p>
-                    <p><strong>Deine Überwachung ist aktuell gefährdet.</strong></p>
-                    <p>Bitte überprüfe deine Zahlungsmethode, um den Schutz aufrechtzuerhalten:</p>
-                    <p><a href="https://resortpassalarm.com/dashboard">Zahlungsdaten prüfen</a></p>
-                `
-            });
+            try {
+                await resend.emails.send({
+                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    to: invoice.customer_email,
+                    subject: 'Wichtig: Zahlung fehlgeschlagen ⚠️',
+                    html: `
+                        <p>Hallo,</p>
+                        <p>Leider konnten wir dein Abo für den ResortPassAlarm nicht verlängern. Die Zahlung ist fehlgeschlagen.</p>
+                        <p><strong>Deine Überwachung ist aktuell gefährdet.</strong></p>
+                        <p>Bitte überprüfe deine Zahlungsmethode, um den Schutz aufrechtzuerhalten:</p>
+                        <p><a href="https://resortpassalarm.com/dashboard">Zahlungsdaten prüfen</a></p>
+                    `
+                });
+            } catch (e) {
+                console.error("Failed to send payment failed email:", e);
+            }
         }
     }
 
@@ -245,24 +259,33 @@ export default async function handler(req: any, res: any) {
         if (sub && sub.user_id && resend) {
              const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', sub.user_id).single();
              if (profile && profile.email) {
-                 await resend.emails.send({
-                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-                    to: profile.email,
-                    subject: 'Dein Abo wurde beendet',
-                    html: `
-                        <p>Hallo ${profile.first_name || ''},</p>
-                        <p>Dein ResortPassAlarm Abo ist nun ausgelaufen und wurde beendet.</p>
-                        <p>Du erhältst ab sofort keine Alarme mehr.</p>
-                        <p>Du kannst jederzeit zurückkehren: <a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
-                    `
-                });
+                 try {
+                     await resend.emails.send({
+                        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                        to: profile.email,
+                        subject: 'Dein Abo wurde beendet',
+                        html: `
+                            <p>Hallo ${profile.first_name || ''},</p>
+                            <p>Dein ResortPassAlarm Abo ist nun ausgelaufen und wurde beendet.</p>
+                            <p>Du erhältst ab sofort keine Alarme mehr.</p>
+                            <p>Du kannst jederzeit zurückkehren: <a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>
+                        `
+                    });
+                 } catch (e) {
+                     console.error("Failed to send cancellation email:", e);
+                 }
              }
         }
     }
 
+    // --- SUCCESS RESPONSE ---
     res.status(200).json({ received: true });
+
   } catch (error) {
-    console.error("Webhook processing error:", error);
-    res.status(500).json({ error: "Internal Server Error" });
+    // --- FAIL-SAFE CATCH ---
+    // We log the error thoroughly, but we respond with 200 OK to Stripe.
+    // This stops Stripe from retrying the event for 3 days and disabling the webhook.
+    console.error("CRITICAL WEBHOOK PROCESSING ERROR (Swallowed to prevent retry):", error);
+    res.status(200).json({ received: true, warning: "Internal Error Occurred, check logs." });
   }
 }
