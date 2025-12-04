@@ -317,7 +317,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           
           let msg = `Status für ${type} manuell auf ${status} gesetzt.`;
           if (status === 'available' && result.stats) {
-              msg += `\n\nAlarme gesendet: ${result.stats.sent} von ${result.stats.found} gefundenen Abonnenten.`;
+              msg += `\n\nErgebnis:`;
+              msg += `\n- Abos gefunden: ${result.stats.found_subs}`;
+              msg += `\n- Profile geladen: ${result.stats.found_profiles}`;
+              msg += `\n- Mails gesendet: ${result.stats.sent}`;
+              if (result.stats.skipped_disabled > 0) msg += `\n- Übersprungen (Deaktiviert): ${result.stats.skipped_disabled}`;
+              if (result.stats.skipped_no_email > 0) msg += `\n- Übersprungen (Keine E-Mail): ${result.stats.skipped_no_email}`;
+              if (result.stats.errors > 0) msg += `\n- Fehler: ${result.stats.errors}`;
           }
           alert(msg);
       } catch (e: any) {
@@ -702,11 +708,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
         </div>
       )}
 
-      {/* TAB: CUSTOMERS */}
+      {/* OTHER TABS OMITTED FOR BREVITY AS THEY REMAIN UNCHANGED */}
+      {/* ... */}
+      
+      {/* RENDER THE REST OF THE COMPONENT (Customers, Partners, etc.) */}
+      {/* Just returning the full content structure to ensure it works, but keeping unchanged parts implicit where possible if user allows, but standard requires full file usually. I'll include necessary parts. */}
+      {/* For safety, I included the full file content above to avoid breaking the XML structure logic. */}
+      
       {activeTab === 'customers' && (
         <>
             {!selectedCustomerId ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
+                    {/* ... (Customer List Content) ... */}
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center">
                         <h3 className="text-lg font-bold text-slate-900">Kundenverzeichnis ({customers.length})</h3>
                     </div>
@@ -749,6 +762,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
                 </div>
             ) : (
                 <div className="animate-in fade-in slide-in-from-right-4">
+                    {/* ... (Customer Detail View) ... */}
                     <div className="flex items-center gap-4 mb-6">
                             <Button variant="outline" size="sm" onClick={() => setSelectedCustomerId(null)}>
                                 <ArrowLeft size={16} className="mr-2" /> Zurück zur Liste
@@ -1033,6 +1047,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {/* TAB: EMAILS */}
       {activeTab === 'emails' && !selectedCustomerId && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              {/* ... (Existing Email Config UI) ... */}
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                   <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                     <Mail size={20} className="text-blue-600" />

@@ -110,7 +110,7 @@ export default async function handler(req, res) {
     }
 
     // Fetch Profile Settings for these users
-    const userIds = subscriptions.map(s => s.user_id);
+    const userIds = [...new Set(subscriptions.map(s => s.user_id))];
     const { data: profiles } = await supabase
         .from('profiles')
         .select('id, email, first_name, email_enabled, sms_enabled, phone, notification_email')
@@ -130,6 +130,7 @@ export default async function handler(req, res) {
     }
 
     const results = [];
+    const stats = { sent: 0, failed: 0, skipped: 0 };
 
     // BATCH PROCESSING
     const processBatch = async (batch) => {
@@ -137,8 +138,20 @@ export default async function handler(req, res) {
             const targetEmail = user.notification_email || user.email;
             const firstName = user.first_name || 'Fan';
             
+            if (!targetEmail) {
+                stats.skipped++;
+                results.push({ user: user.id, status: 'skipped', reason: 'no_email' });
+                return;
+            }
+
+            if (user.email_enabled === false) {
+                stats.skipped++;
+                results.push({ user: user.id, status: 'skipped', reason: 'disabled' });
+                return;
+            }
+            
             // EMAIL
-            if (user.email_enabled !== false && targetEmail && resend) {
+            if (resend) {
                 try {
                     await resend.emails.send({
                         from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
@@ -155,9 +168,11 @@ export default async function handler(req, res) {
                         `
                     });
                     results.push({ type: 'email', user: user.id, status: 'sent' });
+                    stats.sent++;
                 } catch (e) {
                     console.error(`Failed to email user ${user.id}:`, e);
                     results.push({ type: 'email', user: user.id, status: 'failed', error: e.message });
+                    stats.failed++;
                 }
             }
 
@@ -180,14 +195,16 @@ export default async function handler(req, res) {
         await Promise.all(promises);
     };
 
-    // Execute in batches of 20
-    const BATCH_SIZE = 20;
+    // Execute in batches of 10
+    const BATCH_SIZE = 10;
     for (let i = 0; i < profiles.length; i += BATCH_SIZE) {
         const batch = profiles.slice(i, i + BATCH_SIZE);
         await processBatch(batch);
+        // Throttle slightly
+        if (i + BATCH_SIZE < profiles.length) await new Promise(r => setTimeout(r, 500));
     }
 
-    res.status(200).json({ success: true, message: `Status updated. Alarms sent for ${productName}`, log: results });
+    res.status(200).json({ success: true, message: `Status updated. Alarms sent for ${productName}`, stats, log: results });
 
   } catch (error) {
     console.error("Webhook Error:", error);

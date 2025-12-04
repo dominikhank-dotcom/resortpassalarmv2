@@ -15,7 +15,14 @@ export default async function handler(req: any, res: any) {
       await supabase.from('system_settings').upsert({ key: type === 'gold' ? 'status_gold' : 'status_silver', value: status, updated_at: now });
       await supabase.from('system_settings').upsert({ key: 'last_checked', value: now, updated_at: now });
 
-      let stats = { found: 0, sent: 0, errors: 0 };
+      let stats = { 
+          found_subs: 0, 
+          found_profiles: 0, 
+          sent: 0, 
+          errors: 0, 
+          skipped_disabled: 0, 
+          skipped_no_email: 0 
+      };
 
       if (status === 'available') {
           // 1. Get Active Subscriptions
@@ -25,9 +32,14 @@ export default async function handler(req: any, res: any) {
             .in('status', ['active', 'trialing', 'Active']);
             
           if (subs && subs.length > 0) {
-              const { data: profiles } = await supabase.from('profiles').select('*').in('id', subs.map(s => s.user_id));
+              stats.found_subs = subs.length;
               
-              stats.found = profiles?.length || 0;
+              // Get unique User IDs
+              const userIds = [...new Set(subs.map(s => s.user_id))];
+              
+              const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
+              
+              stats.found_profiles = profiles?.length || 0;
 
               let resend; 
               if (process.env.RESEND_API_KEY) resend = new Resend(process.env.RESEND_API_KEY);
@@ -51,8 +63,22 @@ export default async function handler(req: any, res: any) {
                       const firstName = p.first_name || 'Fan';
                       let sent = false;
 
+                      // Check if email exists
+                      if (!targetEmail) {
+                          stats.skipped_no_email++;
+                          console.log(`Skipping user ${p.id}: No email found`);
+                          return;
+                      }
+
+                      // Check if notifications are enabled
+                      if (p.email_enabled === false) {
+                          stats.skipped_disabled++;
+                          console.log(`Skipping user ${p.id}: Email disabled in settings`);
+                          return;
+                      }
+
                       // Send Email
-                      if (p.email_enabled !== false && targetEmail && resend) {
+                      if (resend) {
                           try { 
                               await resend.emails.send({ 
                                   from: 'ResortPass Alarm <alarm@resortpassalarm.com>', 
@@ -95,12 +121,16 @@ export default async function handler(req: any, res: any) {
                   await Promise.all(promises);
               };
 
-              // Process in chunks of 20 to avoid timeouts/rate limits
-              const BATCH_SIZE = 20;
+              // Process in chunks of 10 (Safe batch size)
+              const BATCH_SIZE = 10;
               const allProfiles = profiles || [];
               for (let i = 0; i < allProfiles.length; i += BATCH_SIZE) {
                   const batch = allProfiles.slice(i, i + BATCH_SIZE);
                   await processBatch(batch);
+                  // Brief pause to allow API rate limits to recover
+                  if (i + BATCH_SIZE < allProfiles.length) {
+                      await new Promise(resolve => setTimeout(resolve, 500));
+                  }
               }
           }
       }
