@@ -312,9 +312,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
 
   const handleManualStatusChange = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       try {
-          await updateSystemStatus(type, status);
+          const result = await updateSystemStatus(type, status);
           setCurrentStatus(prev => ({ ...prev, [type]: status, lastChecked: new Date().toISOString() }));
-          alert(`Status für ${type} manuell auf ${status} gesetzt. Startseite aktualisiert.`);
+          
+          let msg = `Status für ${type} manuell auf ${status} gesetzt.`;
+          if (status === 'available' && result.stats) {
+              msg += `\n\nAlarme gesendet: ${result.stats.sent} von ${result.stats.found} gefundenen Abonnenten.`;
+          }
+          alert(msg);
       } catch (e: any) {
           alert("Fehler beim Status-Update: " + e.message);
       }

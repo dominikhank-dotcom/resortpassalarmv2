@@ -131,47 +131,60 @@ export default async function handler(req, res) {
 
     const results = [];
 
-    // Loop through users and send based on preferences
-    for (const user of profiles) {
-        const targetEmail = user.notification_email || user.email;
-        const firstName = user.first_name || 'Fan';
-        
-        // EMAIL
-        if (user.email_enabled !== false && targetEmail && resend) {
-            try {
-                await resend.emails.send({
-                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
-                    to: targetEmail,
-                    subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
-                    html: `
-                      <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
-                      <p>Hallo ${firstName},</p>
-                      <p>Unser System hat soeben freie Kontingente für <strong>ResortPass ${productName}</strong> gefunden!</p>
-                      <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
-                      <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
-                      <p>Oder kopiere diesen Link: ${link}</p>
-                      <p>Viel Erfolg!<br>Dein Wächter</p>
-                    `
-                });
-                results.push({ type: 'email', user: user.id, status: 'sent' });
-            } catch (e) {
-                console.error(`Failed to email user ${user.id}:`, e);
+    // BATCH PROCESSING
+    const processBatch = async (batch) => {
+        const promises = batch.map(async (user) => {
+            const targetEmail = user.notification_email || user.email;
+            const firstName = user.first_name || 'Fan';
+            
+            // EMAIL
+            if (user.email_enabled !== false && targetEmail && resend) {
+                try {
+                    await resend.emails.send({
+                        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                        to: targetEmail,
+                        subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
+                        html: `
+                          <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
+                          <p>Hallo ${firstName},</p>
+                          <p>Unser System hat soeben freie Kontingente für <strong>ResortPass ${productName}</strong> gefunden!</p>
+                          <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
+                          <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
+                          <p>Oder kopiere diesen Link: ${link}</p>
+                          <p>Viel Erfolg!<br>Dein Wächter</p>
+                        `
+                    });
+                    results.push({ type: 'email', user: user.id, status: 'sent' });
+                } catch (e) {
+                    console.error(`Failed to email user ${user.id}:`, e);
+                    results.push({ type: 'email', user: user.id, status: 'failed', error: e.message });
+                }
             }
-        }
 
-        // SMS
-        if (user.sms_enabled && user.phone && twilioClient) {
-            try {
-                await twilioClient.messages.create({
-                    body: `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: ${link}`,
-                    from: process.env.TWILIO_PHONE_NUMBER,
-                    to: user.phone,
-                });
-                results.push({ type: 'sms', user: user.id, status: 'sent' });
-            } catch (e) {
-                console.error(`Failed to sms user ${user.id}:`, e);
+            // SMS
+            if (user.sms_enabled && user.phone && twilioClient) {
+                try {
+                    await twilioClient.messages.create({
+                        body: `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: ${link}`,
+                        from: process.env.TWILIO_PHONE_NUMBER,
+                        to: user.phone,
+                    });
+                    results.push({ type: 'sms', user: user.id, status: 'sent' });
+                } catch (e) {
+                    console.error(`Failed to sms user ${user.id}:`, e);
+                    results.push({ type: 'sms', user: user.id, status: 'failed', error: e.message });
+                }
             }
-        }
+        });
+        
+        await Promise.all(promises);
+    };
+
+    // Execute in batches of 20
+    const BATCH_SIZE = 20;
+    for (let i = 0; i < profiles.length; i += BATCH_SIZE) {
+        const batch = profiles.slice(i, i + BATCH_SIZE);
+        await processBatch(batch);
     }
 
     res.status(200).json({ success: true, message: `Status updated. Alarms sent for ${productName}`, log: results });
