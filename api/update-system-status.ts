@@ -6,12 +6,14 @@ const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', proces
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  
   const { type, status, userId } = req.body;
   const { data: user } = await supabase.from('profiles').select('role').eq('id', userId).single();
   if (!user || user.role !== 'ADMIN') return res.status(403).json({ error: 'Unauthorized' });
 
   try {
       const now = new Date().toISOString();
+      // Update System Settings
       await supabase.from('system_settings').upsert({ key: type === 'gold' ? 'status_gold' : 'status_silver', value: status, updated_at: now });
       await supabase.from('system_settings').upsert({ key: 'last_checked', value: now, updated_at: now });
 
@@ -23,13 +25,16 @@ export default async function handler(req: any, res: any) {
           skipped_disabled: 0, 
           skipped_no_email: 0 
       };
+      
+      let logs: any[] = [];
 
       if (status === 'available') {
-          // 1. Get Active Subscriptions
+          // 1. Get Active Subscriptions (Case Insensitive Check done by OR logic in application if needed, or rely on consistent DB status)
+          // Using .in() with various casings to be safe
           const { data: subs } = await supabase
             .from('subscriptions')
-            .select('user_id')
-            .in('status', ['active', 'trialing', 'Active']);
+            .select('user_id, status')
+            .in('status', ['active', 'trialing', 'Active', 'Trialing']);
             
           if (subs && subs.length > 0) {
               stats.found_subs = subs.length;
@@ -37,7 +42,10 @@ export default async function handler(req: any, res: any) {
               // Get unique User IDs
               const userIds = [...new Set(subs.map(s => s.user_id))];
               
-              const { data: profiles } = await supabase.from('profiles').select('*').in('id', userIds);
+              const { data: profiles } = await supabase
+                .from('profiles')
+                .select('id, email, notification_email, first_name, email_enabled, sms_enabled, phone')
+                .in('id', userIds);
               
               stats.found_profiles = profiles?.length || 0;
 
@@ -56,26 +64,27 @@ export default async function handler(req: any, res: any) {
                 ? (goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold")
                 : (silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver");
 
-              // BATCH PROCESSING HELPER
+              // HELPER: Send Single Batch
               const processBatch = async (batch: any[]) => {
                   const promises = batch.map(async (p) => {
                       const targetEmail = p.notification_email || p.email;
                       const firstName = p.first_name || 'Fan';
-                      let sent = false;
-
-                      // Check if email exists
+                      
+                      // LOGIC: Check why we might skip
                       if (!targetEmail) {
                           stats.skipped_no_email++;
-                          console.log(`Skipping user ${p.id}: No email found`);
+                          logs.push({ email: 'unknown', id: p.id, status: 'SKIPPED', reason: 'No Email in Profile' });
                           return;
                       }
 
-                      // Check if notifications are enabled
                       if (p.email_enabled === false) {
                           stats.skipped_disabled++;
-                          console.log(`Skipping user ${p.id}: Email disabled in settings`);
+                          logs.push({ email: targetEmail, id: p.id, status: 'SKIPPED', reason: 'Email Disabled by User' });
                           return;
                       }
+
+                      let sentEmail = false;
+                      let sentSms = false;
 
                       // Send Email
                       if (resend) {
@@ -94,9 +103,10 @@ export default async function handler(req: any, res: any) {
                                     <p>Viel Erfolg!<br>Dein Wächter</p>
                                   ` 
                               }); 
-                              sent = true;
-                          } catch (e) {
+                              sentEmail = true;
+                          } catch (e: any) {
                               console.error(`Email send failed for ${p.id}`, e);
+                              logs.push({ email: targetEmail, id: p.id, status: 'ERROR', reason: `Resend: ${e.message}` });
                               stats.errors++;
                           }
                       }
@@ -109,31 +119,38 @@ export default async function handler(req: any, res: any) {
                                   from: process.env.TWILIO_PHONE_NUMBER, 
                                   to: p.phone 
                               }); 
-                              sent = true;
-                          } catch (e) {
+                              sentSms = true;
+                          } catch (e: any) {
                               console.error(`SMS send failed for ${p.id}`, e);
-                              stats.errors++;
+                              // We don't fail the whole log if SMS fails but Email worked
                           }
                       }
                       
-                      if(sent) stats.sent++;
+                      if(sentEmail) {
+                          stats.sent++;
+                          logs.push({ email: targetEmail, id: p.id, status: 'SENT', type: sentSms ? 'Email+SMS' : 'Email' });
+                      }
                   });
                   await Promise.all(promises);
               };
 
-              // Process in chunks of 10 (Safe batch size)
-              const BATCH_SIZE = 10;
+              // Process in SMALLER chunks (5) with DELAY to prevent rate limits
+              const BATCH_SIZE = 5;
               const allProfiles = profiles || [];
+              
               for (let i = 0; i < allProfiles.length; i += BATCH_SIZE) {
                   const batch = allProfiles.slice(i, i + BATCH_SIZE);
                   await processBatch(batch);
-                  // Brief pause to allow API rate limits to recover
+                  
+                  // 1 Second Delay between batches
                   if (i + BATCH_SIZE < allProfiles.length) {
-                      await new Promise(resolve => setTimeout(resolve, 500));
+                      await new Promise(resolve => setTimeout(resolve, 1000));
                   }
               }
           }
       }
-      return res.status(200).json({ success: true, stats });
-  } catch (error: any) { return res.status(500).json({ error: error.message }); }
+      return res.status(200).json({ success: true, stats, logs });
+  } catch (error: any) { 
+      return res.status(500).json({ error: error.message }); 
+  }
 }
