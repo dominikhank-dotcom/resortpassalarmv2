@@ -1,4 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
+import Stripe from 'stripe';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+  apiVersion: '2023-10-16',
+});
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
@@ -20,28 +25,60 @@ export default async function handler(req: any, res: any) {
         // 2. Get all active subscriptions
         const { data: subs } = await supabase
             .from('subscriptions')
-            .select('user_id, subscription_price')
+            .select('user_id, subscription_price, stripe_customer_id')
             .in('status', ['active', 'trialing']);
         
         let fixedCount = 0;
         let logs = [];
 
         for (const sub of subs || []) {
-            // 3. Get User Profile with Referrer
+            // 3. Get User Profile
             const { data: user } = await supabase
                 .from('profiles')
                 .select('id, referred_by, email')
                 .eq('id', sub.user_id)
                 .single();
             
-            if (user && user.referred_by) {
-                const refCode = user.referred_by.trim();
-                
+            if (!user) continue;
+
+            let refCode = user.referred_by;
+
+            // --- RECOVERY LOGIC START ---
+            // If DB doesn't have the code, ask Stripe if it was in the Checkout Session Metadata
+            if (!refCode && sub.stripe_customer_id) {
+                try {
+                    // Search Stripe Checkout Sessions for this customer to find lost metadata
+                    const sessions = await stripe.checkout.sessions.list({
+                        customer: sub.stripe_customer_id,
+                        limit: 5
+                    });
+
+                    // Look for ANY session with referralCode in metadata
+                    const validSession = sessions.data.find(s => s.metadata && s.metadata.referralCode);
+                    
+                    if (validSession && validSession.metadata?.referralCode) {
+                        refCode = validSession.metadata.referralCode.trim();
+                        
+                        // Self-Healing: Update DB
+                        await supabase
+                            .from('profiles')
+                            .update({ referred_by: refCode })
+                            .eq('id', user.id);
+                        
+                        logs.push(`RECOVERY: Found code "${refCode}" in Stripe for ${user.email}. Profile updated.`);
+                    }
+                } catch (stripeErr: any) {
+                    console.error(`Stripe Lookup Error for ${user.email}:`, stripeErr.message);
+                }
+            }
+            // --- RECOVERY LOGIC END ---
+
+            if (refCode) {
                 // 4. Resolve Partner
                 let { data: partner } = await supabase
                     .from('profiles')
                     .select('id, email')
-                    .ilike('referral_code', refCode)
+                    .ilike('referral_code', refCode.trim())
                     .maybeSingle();
                 
                 // Fallback ID check
@@ -51,8 +88,13 @@ export default async function handler(req: any, res: any) {
                 }
 
                 if (partner) {
+                    // Prevent self-referral
+                    if (partner.id === user.id) {
+                        logs.push(`Skipped: Self-referral detected for ${user.email}`);
+                        continue;
+                    }
+
                     // 5. Check if ANY commission exists for this pair
-                    // (Simplistic check: If NO commission exists at all, but user has active sub -> Create one)
                     const { data: existing } = await supabase.from('commissions')
                         .select('id')
                         .eq('source_user_id', user.id)
@@ -71,8 +113,10 @@ export default async function handler(req: any, res: any) {
                             status: 'pending'
                         });
                         fixedCount++;
-                        logs.push(`Fixed: User ${user.email} -> Partner ${partner.email} (${amount}€)`);
+                        logs.push(`FIXED: Commission created for ${user.email} -> Partner ${partner.email} (${amount}€)`);
                     }
+                } else {
+                    logs.push(`Warning: Referral code "${refCode}" found for ${user.email} but no partner exists.`);
                 }
             }
         }

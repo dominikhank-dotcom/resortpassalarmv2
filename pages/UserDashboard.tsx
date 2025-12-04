@@ -316,10 +316,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mt-2">
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Geworben von (Ref Code)</label>
                 <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm text-blue-600 bg-white px-2 py-1 rounded border border-slate-200">
-                        {userProfile?.referred_by || localStorage.getItem('resortpass_referral') || '-'}
-                    </span>
-                    <span className="text-xs text-slate-400">(Nur zur Info)</span>
+                    {userProfile?.referred_by ? (
+                        <span className="font-mono text-sm text-blue-600 bg-white px-2 py-1 rounded border border-slate-200">
+                            {userProfile.referred_by}
+                        </span>
+                    ) : (
+                        <span className="text-sm text-amber-600 bg-amber-50 px-2 py-1 rounded border border-amber-200">
+                            Nicht getrackt
+                        </span>
+                    )}
+                    <span className="text-xs text-slate-400">(DB Status)</span>
                 </div>
             </div>
 
