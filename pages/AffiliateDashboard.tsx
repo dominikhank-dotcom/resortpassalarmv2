@@ -64,10 +64,14 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
             
             // --- TRIGGER WELCOME MAIL (Partner) ---
             const sessionKey = `partner_welcome_sent_${user.id}`;
-            if (!welcomeTriggeredRef.current && !sessionStorage.getItem(sessionKey)) {
+            const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
+
+            if (!welcomeTriggeredRef.current && !alreadyTriggeredSession) {
                 welcomeTriggeredRef.current = true;
                 sessionStorage.setItem(sessionKey, 'true');
                 
+                console.log("AffiliateDashboard: Triggering welcome email for", user.email);
+
                 fetch('/api/trigger-partner-welcome', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -76,7 +80,14 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         email: user.email, 
                         firstName: user.user_metadata?.first_name 
                     })
-                }).catch(e => console.error("Welcome trigger failed:", e));
+                })
+                .then(async res => {
+                    const json = await res.json();
+                    console.log("AffiliateDashboard: Welcome API Response:", json);
+                })
+                .catch(e => console.error("Welcome trigger failed:", e));
+            } else {
+                console.log("AffiliateDashboard: Welcome mail check skipped (Already triggered).");
             }
 
             const { data: profile } = await supabase

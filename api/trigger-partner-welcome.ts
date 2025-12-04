@@ -44,11 +44,12 @@ export default async function handler(req: any, res: any) {
     }
 
     // 2. ATOMIC LOCK: Try to set partner_welcome_sent = true where it is NOT TRUE (handles false and null)
+    // This query says: "Update to TRUE, but ONLY IF it is NOT ALREADY TRUE"
     const { data: updatedRows, error: updateError } = await supabase
         .from('profiles')
         .update({ partner_welcome_sent: true })
         .eq('id', userId)
-        .neq('partner_welcome_sent', true) // More robust than .is('x', false)
+        .neq('partner_welcome_sent', true) // More robust than .is('x', false) for NULLs
         .select();
 
     if (updateError) {
@@ -58,7 +59,7 @@ export default async function handler(req: any, res: any) {
 
     // If 0 rows updated, it means it was ALREADY true (race condition lost or already processed)
     if (!updatedRows || updatedRows.length === 0) {
-        console.log(">>> SKIPPED: Email already sent or profile missing.");
+        console.log(">>> SKIPPED: Email already sent or profile missing (Lock failed).");
         return res.status(200).json({ success: true, message: 'Already sent or profile missing' });
     }
 
@@ -84,6 +85,8 @@ export default async function handler(req: any, res: any) {
 
         if (error) {
             console.error(">>> RESEND ERROR:", error);
+            // We logged the error, but the lock was already acquired. 
+            // We could revert the lock, but let's assume manual intervention or support if email fails.
             return res.status(500).json({ error: error.message });
         }
         console.log(">>> EMAIL SENT. ID:", data?.id);
