@@ -81,22 +81,29 @@ export default async function handler(req, res) {
     let productName = "";
     let link = "";
     
+    // Fetch dynamic links from DB or use defaults
+    const { data: goldUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_gold').single();
+    const { data: silverUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_silver').single();
+    
+    const goldLink = goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
+    const silverLink = silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver";
+
     if (triggerGold && triggerSilver) {
         productName = "Gold & Silver";
-        link = "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
+        link = goldLink; // Prioritize Gold link if both available
     } else if (triggerGold) {
         productName = "Gold";
-        link = "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
+        link = goldLink;
     } else if (triggerSilver) {
         productName = "Silver";
-        link = "https://tickets.mackinternational.de/de/ticket/resortpass-silver";
+        link = silverLink;
     }
 
-    // Get Subscribers with ACTIVE status
+    // Get Subscribers with ACTIVE status (Case Insensitive)
     const { data: subscriptions } = await supabase
         .from('subscriptions')
         .select('user_id')
-        .eq('status', 'active');
+        .in('status', ['active', 'trialing', 'Active']);
     
     if (!subscriptions || subscriptions.length === 0) {
         return res.status(200).json({ message: 'Items available but no active subscribers.' });
@@ -127,6 +134,7 @@ export default async function handler(req, res) {
     // Loop through users and send based on preferences
     for (const user of profiles) {
         const targetEmail = user.notification_email || user.email;
+        const firstName = user.first_name || 'Fan';
         
         // EMAIL
         if (user.email_enabled !== false && targetEmail && resend) {
@@ -134,12 +142,15 @@ export default async function handler(req, res) {
                 await resend.emails.send({
                     from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
                     to: targetEmail,
-                    subject: `🚨 ResortPass ${productName} VERFÜGBAR! Schnell sein!`,
+                    subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
                     html: `
-                      <h1>ALARM STUFE ROT!</h1>
-                      <p>Hallo ${user.first_name || 'Fan'},</p>
-                      <p>Der <strong>ResortPass ${productName}</strong> ist verfügbar!</p>
-                      <p><a href="${link}">ZUM SHOP</a></p>
+                      <h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
+                      <p>Hallo ${firstName},</p>
+                      <p>Unser System hat soeben freie Kontingente für <strong>ResortPass ${productName}</strong> gefunden!</p>
+                      <p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
+                      <a href="${link}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
+                      <p>Oder kopiere diesen Link: ${link}</p>
+                      <p>Viel Erfolg!<br>Dein Wächter</p>
                     `
                 });
                 results.push({ type: 'email', user: user.id, status: 'sent' });
