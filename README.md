@@ -1,3 +1,4 @@
+
 # ResortPassAlarm
 
 Ein professionelles SaaS-Tool zur Überwachung der Verfügbarkeit des Europa-Park ResortPass (Gold & Silver).
@@ -67,6 +68,7 @@ Falls Fehler wie "relation already exists" auftreten, ist das gut - dann existie
 -- DROP TABLE IF EXISTS public.subscriptions CASCADE;
 -- DROP TABLE IF EXISTS public.profiles CASCADE;
 -- DROP TABLE IF EXISTS public.system_settings CASCADE;
+-- DROP TABLE IF EXISTS public.email_templates CASCADE;
 
 -- 2. Tabellen erstellen (Falls nicht vorhanden)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -151,12 +153,26 @@ CREATE TABLE IF NOT EXISTS public.system_settings (
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now())
 );
 
+-- EMAIL TEMPLATES TABLE
+CREATE TABLE IF NOT EXISTS public.email_templates (
+  id text PRIMARY KEY, -- 'cust_welcome', 'cust_alarm' etc.
+  name text NOT NULL,
+  description text,
+  category text NOT NULL, -- 'CUSTOMER' oder 'PARTNER'
+  subject text NOT NULL,
+  body text NOT NULL,
+  variables text[], -- Array von Strings: ['{firstName}', '{link}']
+  is_enabled boolean DEFAULT true,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
 -- 3. Sicherheit aktivieren (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.payouts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.email_templates ENABLE ROW LEVEL SECURITY;
 
 -- 4. Policies (Wer darf was?)
 -- Hinweis: Fehler "policy already exists" kann ignoriert werden
@@ -191,8 +207,16 @@ CREATE POLICY "Admin insert settings" ON public.system_settings FOR INSERT WITH 
   auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
 );
 
+-- Email Templates Policies
+DROP POLICY IF EXISTS "Public read templates" ON public.email_templates;
+CREATE POLICY "Public read templates" ON public.email_templates FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Admin update templates" ON public.email_templates;
+CREATE POLICY "Admin update templates" ON public.email_templates FOR ALL USING (
+  auth.uid() IN (SELECT id FROM public.profiles WHERE role = 'ADMIN')
+);
+
 -- 5. Automatik Trigger (WICHTIG FÜR NEUE USER)
--- Aktualisiert, um Webseite zu nutzen
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS trigger AS $$
 DECLARE
@@ -219,7 +243,6 @@ BEGIN
   END IF;
 
   -- 3. Code bauen: Basis + Zufallszahl (um Kollisionen zu vermeiden)
-  -- Schneidet den Code bei 15 Zeichen ab, damit er nicht zu lang wird
   final_code := substring(base_code from 1 for 15) || '-' || floor(random() * 1000)::text;
 
   INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code, referred_by)
@@ -246,3 +269,12 @@ CREATE TRIGGER on_auth_user_created
 INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate', '50') ON CONFLICT DO NOTHING;
 INSERT INTO public.system_settings (key, value) VALUES ('price_new_customers', '1.99') ON CONFLICT DO NOTHING;
 INSERT INTO public.system_settings (key, value) VALUES ('price_existing_customers', '1.99') ON CONFLICT DO NOTHING;
+
+-- Standard Templates
+INSERT INTO public.email_templates (id, name, description, category, subject, body, variables, is_enabled)
+VALUES
+('cust_welcome', 'Registrierungs-Mail', 'Wird nach der Registrierung versendet.', 'CUSTOMER', 'Willkommen bei ResortPassAlarm, {firstName}!', '<h1>Hallo {firstName},</h1><p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p><p><a href="{loginLink}">Zum Login</a></p>', ARRAY['{firstName}', '{loginLink}'], true),
+('cust_sub_active', 'Abo aktiviert', 'Bestätigung nach Kauf.', 'CUSTOMER', 'Dein Premium-Schutz ist aktiv! 🛡️', '<h1>Das ging schnell!</h1><p>Danke {firstName}, deine Überwachung läuft.</p><p><a href="{dashboardLink}">Zum Dashboard</a></p>', ARRAY['{firstName}', '{dashboardLink}'], true),
+('cust_alarm_real', 'ECHT ALARM (Verfügbar)', 'Wenn Tickets gefunden wurden.', 'CUSTOMER', '🚨 {productName} VERFÜGBAR! SCHNELL SEIN!', '<h1 style="color: #d97706;">ALARM STUFE ROT!</h1><p>Hallo {firstName},</p><p>Es gibt freie Kontingente für <strong>{productName}</strong>!</p><a href="{shopLink}">ZUM TICKET SHOP</a>', ARRAY['{firstName}', '{productName}', '{shopLink}'], true),
+('part_register', 'Partner Registrierung', 'Willkommensmail für Partner.', 'PARTNER', 'Willkommen im Partnerprogramm', '<h1>Hallo {firstName},</h1><p>Schön, dass du dabei bist.</p><p><a href="{affiliateLink}">Zum Dashboard</a></p>', ARRAY['{firstName}', '{affiliateLink}'], true)
+ON CONFLICT (id) DO NOTHING;

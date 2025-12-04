@@ -1,3 +1,4 @@
+
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -199,7 +200,6 @@ export const getSystemSettings = async () => {
       method: 'GET'
     });
     if (response.status === 404) {
-      // API not available yet (maybe due to build error), fail gracefully
       console.warn("System Settings API not found (404). Using defaults.");
       return null;
     }
@@ -240,6 +240,42 @@ export const updateSystemStatus = async (type: 'gold' | 'silver', status: 'avail
         return await handleResponse(response);
     } catch (error: any) {
         console.error("Update Status Error:", error);
+        throw error;
+    }
+};
+
+// --- EMAIL TEMPLATES ---
+
+export const getEmailTemplates = async () => {
+    try {
+        // Add timestamp to prevent caching
+        const response = await fetch(`/api/email-templates?t=${Date.now()}`, { 
+            method: 'GET',
+            headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
+            }
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Get Templates Error:", error);
+        return null;
+    }
+};
+
+export const saveEmailTemplate = async (template: EmailTemplate) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Nicht eingeloggt");
+
+    try {
+        const response = await fetch('/api/email-templates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id, template })
+        });
+        return await handleResponse(response);
+    } catch (error: any) {
+        console.error("Save Template Error:", error);
         throw error;
     }
 };

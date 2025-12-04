@@ -110,7 +110,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         if (profile) {
             setUserProfile(profile);
             setPersonalData({
-                firstName: profile.first_name || '', lastName: profile.last_name || '', street: profile.street || '', house_number: profile.house_number || '', zip: profile.zip || '', city: profile.city || '', country: profile.country || 'Deutschland', email: profile.email || user.email || ''
+                firstName: profile.first_name || '', 
+                lastName: profile.last_name || '', 
+                street: profile.street || '', 
+                houseNumber: profile.house_number || '', 
+                zip: profile.zip || '', 
+                city: profile.city || '', 
+                country: profile.country || 'Deutschland', 
+                email: profile.email || user.email || ''
             });
             setNotifications({
                 email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "", emailEnabled: profile.email_enabled !== false, smsEnabled: profile.sms_enabled === true

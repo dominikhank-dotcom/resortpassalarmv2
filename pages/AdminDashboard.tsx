@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, Briefcase, 
@@ -6,11 +7,11 @@ import {
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete, adminUpdateCustomer } from '../services/backendService';
+import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete, adminUpdateCustomer, getEmailTemplates, saveEmailTemplate } from '../services/backendService';
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
-// --- DEFAULT TEMPLATES ---
+// --- DEFAULT TEMPLATES (Fallback) ---
 const DEFAULT_TEMPLATES: EmailTemplate[] = [
   // --- CUSTOMER EMAILS ---
   {
@@ -300,6 +301,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             if (payouts) setPendingPayouts(payouts);
         }
 
+        // 7. Fetch Email Templates
+        if (activeTab === 'emails') {
+            const dbTemplates = await getEmailTemplates();
+            if (dbTemplates) {
+                if (dbTemplates.length > 0) {
+                    // Map DB keys (snake_case) to Frontend types (camelCase)
+                    const mappedTemplates = dbTemplates.map((t: any) => ({
+                        id: t.id,
+                        name: t.name,
+                        description: t.description,
+                        category: t.category,
+                        subject: t.subject,
+                        body: t.body,
+                        variables: t.variables,
+                        isEnabled: t.is_enabled
+                    }));
+                    setTemplates(mappedTemplates);
+                }
+            } else {
+                // If getEmailTemplates returns null, it means there was an error fetching
+                alert("Warnung: Konnte E-Mail Templates nicht laden. Zeige Standard-Werte.");
+            }
+        }
+
       } catch (error) {
         console.error("Error fetching admin data:", error);
       } finally {
@@ -478,8 +503,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     } catch (error) { setAiInsights("Fehler bei der Analyse."); } finally { setIsAnalyzing(false); }
   };
 
-  const toggleEmailTemplate = (id: string) => { setTemplates(prev => prev.map(t => t.id === id ? { ...t, isEnabled: !t.isEnabled } : t)); };
+  const toggleEmailTemplate = (id: string) => { 
+      setTemplates(prev => prev.map(t => {
+          if (t.id === id) {
+              const newState = !t.isEnabled;
+              // Save immediately when toggling
+              saveEmailTemplate({ ...t, isEnabled: newState }).catch(err => alert("Fehler beim Speichern: " + err.message));
+              return { ...t, isEnabled: newState };
+          }
+          return t;
+      })); 
+  };
+  
   const updateTemplate = (id: string, field: 'subject' | 'body', value: string) => { setTemplates(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t)); };
+  
+  const handleSaveTemplateLocal = async (id: string) => {
+      const template = templates.find(t => t.id === id);
+      if (template) {
+          try {
+              await saveEmailTemplate(template);
+              alert("Template gespeichert!");
+              setEditingTemplateId(null);
+          } catch (e: any) {
+              alert("Fehler: " + e.message);
+          }
+      }
+  };
+
   const handleSendTestEmail = async (template: EmailTemplate) => {
     setIsSendingTestEmail(true);
     try { await sendTemplateTest(template, adminAuth.currentEmail, productUrls); alert("Gesendet!"); } catch (error: any) { alert("Fehler: " + error.message); } finally { setIsSendingTestEmail(false); }
@@ -567,8 +617,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4"><h2 className="text-xl font-bold text-slate-900 flex items-center gap-2"><Mail size={20} className="text-blue-600" /> System E-Mails</h2></div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <div className="space-y-4"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Kunden Kommunikation</h3>{templates.filter(t => t.category === 'CUSTOMER').map(template => (<div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-blue-300 transition-colors"><div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100"><div><h4 className="font-bold text-slate-900">{template.name}</h4><p className="text-xs text-slate-500 mt-1">{template.description}</p></div><div className="flex items-center gap-2"><button onClick={() => toggleEmailTemplate(template.id)} className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div></div>{editingTemplateId === template.id ? (<div className="p-4 space-y-4 bg-slate-50"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label><input type="text" value={template.subject} onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label><textarea value={template.body} onChange={(e) => updateTemplate(template.id, 'body', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs" /></div><div className="flex justify-end gap-2 pt-2"><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button><Button size="sm" onClick={() => setEditingTemplateId(null)}>Speichern</Button></div></div>) : (<div className="p-4"><div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div><div className="flex gap-2 justify-end"><Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>Test senden</Button><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>Bearbeiten</Button></div></div>)}</div>))}</div>
-                 <div className="space-y-4"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Partner Kommunikation</h3>{templates.filter(t => t.category === 'PARTNER').map(template => (<div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-purple-300 transition-colors"><div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100"><div><h4 className="font-bold text-slate-900">{template.name}</h4><p className="text-xs text-slate-500 mt-1">{template.description}</p></div><div className="flex items-center gap-2"><button onClick={() => toggleEmailTemplate(template.id)} className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div></div>{editingTemplateId === template.id ? (<div className="p-4 space-y-4 bg-slate-50"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label><input type="text" value={template.subject} onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label><textarea value={template.body} onChange={(e) => updateTemplate(template.id, 'body', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs" /></div><div className="flex justify-end gap-2 pt-2"><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button><Button size="sm" onClick={() => setEditingTemplateId(null)}>Speichern</Button></div></div>) : (<div className="p-4"><div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div><div className="flex gap-2 justify-end"><Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>Test senden</Button><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>Bearbeiten</Button></div></div>)}</div>))}</div>
+                 <div className="space-y-4"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Kunden Kommunikation</h3>{templates.filter(t => t.category === 'CUSTOMER').map(template => (<div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-blue-300 transition-colors"><div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100"><div><h4 className="font-bold text-slate-900">{template.name}</h4><p className="text-xs text-slate-500 mt-1">{template.description}</p></div><div className="flex items-center gap-2"><button onClick={() => toggleEmailTemplate(template.id)} className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div></div>{editingTemplateId === template.id ? (<div className="p-4 space-y-4 bg-slate-50"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label><input type="text" value={template.subject} onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label><textarea value={template.body} onChange={(e) => updateTemplate(template.id, 'body', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs" /></div><div className="flex justify-end gap-2 pt-2"><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button><Button size="sm" onClick={() => handleSaveTemplateLocal(template.id)}>Speichern</Button></div></div>) : (<div className="p-4"><div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div><div className="flex gap-2 justify-end"><Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>Test senden</Button><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>Bearbeiten</Button></div></div>)}</div>))}</div>
+                 <div className="space-y-4"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Partner Kommunikation</h3>{templates.filter(t => t.category === 'PARTNER').map(template => (<div key={template.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:border-purple-300 transition-colors"><div className="p-4 flex items-start justify-between bg-slate-50/50 border-b border-slate-100"><div><h4 className="font-bold text-slate-900">{template.name}</h4><p className="text-xs text-slate-500 mt-1">{template.description}</p></div><div className="flex items-center gap-2"><button onClick={() => toggleEmailTemplate(template.id)} className={`w-8 h-4 rounded-full relative transition-colors ${template.isEnabled ? 'bg-green-500' : 'bg-slate-300'}`}><div className={`w-3 h-3 bg-white rounded-full absolute top-0.5 transition-transform ${template.isEnabled ? 'left-4.5' : 'left-0.5'}`}></div></button></div></div>{editingTemplateId === template.id ? (<div className="p-4 space-y-4 bg-slate-50"><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label><input type="text" value={template.subject} onChange={(e) => updateTemplate(template.id, 'subject', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg" /></div><div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label><textarea value={template.body} onChange={(e) => updateTemplate(template.id, 'body', e.target.value)} className="w-full text-sm px-3 py-2 border border-slate-300 rounded-lg h-32 font-mono text-xs" /></div><div className="flex justify-end gap-2 pt-2"><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(null)}>Abbrechen</Button><Button size="sm" onClick={() => handleSaveTemplateLocal(template.id)}>Speichern</Button></div></div>) : (<div className="p-4"><div className="text-sm text-slate-600 mb-3 font-medium">Betreff: {template.subject}</div><div className="flex gap-2 justify-end"><Button size="sm" variant="secondary" onClick={() => handleSendTestEmail(template)} disabled={isSendingTestEmail}>Test senden</Button><Button size="sm" variant="outline" onClick={() => setEditingTemplateId(template.id)}>Bearbeiten</Button></div></div>)}</div>))}</div>
               </div>
           </div>
       )}
