@@ -43,7 +43,7 @@ export default async function handler(req: any, res: any) {
               
               const { data: profiles } = await supabase
                 .from('profiles')
-                .select('id, email, notification_email, first_name, email_enabled, sms_enabled, phone')
+                .select('id, email, notification_email, first_name, email_enabled, sms_enabled, phone, notify_gold, notify_silver')
                 .in('id', userIds);
               
               stats.found_profiles = profiles?.length || 0;
@@ -71,14 +71,20 @@ export default async function handler(req: any, res: any) {
                   const hasEmail = !!targetEmail;
                   const enabled = p.email_enabled !== false;
                   
+                  // Specific Preference Check
+                  const wantsProduct = type === 'gold' ? (p.notify_gold !== false) : (p.notify_silver !== false);
+                  
                   if (!hasEmail) {
                       stats.skipped_no_email++;
                       logs.push({ email: 'unknown', id: p.id, status: 'SKIPPED', reason: 'No Email' });
                   } else if (!enabled) {
                       stats.skipped_disabled++;
                       logs.push({ email: targetEmail, id: p.id, status: 'SKIPPED', reason: 'Disabled' });
+                  } else if (!wantsProduct) {
+                      // Silently skip if user opted out of this specific product
+                      // logs.push({ email: targetEmail, id: p.id, status: 'SKIPPED', reason: 'Pref: Off' });
                   }
-                  return hasEmail && enabled;
+                  return hasEmail && enabled && wantsProduct;
               });
 
               if (resend && validProfilesForEmail.length > 0) {
@@ -122,7 +128,12 @@ export default async function handler(req: any, res: any) {
 
               // --- SMS BATCH SENDING (High Concurrency for Twilio) ---
               if (twilioClient) {
-                  const smsProfiles = (profiles || []).filter(p => p.sms_enabled && p.phone);
+                  // Filter for SMS pref AND product pref
+                  const smsProfiles = (profiles || []).filter(p => {
+                      const wantsProduct = type === 'gold' ? (p.notify_gold !== false) : (p.notify_silver !== false);
+                      return p.sms_enabled && p.phone && wantsProduct;
+                  });
+                  
                   const SMS_BATCH_SIZE = 50; // Higher concurrency for Twilio
                   
                   // Load SMS Template from DB

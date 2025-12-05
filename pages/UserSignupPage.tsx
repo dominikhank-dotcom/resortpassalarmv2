@@ -1,5 +1,6 @@
+
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/Button';
 import { supabase, getEnv } from '../lib/supabase';
 
@@ -17,6 +18,12 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
     password: '',
     confirmPassword: ''
   });
+  // New: Preferences, default OFF
+  const [preferences, setPreferences] = useState({
+    gold: false,
+    silver: false
+  });
+
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -50,6 +57,11 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
       setError("Die Passwörter stimmen nicht überein.");
       return;
     }
+    // New Validation: At least one pass type selected
+    if (!preferences.gold && !preferences.silver) {
+      setError("Bitte wähle mindestens einen ResortPass aus, den du überwachen möchtest.");
+      return;
+    }
 
     setIsLoading(true);
 
@@ -73,7 +85,10 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
             last_name: formData.lastName,
             role: 'CUSTOMER',
             // Save referral code directly to user metadata for robust tracking
-            referred_by: referralCode || null 
+            referred_by: referralCode || null,
+            // Save notification preferences
+            notify_gold: preferences.gold,
+            notify_silver: preferences.silver
           }
         }
       });
@@ -188,6 +203,40 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
                   className="block w-full appearance-none rounded-lg border border-slate-300 pl-10 px-3 py-2 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-blue-500 sm:text-sm"
                 />
+              </div>
+            </div>
+
+            {/* Pass Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Welchen Pass suchst du? <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-4">
+                <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.gold ? 'border-yellow-500 bg-yellow-50 ring-1 ring-yellow-500' : 'border-slate-200 hover:border-yellow-200'}`}>
+                  <input 
+                    type="checkbox" 
+                    className="sr-only" 
+                    checked={preferences.gold} 
+                    onChange={(e) => setPreferences({...preferences, gold: e.target.checked})} 
+                  />
+                  <div className={`p-2 rounded-full mb-2 ${preferences.gold ? 'bg-yellow-100 text-yellow-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <Ticket size={24} />
+                  </div>
+                  <span className={`font-bold ${preferences.gold ? 'text-slate-900' : 'text-slate-500'}`}>ResortPass Gold</span>
+                </label>
+
+                <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.silver ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-blue-200'}`}>
+                  <input 
+                    type="checkbox" 
+                    className="sr-only" 
+                    checked={preferences.silver} 
+                    onChange={(e) => setPreferences({...preferences, silver: e.target.checked})} 
+                  />
+                  <div className={`p-2 rounded-full mb-2 ${preferences.silver ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <Ticket size={24} />
+                  </div>
+                  <span className={`font-bold ${preferences.silver ? 'text-slate-900' : 'text-slate-500'}`}>ResortPass Silver</span>
+                </label>
               </div>
             </div>
 

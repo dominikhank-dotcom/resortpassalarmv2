@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
@@ -40,6 +41,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     isActive: true, lastChecked: "Lade...", isAvailable: false, url: productUrls.silver
   });
   
+  // New States for Preferences
+  const [prefs, setPrefs] = useState({ gold: true, silver: true });
+  
   useEffect(() => {
     setMonitorGold(prev => ({...prev, url: productUrls.gold}));
     setMonitorSilver(prev => ({...prev, url: productUrls.silver}));
@@ -63,39 +67,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
     console.log("Dashboard: Auth User check:", user ? "Found" : "Not Found");
 
     if (user) {
-        // --- WELCOME MAIL TRIGGER (Backend First + Atomic Lock + Session Storage) ---
-        // 1. Check React Ref (for current component mount)
-        // 2. Check Session Storage (for browser session reload protection)
-        const sessionKey = `welcome_sent_${user.id}`;
-        const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
-
-        if (!welcomeTriggeredRef.current && !alreadyTriggeredSession) {
-            welcomeTriggeredRef.current = true;
-            // Set flag immediately to prevent other calls
-            sessionStorage.setItem(sessionKey, 'true');
-            
-            console.log("Dashboard: Initiating Welcome Mail Check via API for:", user.email);
-            
-            fetch('/api/trigger-welcome', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ 
-                    userId: user.id, 
-                    email: user.email,
-                    firstName: user.user_metadata?.first_name 
-                })
-            }).then(async res => {
-                const json = await res.json();
-                console.log("Dashboard: Welcome API Response:", res.status, json);
-            }).catch(err => {
-                console.error("Dashboard: Welcome API Network Fail:", err);
-                // On network fail, maybe remove session key to retry later? 
-                // For now, safety first: don't spam.
-            });
-        } else {
-            console.log("Dashboard: Welcome mail check skipped (Already triggered in this session).");
-        }
-
         // --- FETCH PROFILE ---
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         console.log(`Dashboard: Profile fetch attempt ${retryCount + 1}/10. Result:`, profile ? "Found" : "Null");
@@ -123,6 +94,43 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "", emailEnabled: profile.email_enabled !== false, smsEnabled: profile.sms_enabled === true
             });
             setTempData({ email: profile.notification_email || profile.email || user.email || '', sms: profile.phone || "" });
+            
+            // Set Gold/Silver Prefs
+            setPrefs({
+                gold: profile.notify_gold !== false, // default true if null
+                silver: profile.notify_silver !== false
+            });
+
+            // --- WELCOME MAIL TRIGGER (Safety Checked) ---
+            // Only trigger if database says it hasn't been sent yet.
+            if (profile.welcome_mail_sent !== true) {
+                const sessionKey = `welcome_sent_${user.id}`;
+                const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
+
+                if (!welcomeTriggeredRef.current && !alreadyTriggeredSession) {
+                    welcomeTriggeredRef.current = true;
+                    sessionStorage.setItem(sessionKey, 'true');
+                    
+                    console.log("Dashboard: Initiating Welcome Mail Check via API for:", user.email);
+                    
+                    fetch('/api/trigger-welcome', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ 
+                            userId: user.id, 
+                            email: user.email,
+                            firstName: user.user_metadata?.first_name 
+                        })
+                    }).then(async res => {
+                        const json = await res.json();
+                        console.log("Dashboard: Welcome API Response:", res.status, json);
+                    }).catch(err => {
+                        console.error("Dashboard: Welcome API Network Fail:", err);
+                    });
+                }
+            } else {
+                console.log("Dashboard: Welcome mail already marked sent in DB. Skipping.");
+            }
         }
 
         const { data: logs } = await supabase.from('notification_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
@@ -185,8 +193,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   }, []);
 
   const updateProfileColumn = async (column: string, value: any) => { const { data: { user } } = await supabase.auth.getUser(); if (!user) return; await supabase.from('profiles').update({ [column]: value }).eq('id', user.id); };
+  
   const handleToggleEmail = (enabled: boolean) => { setNotifications(prev => ({...prev, emailEnabled: enabled})); updateProfileColumn('email_enabled', enabled); };
   const handleToggleSms = (enabled: boolean) => { setNotifications(prev => ({...prev, smsEnabled: enabled})); updateProfileColumn('sms_enabled', enabled); };
+  
+  const handleTogglePref = (type: 'gold' | 'silver', enabled: boolean) => {
+      setPrefs(prev => ({ ...prev, [type]: enabled }));
+      updateProfileColumn(type === 'gold' ? 'notify_gold' : 'notify_silver', enabled);
+  }
+
   const handleSavePersonalData = async (e: React.FormEvent) => { e.preventDefault(); const { data: { user } } = await supabase.auth.getUser(); if (user) { const { error } = await supabase.from('profiles').update({ street: personalData.street, house_number: personalData.houseNumber, zip: personalData.zip, city: personalData.city, country: personalData.country, email: personalData.email }).eq('id', user.id); if (error) { alert("Fehler: " + error.message); } else { alert("Daten gespeichert."); } } };
   const handleManualCheck = (type: 'gold' | 'silver') => { setIsChecking(type); fetchSystemStatus().then(() => { setTimeout(() => setIsChecking(null), 800); }); };
   const handleManualSync = async () => { setIsSyncing(true); try { const result = await syncSubscription(); if (result.found) { await fetchProfileAndSub(); alert("Abo synchronisiert!"); } else { alert("Kein Abo gefunden."); } } catch (e: any) { alert("Fehler: " + e.message); } finally { setIsSyncing(false); } }
@@ -229,7 +244,51 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   
   const handleManageBilling = async () => { await createPortalSession(); }
 
-  const StatusCard = ({ title, type, monitor }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus }) => { const isLoading = isChecking === type; return (<div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full"><div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50"><div className="flex items-center gap-2"><Ticket className={type === 'gold' ? 'text-yellow-500' : 'text-slate-400'} fill="currentColor" size={20} /><h2 className="font-bold text-slate-900">{title}</h2></div><div className="flex items-center gap-2 text-xs text-slate-500 font-mono"><RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />{isLoading ? "Prüfe..." : monitor.lastChecked}</div></div><div className={`flex-1 p-6 flex flex-col items-center justify-center text-center transition-all duration-500 ${monitor.isAvailable ? 'bg-green-50/50' : 'bg-white'}`}>{monitor.isAvailable ? (<div className="space-y-4 animate-in fade-in zoom-in w-full"><div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600"><CheckCircle size={32} /></div><div><h3 className="text-xl font-bold text-green-800">VERFÜGBAR!</h3><p className="text-green-700 text-sm">Schnell sein!</p></div></div>) : (<div className="space-y-4 w-full"><div className="relative mx-auto w-16 h-16 flex items-center justify-center"><div className="absolute inset-0 bg-red-100 rounded-full opacity-50 animate-pulse"></div><div className="relative bg-red-50 w-full h-full rounded-full flex items-center justify-center text-red-500 z-10 border border-red-100"><XCircle size={32} /></div></div><div><h3 className="text-lg font-bold text-red-600">Ausverkauft</h3><p className="text-slate-500 text-sm">Momentan keine Kontingente.</p></div></div>)}</div><div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center"><Button onClick={() => handleManualCheck(type)} variant="secondary" size="sm" className="w-full justify-center bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 mb-3" disabled={isLoading}><RefreshCw size={14} className={isLoading ? "animate-spin mr-2" : "mr-2"} />{isLoading ? "Wird geprüft..." : "Manuell Prüfen"}</Button><a href={monitor.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#00305e] hover:underline transition-colors"><ExternalLink size={12} />Zum Europa-Park Shop</a></div></div>); };
+  const StatusCard = ({ title, type, monitor, enabled, onToggle }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus, enabled: boolean, onToggle: (val: boolean) => void }) => { 
+      const isLoading = isChecking === type; 
+      return (
+        <div className={`bg-white rounded-2xl shadow-sm border ${enabled ? 'border-slate-200' : 'border-slate-100 opacity-90'} overflow-hidden flex flex-col h-full`}>
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <div className="flex items-center gap-2">
+                    <Ticket className={type === 'gold' ? 'text-yellow-500' : 'text-slate-400'} fill="currentColor" size={20} />
+                    <h2 className="font-bold text-slate-900">{title}</h2>
+                </div>
+                
+                {/* Toggle Switch */}
+                <label className="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" className="sr-only peer" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                </label>
+            </div>
+            <div className={`flex-1 p-6 flex flex-col items-center justify-center text-center transition-all duration-500 ${!enabled ? 'bg-slate-50' : monitor.isAvailable ? 'bg-green-50/50' : 'bg-white'}`}>
+                {!enabled ? (
+                    <div className="text-slate-400 flex flex-col items-center animate-in fade-in">
+                        <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center mb-2"><Bell size={20} /></div>
+                        <p className="text-sm font-medium">Alarm deaktiviert</p>
+                    </div>
+                ) : monitor.isAvailable ? (
+                    <div className="space-y-4 animate-in fade-in zoom-in w-full">
+                        <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center text-green-600"><CheckCircle size={32} /></div>
+                        <div><h3 className="text-xl font-bold text-green-800">VERFÜGBAR!</h3><p className="text-green-700 text-sm">Schnell sein!</p></div>
+                    </div>
+                ) : (
+                    <div className="space-y-4 w-full">
+                        <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+                            <div className="absolute inset-0 bg-red-100 rounded-full opacity-50 animate-pulse"></div>
+                            <div className="relative bg-red-50 w-full h-full rounded-full flex items-center justify-center text-red-500 z-10 border border-red-100"><XCircle size={32} /></div>
+                        </div>
+                        <div><h3 className="text-lg font-bold text-red-600">Ausverkauft</h3><p className="text-slate-500 text-sm">Momentan keine Kontingente.</p></div>
+                    </div>
+                )}
+            </div>
+            <div className="p-4 bg-slate-50 border-t border-slate-100 flex flex-col items-center">
+                <div className="flex items-center gap-2 text-xs text-slate-500 font-mono mb-3"><RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />{isLoading ? "Prüfe..." : monitor.lastChecked}</div>
+                <Button onClick={() => handleManualCheck(type)} variant="secondary" size="sm" className="w-full justify-center bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 mb-3" disabled={isLoading}><RefreshCw size={14} className={isLoading ? "animate-spin mr-2" : "mr-2"} />{isLoading ? "Wird geprüft..." : "Manuell Prüfen"}</Button>
+                <a href={monitor.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-slate-400 hover:text-[#00305e] hover:underline transition-colors"><ExternalLink size={12} />Zum Europa-Park Shop</a>
+            </div>
+        </div>
+      ); 
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -240,9 +299,20 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           {hasActiveSubscription ? (<div className="flex items-center gap-2 bg-[#00305e] text-white px-4 py-2 rounded-lg shadow-sm text-sm font-medium animate-in fade-in"><Shield size={16} className="text-[#ffcc00]" />Premium Schutz Aktiv</div>) : (<div className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg shadow-md text-sm font-bold animate-pulse"><AlertOctagon size={18} />WARNUNG: SCHUTZ INAKTIV</div>)}
         </div>
 
+        {/* Global Warning if Both Disabled */}
+        {hasActiveSubscription && !prefs.gold && !prefs.silver && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-start gap-3 animate-pulse">
+                <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
+                <div>
+                    <h3 className="font-bold text-red-800">Keine Überwachung aktiv!</h3>
+                    <p className="text-sm text-red-700">Du hast sowohl Gold als auch Silver Alarme deaktiviert. Du wirst keine Benachrichtigungen erhalten.</p>
+                </div>
+            </div>
+        )}
+
         <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${!hasActiveSubscription ? 'opacity-50 grayscale pointer-events-none select-none' : ''}`}>
-          <StatusCard title="ResortPass Silver" type="silver" monitor={monitorSilver} />
-          <StatusCard title="ResortPass Gold" type="gold" monitor={monitorGold} />
+          <StatusCard title="ResortPass Silver" type="silver" monitor={monitorSilver} enabled={prefs.silver} onToggle={(val) => handleTogglePref('silver', val)} />
+          <StatusCard title="ResortPass Gold" type="gold" monitor={monitorGold} enabled={prefs.gold} onToggle={(val) => handleTogglePref('gold', val)} />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

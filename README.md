@@ -38,6 +38,7 @@ Für den Live-Betrieb müssen folgende Variablen in Vercel gesetzt werden:
 - `TWILIO_ACCOUNT_SID`
 - `TWILIO_AUTH_TOKEN`
 - `TWILIO_PHONE_NUMBER`
+- `TWILIO_MESSAGING_SERVICE_SID`
 - `BROWSE_AI_API_KEY`
 - `BROWSE_AI_ROBOT_ID`
 - `API_KEY` (für Google Gemini)
@@ -90,6 +91,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   welcome_mail_sent boolean DEFAULT false, -- Verhindert doppelte Willkommens-Mails für Kunden
   partner_welcome_sent boolean DEFAULT false, -- NEU: Partner Willkommens-Mail
   tips_mail_sent boolean DEFAULT false, -- NEU: Partner Tipps Mail (nach 10 Min)
+  notify_gold boolean DEFAULT true, -- NEU: Gold Alarm erwünscht
+  notify_silver boolean DEFAULT true, -- NEU: Silver Alarm erwünscht
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -105,6 +108,8 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_account_id text; -- 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS welcome_mail_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_welcome_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tips_mail_sent boolean DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_gold boolean DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_silver boolean DEFAULT true;
 
 -- Constraints sicherstellen (Ignorieren falls schon da)
 DO $$ BEGIN
@@ -223,8 +228,23 @@ DECLARE
   base_code text;
   final_code text;
   website_input text;
+  notify_gold_val boolean;
+  notify_silver_val boolean;
 BEGIN
   website_input := new.raw_user_meta_data->>'website';
+  
+  -- Lese notify values (default true wenn nicht gesetzt)
+  IF (new.raw_user_meta_data->>'notify_gold') IS NOT NULL THEN
+    notify_gold_val := (new.raw_user_meta_data->>'notify_gold')::boolean;
+  ELSE
+    notify_gold_val := true;
+  END IF;
+
+  IF (new.raw_user_meta_data->>'notify_silver') IS NOT NULL THEN
+    notify_silver_val := (new.raw_user_meta_data->>'notify_silver')::boolean;
+  ELSE
+    notify_silver_val := true;
+  END IF;
   
   -- 1. Versuch: Code aus Webseite generieren
   IF website_input IS NOT NULL AND length(website_input) > 0 THEN
@@ -245,7 +265,7 @@ BEGIN
   -- 3. Code bauen: Basis + Zufallszahl (um Kollisionen zu vermeiden)
   final_code := substring(base_code from 1 for 15) || '-' || floor(random() * 1000)::text;
 
-  INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code, referred_by)
+  INSERT INTO public.profiles (id, email, first_name, last_name, role, website, referral_code, referred_by, notify_gold, notify_silver)
   VALUES (
     new.id, 
     new.email, 
@@ -254,7 +274,9 @@ BEGIN
     COALESCE(new.raw_user_meta_data->>'role', 'CUSTOMER'),
     website_input,
     final_code,
-    new.raw_user_meta_data->>'referred_by'
+    new.raw_user_meta_data->>'referred_by',
+    notify_gold_val,
+    notify_silver_val
   );
   RETURN new;
 END;
@@ -270,11 +292,76 @@ INSERT INTO public.system_settings (key, value) VALUES ('global_commission_rate'
 INSERT INTO public.system_settings (key, value) VALUES ('price_new_customers', '1.99') ON CONFLICT DO NOTHING;
 INSERT INTO public.system_settings (key, value) VALUES ('price_existing_customers', '1.99') ON CONFLICT DO NOTHING;
 
--- Standard Templates
+-- Standard Templates (alle 8)
+DELETE FROM public.email_templates;
 INSERT INTO public.email_templates (id, name, description, category, subject, body, variables, is_enabled)
 VALUES
-('cust_welcome', 'Registrierungs-Mail', 'Wird nach der Registrierung versendet.', 'CUSTOMER', 'Willkommen bei ResortPassAlarm, {firstName}!', '<h1>Hallo {firstName},</h1><p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p><p><a href="{loginLink}">Zum Login</a></p>', ARRAY['{firstName}', '{loginLink}'], true),
-('cust_sub_active', 'Abo aktiviert', 'Bestätigung nach Kauf.', 'CUSTOMER', 'Dein Premium-Schutz ist aktiv! 🛡️', '<h1>Das ging schnell!</h1><p>Danke {firstName}, deine Überwachung läuft.</p><p><a href="{dashboardLink}">Zum Dashboard</a></p>', ARRAY['{firstName}', '{dashboardLink}'], true),
-('cust_alarm_real', 'ECHT ALARM (Verfügbar)', 'Wenn Tickets gefunden wurden.', 'CUSTOMER', '🚨 {productName} VERFÜGBAR! SCHNELL SEIN!', '<h1 style="color: #d97706;">ALARM STUFE ROT!</h1><p>Hallo {firstName},</p><p>Es gibt freie Kontingente für <strong>{productName}</strong>!</p><a href="{shopLink}">ZUM TICKET SHOP</a>', ARRAY['{firstName}', '{productName}', '{shopLink}'], true),
-('part_register', 'Partner Registrierung', 'Willkommensmail für Partner.', 'PARTNER', 'Willkommen im Partnerprogramm', '<h1>Hallo {firstName},</h1><p>Schön, dass du dabei bist.</p><p><a href="{affiliateLink}">Zum Dashboard</a></p>', ARRAY['{firstName}', '{affiliateLink}'], true)
-ON CONFLICT (id) DO NOTHING;
+('cust_welcome', 'Registrierungs-Mail', 'Wird nach der Registrierung eines neuen Kundenkontos versendet.', 'CUSTOMER', 'Willkommen bei ResortPassAlarm, {firstName}!', '<h1>Hallo {firstName},</h1>
+<p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p>
+<p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>
+<p><a href="{loginLink}">Zum Login</a></p>
+<p>Dein ResortPassAlarm Team</p>', ARRAY['{firstName}', '{loginLink}'], true),
+
+('cust_pw_reset', 'Passwort vergessen', 'Versendet, wenn ein Kunde sein Passwort zurücksetzen möchte.', 'CUSTOMER', 'Passwort zurücksetzen', '<p>Hallo {firstName},</p>
+<p>Wir haben eine Anfrage erhalten, dein Passwort zurückzusetzen.</p>
+<p>Klicke auf den folgenden Link, um ein neues Passwort festzulegen:</p>
+<p><a href="{resetLink}">Passwort zurücksetzen</a></p>
+<p>Falls du das nicht warst, kannst du diese E-Mail ignorieren.</p>', ARRAY['{firstName}', '{resetLink}'], true),
+
+('cust_sub_active', 'Abo aktiviert', 'Bestätigung nach erfolgreichem Abschluss des Abos.', 'CUSTOMER', 'Dein Premium-Schutz ist aktiv! 🛡️', '<h1>Das ging schnell!</h1>
+<p>Danke {firstName}, deine Zahlung war erfolgreich.</p>
+<p>Die Überwachung für ResortPass Gold & Silver ist ab sofort <strong>AKTIV</strong>.</p>
+<p>Wir prüfen die Europa-Park Seite nun rund um die Uhr für dich. Stelle sicher, dass deine Handy-Nummer für SMS-Alarme hinterlegt ist.</p>
+<p><a href="{dashboardLink}">Zum Dashboard</a></p>', ARRAY['{firstName}', '{dashboardLink}'], true),
+
+('cust_sub_expired', 'Abo abgelaufen / Fehlgeschlagen', 'Info, wenn die Zahlung fehlschlägt oder das Abo endet.', 'CUSTOMER', 'Wichtig: Dein Schutz ist inaktiv', '<p>Hallo {firstName},</p>
+<p>Leider konnten wir dein Abo für den ResortPassAlarm nicht verlängern.</p>
+<p><strong>Deine Überwachung ist aktuell pausiert.</strong> Du erhältst keine Alarme mehr, wenn Tickets verfügbar sind.</p>
+<p>Bitte überprüfe deine Zahlungsmethode, um den Schutz zu reaktivieren:</p>
+<p><a href="{dashboardLink}">Zahlungsdaten prüfen</a></p>', ARRAY['{firstName}', '{dashboardLink}'], true),
+
+('cust_alarm_test', 'Test-Alarm', 'Wird versendet, wenn der Nutzer "Test-Alarm senden" klickt.', 'CUSTOMER', '🔔 TEST-ALARM: ResortPass Wächter', '<h1>Funktionstest erfolgreich!</h1>
+<p>Hallo {firstName},</p>
+<p>Dies ist ein <strong>Test-Alarm</strong> von deinem ResortPass Wächter.</p>
+<p>Wenn du diese Mail liest, sind deine Einstellungen korrekt. Wir benachrichtigen dich sofort, wenn Tickets verfügbar sind.</p>', ARRAY['{firstName}'], true),
+
+('cust_alarm_real', 'ECHT ALARM (Verfügbar)', 'Die wichtigste Mail: Wenn Tickets gefunden wurden.', 'CUSTOMER', '🚨 {productName} VERFÜGBAR! SCHNELL SEIN!', '<h1 style="color: #d97706;">ALARM STUFE ROT!</h1>
+<p>Hallo {firstName},</p>
+<p>Unser System hat soeben freie Kontingente für <strong>{productName}</strong> gefunden!</p>
+<p>Die "Wellen" sind oft nur wenige Minuten offen. Handele sofort!</p>
+<a href="{shopLink}" style="background-color: #00305e; color: white; padding: 15px 25px; text-decoration: none; font-weight: bold; font-size: 18px; border-radius: 5px; display: inline-block; margin: 10px 0;">ZUM TICKET SHOP</a>
+<p>Oder kopiere diesen Link: {shopLink}</p>
+<p>Viel Erfolg!<br>Dein Wächter</p>', ARRAY['{firstName}', '{productName}', '{shopLink}'], true),
+
+('part_register', 'Partner Registrierung', 'Willkommensmail für neue Affiliates.', 'PARTNER', 'Willkommen im Partnerprogramm', '<h1>Hallo {firstName},</h1>
+<p>Wir freuen uns sehr, dich als Partner begrüßen zu dürfen.</p>
+<p>Du verdienst ab sofort 50% an jedem vermittelten Nutzer. Deinen persönlichen Empfehlungslink findest du in deinem Dashboard.</p>
+<p><a href="{affiliateLink}">Zum Partner-Dashboard</a></p>
+<p>Auf gute Zusammenarbeit!</p>', ARRAY['{firstName}', '{affiliateLink}'], true),
+
+('part_pw_reset', 'Partner Passwort vergessen', 'Passwort Reset für Partner.', 'PARTNER', 'Partner-Login: Neues Passwort', '<p>Hallo {firstName},</p>
+<p>hier ist der Link, um dein Passwort für den Partner-Bereich zurückzusetzen:</p>
+<p><a href="{resetLink}">Passwort ändern</a></p>', ARRAY['{firstName}', '{resetLink}'], true),
+
+('part_welcome', 'Partner: Tipps zum Start', 'Tipps für neue Partner (Follow-up).', 'PARTNER', 'So verdienst du deine erste Provision 💸', '<p>Hey {firstName},</p>
+<p>schön, dass du dabei bist! Hier sind 3 Tipps, wie du deine Einnahmen maximierst:</p>
+<ol>
+<li>Poste deinen Link in deiner Instagram Bio.</li>
+<li>Erkläre deiner Community, dass sie mit dem Tool Zeit sparen.</li>
+<li>Nutze unsere vorgefertigten Marketing-Texte aus dem Dashboard.</li>
+</ol>
+<p>Viel Erfolg!</p>', ARRAY['{firstName}'], true),
+
+('part_monthly', 'Partner: Monats-Statistik', 'Automatischer Report über Einnahmen.', 'PARTNER', 'Deine Einnahmen im {month}', '<h1>Dein Monats-Update</h1>
+<p>Hallo {firstName},</p>
+<p>Im {month} lief es richtig gut:</p>
+<ul>
+<li>Neue Kunden: {newCustomers}</li>
+<li>Umsatz: {revenue} €</li>
+<li><strong>Deine Provision: {commission} €</strong></li>
+</ul>
+<p>Die Auszahlung erfolgt automatisch zum Monatsanfang.</p>
+<p>Weiter so!</p>', ARRAY['{firstName}', '{month}', '{newCustomers}', '{revenue}', '{commission}'], true),
+
+('sms_gold_alarm', 'SMS Alarm: Gold', 'SMS Text für Gold Verfügbarkeit.', 'SMS', 'SMS Gold', '🚨 Gold ALARM! ResortPass verfügbar! Schnell: {link}', ARRAY['{link}'], true),
+('sms_silver_alarm', 'SMS Alarm: Silver', 'SMS Text für Silver Verfügbarkeit.', 'SMS', 'SMS Silver', '🚨 Silver ALARM! ResortPass verfügbar! Schnell: {link}', ARRAY['{link}'], true);

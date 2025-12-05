@@ -49,29 +49,11 @@ export default async function handler(req, res) {
        return res.status(200).json({ message: 'Status updated. No new availability.' });
     }
 
-    let productName = "";
     const { data: goldUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_gold').single();
     const { data: silverUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_silver').single();
     
-    let link = "";
     const goldLink = goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
     const silverLink = silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver";
-
-    // Determine Logic: Which Product?
-    let smsTemplateId = 'sms_gold_alarm'; // Default
-    if (triggerGold && triggerSilver) {
-        productName = "Gold & Silver";
-        link = goldLink; // Prioritize Gold Link
-        smsTemplateId = 'sms_gold_alarm'; // Prioritize Gold Msg
-    } else if (triggerGold) {
-        productName = "Gold";
-        link = goldLink;
-        smsTemplateId = 'sms_gold_alarm';
-    } else if (triggerSilver) {
-        productName = "Silver";
-        link = silverLink;
-        smsTemplateId = 'sms_silver_alarm';
-    }
 
     const { data: subscriptions } = await supabase
         .from('subscriptions')
@@ -85,7 +67,7 @@ export default async function handler(req, res) {
     const userIds = [...new Set(subscriptions.map(s => s.user_id))];
     const { data: profiles } = await supabase
         .from('profiles')
-        .select('id, email, first_name, email_enabled, sms_enabled, phone, notification_email')
+        .select('id, email, first_name, email_enabled, sms_enabled, phone, notification_email, notify_gold, notify_silver')
         .in('id', userIds);
 
     if (!profiles) return res.status(200).json({ message: 'No profiles found.' });
@@ -102,19 +84,41 @@ export default async function handler(req, res) {
     const logs = [];
     const stats = { sent: 0, failed: 0, skipped: 0 };
 
-    // --- EMAIL BATCHING (Resend) ---
+    // --- PREPARE EMAILS ---
     if (resend) {
         const validProfiles = profiles.filter(user => {
             const hasEmail = !!(user.notification_email || user.email);
             const enabled = user.email_enabled !== false;
-            return hasEmail && enabled;
+            
+            // Should user receive ANY alert?
+            // If Gold triggers AND user wants Gold -> YES
+            // If Silver triggers AND user wants Silver -> YES
+            const matchGold = triggerGold && (user.notify_gold !== false);
+            const matchSilver = triggerSilver && (user.notify_silver !== false);
+            
+            return hasEmail && enabled && (matchGold || matchSilver);
         });
 
-        const BATCH_SIZE = 100;
-        
-        for (let i = 0; i < validProfiles.length; i += BATCH_SIZE) {
-            const batch = validProfiles.slice(i, i + BATCH_SIZE);
-            const payloads = batch.map(user => ({
+        const payloads = validProfiles.map(user => {
+            // Customize content based on match
+            const matchGold = triggerGold && (user.notify_gold !== false);
+            const matchSilver = triggerSilver && (user.notify_silver !== false);
+            
+            let productName = "";
+            let link = "";
+            
+            if (matchGold && matchSilver) {
+                productName = "Gold & Silver";
+                link = goldLink; // Prioritize Gold link
+            } else if (matchGold) {
+                productName = "Gold";
+                link = goldLink;
+            } else {
+                productName = "Silver";
+                link = silverLink;
+            }
+
+            return {
                 from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
                 to: user.notification_email || user.email,
                 subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
@@ -127,10 +131,15 @@ export default async function handler(req, res) {
                   <p>Oder kopiere diesen Link: ${link}</p>
                   <p>Viel Erfolg!<br>Dein Wächter</p>
                 `
-            }));
+            };
+        });
 
+        const BATCH_SIZE = 100;
+        
+        for (let i = 0; i < payloads.length; i += BATCH_SIZE) {
+            const batch = payloads.slice(i, i + BATCH_SIZE);
             try {
-                const { error } = await resend.batch.send(payloads);
+                const { error } = await resend.batch.send(batch);
                 if (error) throw error;
                 stats.sent += batch.length;
             } catch (e) {
@@ -141,27 +150,44 @@ export default async function handler(req, res) {
         }
     }
 
-    // --- SMS SENDING ---
+    // --- PREPARE SMS ---
     if (twilioClient) {
-        const smsUsers = profiles.filter(u => u.sms_enabled && u.phone);
+        const smsUsers = profiles.filter(user => {
+            const enabled = user.sms_enabled && user.phone;
+            const matchGold = triggerGold && (user.notify_gold !== false);
+            const matchSilver = triggerSilver && (user.notify_silver !== false);
+            return enabled && (matchGold || matchSilver);
+        });
+
+        // Pre-fetch templates
+        const { data: tGold } = await supabase.from('email_templates').select('body').eq('id', 'sms_gold_alarm').single();
+        const { data: tSilver } = await supabase.from('email_templates').select('body').eq('id', 'sms_silver_alarm').single();
+        
         const SMS_BATCH_SIZE = 50;
-        
-        // Fetch specific SMS template from DB
-        const { data: smsTemplate } = await supabase
-            .from('email_templates')
-            .select('body')
-            .eq('id', smsTemplateId)
-            .single();
-        
-        let smsBody = smsTemplate?.body || `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: {link}`;
-        smsBody = smsBody.replace('{link}', link);
         
         for (let i = 0; i < smsUsers.length; i += SMS_BATCH_SIZE) {
             const batch = smsUsers.slice(i, i + SMS_BATCH_SIZE);
             await Promise.all(batch.map(async (user) => {
                 try {
+                    const matchGold = triggerGold && (user.notify_gold !== false);
+                    const matchSilver = triggerSilver && (user.notify_silver !== false);
+                    
+                    let body = "";
+                    let link = "";
+                    
+                    if (matchGold) {
+                        body = tGold?.body || "🚨 Gold ALARM! ResortPass verfügbar! Schnell: {link}";
+                        link = goldLink;
+                    } else {
+                        // Only Silver matched
+                        body = tSilver?.body || "🚨 Silver ALARM! ResortPass verfügbar! Schnell: {link}";
+                        link = silverLink;
+                    }
+                    
+                    body = body.replace('{link}', link);
+
                     const msgConfig: any = {
-                        body: smsBody,
+                        body: body,
                         to: user.phone
                     };
                     if (messagingServiceSid) {
@@ -178,7 +204,7 @@ export default async function handler(req, res) {
         }
     }
 
-    res.status(200).json({ success: true, message: `Alarms sent for ${productName}`, stats, logs });
+    res.status(200).json({ success: true, message: `Alarms processed. Emails: ${stats.sent}`, stats, logs });
 
   } catch (error) {
     console.error("Webhook Error:", error);
