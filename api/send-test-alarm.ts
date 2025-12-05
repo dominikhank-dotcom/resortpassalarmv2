@@ -39,16 +39,32 @@ export default async function handler(req: any, res: any) {
 
   // --- SEND SMS ---
   if (sendSms && phone) {
-      if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
-          results.errors.push("SMS aktiviert, aber Twilio Keys fehlen.");
+      const accountSid = process.env.TWILIO_ACCOUNT_SID;
+      const authToken = process.env.TWILIO_AUTH_TOKEN;
+      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+      if (!accountSid || !authToken) {
+          results.errors.push("SMS aktiviert, aber TWILIO_ACCOUNT_SID oder TWILIO_AUTH_TOKEN fehlen in Vercel.");
+      } else if (!messagingServiceSid && !phoneNumber) {
+          results.errors.push("SMS aktiviert, aber weder TWILIO_MESSAGING_SERVICE_SID noch TWILIO_PHONE_NUMBER sind definiert.");
       } else {
           try {
-              const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-              await twilioClient.messages.create({
+              const twilioClient = twilio(accountSid, authToken);
+              
+              const msgConfig: any = {
                   body: '🔔 ResortPass Alarm Test: Dein SMS-Alarm ist aktiv und bereit!',
-                  from: process.env.TWILIO_PHONE_NUMBER,
                   to: phone,
-              });
+              };
+
+              // Use Messaging Service if available (Preferred for high volume)
+              if (messagingServiceSid) {
+                  msgConfig.messagingServiceSid = messagingServiceSid;
+              } else {
+                  msgConfig.from = phoneNumber;
+              }
+
+              await twilioClient.messages.create(msgConfig);
               results.sms = 'sent';
           } catch (error: any) {
               console.error("SMS Error:", error);
