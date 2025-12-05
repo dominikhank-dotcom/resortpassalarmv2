@@ -30,7 +30,7 @@ export interface EmailTemplate {
   id: string;
   name: string;
   description: string;
-  category: 'CUSTOMER' | 'PARTNER';
+  category: 'CUSTOMER' | 'PARTNER' | 'SMS';
   subject: string;
   body: string; 
   variables: string[];

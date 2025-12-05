@@ -1,8 +1,12 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import twilio from 'twilio';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL || '', process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+
+// Helper for delay
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -48,6 +52,7 @@ export default async function handler(req: any, res: any) {
               if (process.env.RESEND_API_KEY) resend = new Resend(process.env.RESEND_API_KEY);
               
               let twilioClient; 
+              let messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
               if (process.env.TWILIO_ACCOUNT_SID) twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
               
               const productName = type === 'gold' ? 'ResortPass Gold' : 'ResortPass Silver';
@@ -59,9 +64,11 @@ export default async function handler(req: any, res: any) {
                 ? (goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold")
                 : (silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver");
 
-              // --- EMAIL BATCH SENDING ---
+              // --- EMAIL BATCH SENDING (Resend Batch API) ---
               const validProfilesForEmail = (profiles || []).filter(p => {
-                  const hasEmail = !!(p.notification_email || p.email);
+                  // Fallback: If profile email is missing, try using notification_email or skip
+                  const targetEmail = p.notification_email || p.email;
+                  const hasEmail = !!targetEmail;
                   const enabled = p.email_enabled !== false;
                   
                   if (!hasEmail) {
@@ -69,17 +76,16 @@ export default async function handler(req: any, res: any) {
                       logs.push({ email: 'unknown', id: p.id, status: 'SKIPPED', reason: 'No Email' });
                   } else if (!enabled) {
                       stats.skipped_disabled++;
-                      logs.push({ email: p.notification_email || p.email, id: p.id, status: 'SKIPPED', reason: 'Disabled' });
+                      logs.push({ email: targetEmail, id: p.id, status: 'SKIPPED', reason: 'Disabled' });
                   }
                   return hasEmail && enabled;
               });
 
               if (resend && validProfilesForEmail.length > 0) {
-                  // Resend Batch Limit is 100
-                  const EMAIL_BATCH_SIZE = 100;
+                  const BATCH_SIZE = 100; // Resend Batch Limit
                   
-                  for (let i = 0; i < validProfilesForEmail.length; i += EMAIL_BATCH_SIZE) {
-                      const chunk = validProfilesForEmail.slice(i, i + EMAIL_BATCH_SIZE);
+                  for (let i = 0; i < validProfilesForEmail.length; i += BATCH_SIZE) {
+                      const chunk = validProfilesForEmail.slice(i, i + BATCH_SIZE);
                       
                       const emailPayloads = chunk.map(p => ({
                           from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
@@ -114,20 +120,38 @@ export default async function handler(req: any, res: any) {
                   }
               }
 
-              // --- SMS BATCH SENDING (Manual Loop) ---
+              // --- SMS BATCH SENDING (High Concurrency for Twilio) ---
               if (twilioClient) {
                   const smsProfiles = (profiles || []).filter(p => p.sms_enabled && p.phone);
-                  const SMS_BATCH_SIZE = 20; 
+                  const SMS_BATCH_SIZE = 50; // Higher concurrency for Twilio
                   
+                  // Load SMS Template from DB
+                  const templateId = type === 'gold' ? 'sms_gold_alarm' : 'sms_silver_alarm';
+                  const { data: smsTemplate } = await supabase
+                      .from('email_templates')
+                      .select('body')
+                      .eq('id', templateId)
+                      .single();
+                  
+                  let smsBody = smsTemplate?.body || `🚨 ALARM: ${productName} ist VERFÜGBAR! Schnell: {link}`;
+                  smsBody = smsBody.replace('{link}', link);
+
                   for (let i = 0; i < smsProfiles.length; i += SMS_BATCH_SIZE) {
                       const chunk = smsProfiles.slice(i, i + SMS_BATCH_SIZE);
                       await Promise.all(chunk.map(async (p) => {
                           try {
-                              await twilioClient.messages.create({ 
-                                  body: `🚨 ALARM: ${productName} ist VERFÜGBAR! Schnell: ${link}`, 
-                                  from: process.env.TWILIO_PHONE_NUMBER, 
+                              const msgConfig: any = { 
+                                  body: smsBody, 
                                   to: p.phone 
-                              });
+                              };
+                              // Use Messaging Service if available, else fallback to single number
+                              if (messagingServiceSid) {
+                                  msgConfig.messagingServiceSid = messagingServiceSid;
+                              } else {
+                                  msgConfig.from = process.env.TWILIO_PHONE_NUMBER;
+                              }
+
+                              await twilioClient.messages.create(msgConfig);
                           } catch (e: any) {
                               console.error(`SMS failed for ${p.id}`, e);
                           }

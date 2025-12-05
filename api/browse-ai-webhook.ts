@@ -1,3 +1,4 @@
+
 import { Resend } from 'resend';
 import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
@@ -56,15 +57,20 @@ export default async function handler(req, res) {
     const goldLink = goldUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-gold";
     const silverLink = silverUrlSetting?.value || "https://tickets.mackinternational.de/de/ticket/resortpass-silver";
 
+    // Determine Logic: Which Product?
+    let smsTemplateId = 'sms_gold_alarm'; // Default
     if (triggerGold && triggerSilver) {
         productName = "Gold & Silver";
-        link = goldLink; 
+        link = goldLink; // Prioritize Gold Link
+        smsTemplateId = 'sms_gold_alarm'; // Prioritize Gold Msg
     } else if (triggerGold) {
         productName = "Gold";
         link = goldLink;
+        smsTemplateId = 'sms_gold_alarm';
     } else if (triggerSilver) {
         productName = "Silver";
         link = silverLink;
+        smsTemplateId = 'sms_silver_alarm';
     }
 
     const { data: subscriptions } = await supabase
@@ -88,6 +94,7 @@ export default async function handler(req, res) {
     if (process.env.RESEND_API_KEY) resend = new Resend(process.env.RESEND_API_KEY);
 
     let twilioClient;
+    let messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
     if (process.env.TWILIO_ACCOUNT_SID) {
         twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
     }
@@ -137,17 +144,33 @@ export default async function handler(req, res) {
     // --- SMS SENDING ---
     if (twilioClient) {
         const smsUsers = profiles.filter(u => u.sms_enabled && u.phone);
-        const SMS_BATCH_SIZE = 20;
+        const SMS_BATCH_SIZE = 50;
+        
+        // Fetch specific SMS template from DB
+        const { data: smsTemplate } = await supabase
+            .from('email_templates')
+            .select('body')
+            .eq('id', smsTemplateId)
+            .single();
+        
+        let smsBody = smsTemplate?.body || `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: {link}`;
+        smsBody = smsBody.replace('{link}', link);
         
         for (let i = 0; i < smsUsers.length; i += SMS_BATCH_SIZE) {
             const batch = smsUsers.slice(i, i + SMS_BATCH_SIZE);
             await Promise.all(batch.map(async (user) => {
                 try {
-                    await twilioClient.messages.create({
-                        body: `🚨 ALARM: ResortPass ${productName} ist VERFÜGBAR! Schnell: ${link}`,
-                        from: process.env.TWILIO_PHONE_NUMBER,
-                        to: user.phone,
-                    });
+                    const msgConfig: any = {
+                        body: smsBody,
+                        to: user.phone
+                    };
+                    if (messagingServiceSid) {
+                        msgConfig.messagingServiceSid = messagingServiceSid;
+                    } else {
+                        msgConfig.from = process.env.TWILIO_PHONE_NUMBER;
+                    }
+
+                    await twilioClient.messages.create(msgConfig);
                 } catch (e) {
                     console.error(`Failed to sms user ${user.id}:`, e);
                 }
