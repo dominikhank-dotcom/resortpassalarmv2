@@ -218,19 +218,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       if (notifications.emailEnabled) activeMethods.push("E-Mail"); 
       if (notifications.smsEnabled) activeMethods.push("SMS"); 
       if (activeMethods.length === 0) { alert("Bitte Benachrichtigungsmethode aktivieren."); return; } 
+      
       setIsSendingAlarm(true); 
       try { 
-          await sendTestAlarm(notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled); 
+          // Result contains detailed status, e.g. { email: 'sent', sms: null, errors: ['SMS Failure'] }
+          const result = await sendTestAlarm(notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled); 
+          
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
-              const msg = 'Test-Alarm erfolgreich gesendet';
-              await supabase.from('notification_logs').insert({ user_id: user.id, type: notifications.emailEnabled ? 'EMAIL' : 'SMS', message: msg });
+              const msg = `Test: ${activeMethods.join(', ')}`;
+              await supabase.from('notification_logs').insert({ user_id: user.id, type: 'EMAIL', message: msg });
+              
               // Refresh logs
               const { data: logs } = await supabase.from('notification_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
               if (logs) setAlarmHistory(logs.map(log => ({ id: log.id, date: new Date(log.created_at).toLocaleString(), type: log.type, message: log.message })));
           }
-          alert("Test verschickt!"); 
-      } catch (error) { alert("Fehler: " + error); } finally { setIsSendingAlarm(false); } 
+
+          if (result.errors && result.errors.length > 0) {
+              alert(`Test teilweise gesendet.\n\nProbleme:\n${result.errors.join('\n')}`);
+          } else {
+              alert("Test erfolgreich verschickt!"); 
+          }
+      } catch (error) { 
+          alert("Fehler: " + error); 
+      } finally { 
+          setIsSendingAlarm(false); 
+      } 
   };
 
   const handleSubscribe = async () => { 
@@ -254,11 +267,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     <h2 className="font-bold text-slate-900">{title}</h2>
                 </div>
                 
-                {/* Toggle Switch */}
-                <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
-                </label>
+                {/* Toggle Switch with Label */}
+                <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Alarm an/aus:</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" className="sr-only peer" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
+                        <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                    </label>
+                </div>
             </div>
             <div className={`flex-1 p-6 flex flex-col items-center justify-center text-center transition-all duration-500 ${!enabled ? 'bg-slate-50' : monitor.isAvailable ? 'bg-green-50/50' : 'bg-white'}`}>
                 {!enabled ? (

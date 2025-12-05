@@ -212,19 +212,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
                 Welchen Pass suchst du? <span className="text-red-500">*</span>
               </label>
               <div className="grid grid-cols-2 gap-4">
-                <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.gold ? 'border-yellow-500 bg-yellow-50 ring-1 ring-yellow-500' : 'border-slate-200 hover:border-yellow-200'}`}>
-                  <input 
-                    type="checkbox" 
-                    className="sr-only" 
-                    checked={preferences.gold} 
-                    onChange={(e) => setPreferences({...preferences, gold: e.target.checked})} 
-                  />
-                  <div className={`p-2 rounded-full mb-2 ${preferences.gold ? 'bg-yellow-100 text-yellow-600' : 'bg-slate-100 text-slate-400'}`}>
-                    <Ticket size={24} />
-                  </div>
-                  <span className={`font-bold ${preferences.gold ? 'text-slate-900' : 'text-slate-500'}`}>ResortPass Gold</span>
-                </label>
-
+                {/* Silver - NOW LEFT */}
                 <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.silver ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-blue-200'}`}>
                   <input 
                     type="checkbox" 
@@ -236,6 +224,20 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
                     <Ticket size={24} />
                   </div>
                   <span className={`font-bold ${preferences.silver ? 'text-slate-900' : 'text-slate-500'}`}>ResortPass Silver</span>
+                </label>
+
+                {/* Gold - NOW RIGHT */}
+                <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.gold ? 'border-yellow-500 bg-yellow-50 ring-1 ring-yellow-500' : 'border-slate-200 hover:border-yellow-200'}`}>
+                  <input 
+                    type="checkbox" 
+                    className="sr-only" 
+                    checked={preferences.gold} 
+                    onChange={(e) => setPreferences({...preferences, gold: e.target.checked})} 
+                  />
+                  <div className={`p-2 rounded-full mb-2 ${preferences.gold ? 'bg-yellow-100 text-yellow-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <Ticket size={24} />
+                  </div>
+                  <span className={`font-bold ${preferences.gold ? 'text-slate-900' : 'text-slate-500'}`}>ResortPass Gold</span>
                 </label>
               </div>
             </div>

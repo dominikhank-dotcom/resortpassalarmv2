@@ -45,9 +45,9 @@ export default async function handler(req: any, res: any) {
       const phoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
       if (!accountSid || !authToken) {
-          results.errors.push("SMS aktiviert, aber TWILIO_ACCOUNT_SID oder TWILIO_AUTH_TOKEN fehlen in Vercel.");
+          results.errors.push("SMS Fehler: TWILIO_ACCOUNT_SID oder TWILIO_AUTH_TOKEN fehlen in Vercel.");
       } else if (!messagingServiceSid && !phoneNumber) {
-          results.errors.push("SMS aktiviert, aber weder TWILIO_MESSAGING_SERVICE_SID noch TWILIO_PHONE_NUMBER sind definiert.");
+          results.errors.push("SMS Fehler: Weder Messaging Service SID noch Phone Number konfiguriert.");
       } else {
           try {
               const twilioClient = twilio(accountSid, authToken);
@@ -68,11 +68,23 @@ export default async function handler(req: any, res: any) {
               results.sms = 'sent';
           } catch (error: any) {
               console.error("SMS Error:", error);
-              results.errors.push(`SMS Fehler: ${error.message}`);
+              // Extract Twilio specific info if available
+              const code = error.code ? ` (Code: ${error.code})` : "";
+              const msg = error.message || "Unknown error";
+              
+              // Helper message for common trial error
+              let hint = "";
+              if (error.code === 21608) {
+                  hint = " [HINWEIS: Im Twilio Trial Mode musst du deine Nummer erst verifizieren!]";
+              }
+
+              results.errors.push(`SMS Fehler: ${msg}${code}${hint}`);
           }
       }
   }
 
+  // Partial success (e.g. Email sent, SMS failed) is still a 200 for the client to process
+  // Only return 500 if EVERYTHING failed
   if (results.errors.length > 0 && !results.email && !results.sms) {
       return res.status(500).json(results);
   }
