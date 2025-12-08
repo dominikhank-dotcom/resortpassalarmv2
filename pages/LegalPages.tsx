@@ -131,6 +131,22 @@ export const TermsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <p>
       Das Abonnement wird auf unbestimmte Zeit geschlossen. Es kann jederzeit zum Ende des aktuellen Abrechnungsmonats über das Dashboard gekündigt werden.
     </p>
+
+    <h2>6. Partnerprogramm</h2>
+    <p>
+      Im Rahmen des Partnerprogramms ("Affiliate") erhalten registrierte Partner eine Provision für die Vermittlung neuer, zahlender Kunden.
+    </p>
+    <p>
+      <strong>Ausschluss von Eigenprovisionen:</strong> Provisionen werden nur für die Vermittlung echter Dritter gewährt. Eigenwerbung (Self-Referrals) ist strikt untersagt. Dies schließt insbesondere ein:
+    </p>
+    <ul className="list-disc pl-5">
+      <li>Anmeldung über den eigenen Partnerlink für den eigenen Bedarf.</li>
+      <li>Verwendung identischer E-Mail-Adressen oder Zahlungskonten (PayPal) für Partner- und Kundenkonto.</li>
+      <li>Anmeldung von Personen, die im selben Haushalt wie der Partner leben (gleiche Anschrift).</li>
+    </ul>
+    <p>
+      Der Anbieter behält sich das Recht vor, bei Verdacht auf Missbrauch Provisionen zu stornieren und Partnerkonten zu sperren.
+    </p>
   </LegalLayout>
 );
 

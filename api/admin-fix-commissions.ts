@@ -35,7 +35,7 @@ export default async function handler(req: any, res: any) {
             // 3. Get User Profile
             const { data: user } = await supabase
                 .from('profiles')
-                .select('id, referred_by, email')
+                .select('*')
                 .eq('id', sub.user_id)
                 .single();
             
@@ -77,20 +77,48 @@ export default async function handler(req: any, res: any) {
                 // 4. Resolve Partner
                 let { data: partner } = await supabase
                     .from('profiles')
-                    .select('id, email')
+                    .select('*')
                     .ilike('referral_code', refCode.trim())
                     .maybeSingle();
                 
                 // Fallback ID check
                 if (!partner && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(refCode)) {
-                     const { data: p } = await supabase.from('profiles').select('id, email').eq('id', refCode).maybeSingle();
+                     const { data: p } = await supabase.from('profiles').select('*').eq('id', refCode).maybeSingle();
                      partner = p;
                 }
 
                 if (partner) {
-                    // Prevent self-referral
+                    // --- SELF-REFERRAL BLOCKER ---
+                    let isBlocked = false;
+                    let blockReason = "";
+
+                    // 1. Same ID
                     if (partner.id === user.id) {
-                        logs.push(`Skipped: Self-referral detected for ${user.email}`);
+                        isBlocked = true;
+                        blockReason = "Same ID";
+                    }
+                    // 2. Same Email / PayPal
+                    else if (
+                        (partner.email && user.email && partner.email.toLowerCase() === user.email.toLowerCase()) ||
+                        (partner.paypal_email && user.paypal_email && partner.paypal_email.toLowerCase() === user.paypal_email.toLowerCase()) ||
+                        (partner.email && user.paypal_email && partner.email.toLowerCase() === user.paypal_email.toLowerCase())
+                    ) {
+                        isBlocked = true;
+                        blockReason = "Same Email/PayPal";
+                    }
+                    // 3. Household (Last Name + Zip match)
+                    else if (
+                        partner.last_name && user.last_name && 
+                        partner.zip && user.zip &&
+                        partner.last_name.trim().toLowerCase() === user.last_name.trim().toLowerCase() &&
+                        partner.zip.trim() === user.zip.trim()
+                    ) {
+                        isBlocked = true;
+                        blockReason = "Household Match (Name+Zip)";
+                    }
+
+                    if (isBlocked) {
+                        logs.push(`Skipped: Self/Household referral blocked for ${user.email} -> Partner ${partner.email}. Reason: ${blockReason}`);
                         continue;
                     }
 

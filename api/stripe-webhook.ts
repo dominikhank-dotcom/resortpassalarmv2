@@ -129,18 +129,59 @@ export default async function handler(req: any, res: any) {
 
           if (userId && amountPaid > 0) {
               try {
-                  const { data: userProfile } = await supabase.from('profiles').select('referred_by').eq('id', userId).single();
+                  const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+                  
                   if (userProfile && userProfile.referred_by) {
                       const refCode = userProfile.referred_by;
-                      let { data: partner } = await supabase.from('profiles').select('id').ilike('referral_code', refCode.trim()).maybeSingle();
+                      let { data: partner } = await supabase.from('profiles').select('*').ilike('referral_code', refCode.trim()).maybeSingle();
+                      
+                      // Fallback ID check
                       if (!partner && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(refCode)) {
-                           const { data: p } = await supabase.from('profiles').select('id').eq('id', refCode).maybeSingle();
+                           const { data: p } = await supabase.from('profiles').select('*').eq('id', refCode).maybeSingle();
                            partner = p;
                       }
 
                       if (partner) {
-                          const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
-                          await supabase.from('commissions').insert({ partner_id: partner.id, source_user_id: userId, amount: commissionAmount, status: 'pending' });
+                          // --- SELF-REFERRAL BLOCKER ---
+                          let isBlocked = false;
+                          let blockReason = "";
+
+                          // 1. Same ID
+                          if (partner.id === userProfile.id) {
+                              isBlocked = true;
+                              blockReason = "Same ID";
+                          }
+                          // 2. Same Email / PayPal
+                          else if (
+                              (partner.email && userProfile.email && partner.email.toLowerCase() === userProfile.email.toLowerCase()) ||
+                              (partner.paypal_email && userProfile.paypal_email && partner.paypal_email.toLowerCase() === userProfile.paypal_email.toLowerCase()) ||
+                              (partner.email && userProfile.paypal_email && partner.email.toLowerCase() === userProfile.paypal_email.toLowerCase())
+                          ) {
+                              isBlocked = true;
+                              blockReason = "Same Email/PayPal";
+                          }
+                          // 3. Household (Last Name + Zip match)
+                          else if (
+                              partner.last_name && userProfile.last_name && 
+                              partner.zip && userProfile.zip &&
+                              partner.last_name.trim().toLowerCase() === userProfile.last_name.trim().toLowerCase() &&
+                              partner.zip.trim() === userProfile.zip.trim()
+                          ) {
+                              isBlocked = true;
+                              blockReason = "Household Match (Name+Zip)";
+                          }
+
+                          if (isBlocked) {
+                              console.warn(`Commission BLOCKED for User ${userId} -> Partner ${partner.id}. Reason: ${blockReason}`);
+                          } else {
+                              const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
+                              await supabase.from('commissions').insert({ 
+                                  partner_id: partner.id, 
+                                  source_user_id: userId, 
+                                  amount: commissionAmount, 
+                                  status: 'pending' 
+                              });
+                          }
                       }
                   }
               } catch (commErr) { console.error("Commission Error:", commErr); }
