@@ -28,6 +28,15 @@ async function getRawBody(readable: any): Promise<Buffer> {
   return Buffer.concat(chunks);
 }
 
+// Helper to parse address line 1 into street and house number
+function parseAddressLine(line1: string) {
+    if (!line1) return { street: '', houseNumber: '' };
+    // Try to match standard format: "Main Street 123" or "Main Street 123a"
+    const match = line1.match(/^(.*?)\s+(\d+[a-zA-Z]?(-\d+)?)$/);
+    if (match) return { street: match[1], houseNumber: match[2] };
+    return { street: line1, houseNumber: '' };
+}
+
 export default async function handler(req: any, res: any) {
   if (req.method !== 'POST') {
     return res.status(405).send('Method not allowed');
@@ -129,8 +138,33 @@ export default async function handler(req: any, res: any) {
 
           if (userId && amountPaid > 0) {
               try {
-                  const { data: userProfile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-                  
+                  // --- SYNC STRIPE ADDRESS TO PROFILE (Auto-Fill) ---
+                  // This ensures fraud checks work even if user didn't enter address in app
+                  let userProfile = null;
+                  const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
+                  userProfile = profile;
+
+                  if (userProfile && (!userProfile.street || !userProfile.zip) && invoice.customer_address) {
+                      const addr = invoice.customer_address;
+                      if (addr.line1 && addr.postal_code && addr.city) {
+                          const { street, houseNumber } = parseAddressLine(addr.line1);
+                          const updateData = {
+                              street: street,
+                              house_number: houseNumber,
+                              zip: addr.postal_code,
+                              city: addr.city,
+                              country: addr.country || 'Deutschland'
+                          };
+                          
+                          // Update DB
+                          await supabase.from('profiles').update(updateData).eq('id', userId);
+                          
+                          // Update local object for the check below
+                          userProfile = { ...userProfile, ...updateData };
+                          console.log(`Synced Stripe Address to Profile for ${userId}`);
+                      }
+                  }
+
                   if (userProfile && userProfile.referred_by) {
                       const refCode = userProfile.referred_by;
                       let { data: partner } = await supabase.from('profiles').select('*').ilike('referral_code', refCode.trim()).maybeSingle();
@@ -174,10 +208,18 @@ export default async function handler(req: any, res: any) {
                               blockReason = "Household Match (Name+Zip+Street)";
                           }
 
+                          const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
+                          
                           if (isBlocked) {
-                              console.warn(`Commission BLOCKED for User ${userId} -> Partner ${partner.id}. Reason: ${blockReason}`);
+                              console.warn(`Commission DECLINED for User ${userId} -> Partner ${partner.id}. Reason: ${blockReason}`);
+                              // Record the declined commission so it's visible in DB/Admin
+                              await supabase.from('commissions').insert({ 
+                                  partner_id: partner.id, 
+                                  source_user_id: userId, 
+                                  amount: commissionAmount, 
+                                  status: 'declined' // New status for blocked items
+                              });
                           } else {
-                              const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
                               await supabase.from('commissions').insert({ 
                                   partner_id: partner.id, 
                                   source_user_id: userId, 
@@ -231,16 +273,12 @@ export default async function handler(req: any, res: any) {
   };
 
   // 3. EXECUTE WITH TIMEOUT PROTECTION (FAIL-SAFE)
-  // We give the logic 15 seconds. If it takes longer, we stop waiting and return 200 OK to Stripe.
-  // This prevents "Timeout" errors from reaching Stripe.
   try {
       await Promise.race([
           processEvent(),
           new Promise((_, reject) => setTimeout(() => reject(new Error("Webhook Logic Timeout")), 15000))
       ]);
   } catch (error: any) {
-      // We swallow the error deliberately so Stripe gets a 200.
-      // We log it so you can see it in Vercel logs.
       console.error("WEBHOOK WARNING (Timeout or Error):", error.message);
   }
 

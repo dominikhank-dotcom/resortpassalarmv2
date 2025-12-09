@@ -44,27 +44,17 @@ export default async function handler(req: any, res: any) {
             let refCode = user.referred_by;
 
             // --- RECOVERY LOGIC START ---
-            // If DB doesn't have the code, ask Stripe if it was in the Checkout Session Metadata
             if (!refCode && sub.stripe_customer_id) {
                 try {
-                    // Search Stripe Checkout Sessions for this customer to find lost metadata
                     const sessions = await stripe.checkout.sessions.list({
                         customer: sub.stripe_customer_id,
                         limit: 5
                     });
-
-                    // Look for ANY session with referralCode in metadata
                     const validSession = sessions.data.find(s => s.metadata && s.metadata.referralCode);
                     
                     if (validSession && validSession.metadata?.referralCode) {
                         refCode = validSession.metadata.referralCode.trim();
-                        
-                        // Self-Healing: Update DB
-                        await supabase
-                            .from('profiles')
-                            .update({ referred_by: refCode })
-                            .eq('id', user.id);
-                        
+                        await supabase.from('profiles').update({ referred_by: refCode }).eq('id', user.id);
                         logs.push(`RECOVERY: Found code "${refCode}" in Stripe for ${user.email}. Profile updated.`);
                     }
                 } catch (stripeErr: any) {
@@ -81,50 +71,13 @@ export default async function handler(req: any, res: any) {
                     .ilike('referral_code', refCode.trim())
                     .maybeSingle();
                 
-                // Fallback ID check
                 if (!partner && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(refCode)) {
                      const { data: p } = await supabase.from('profiles').select('*').eq('id', refCode).maybeSingle();
                      partner = p;
                 }
 
                 if (partner) {
-                    // --- SELF-REFERRAL BLOCKER ---
-                    let isBlocked = false;
-                    let blockReason = "";
-
-                    // 1. Same ID
-                    if (partner.id === user.id) {
-                        isBlocked = true;
-                        blockReason = "Same ID";
-                    }
-                    // 2. Same Email / PayPal
-                    else if (
-                        (partner.email && user.email && partner.email.toLowerCase() === user.email.toLowerCase()) ||
-                        (partner.paypal_email && user.paypal_email && partner.paypal_email.toLowerCase() === user.paypal_email.toLowerCase()) ||
-                        (partner.email && user.paypal_email && partner.email.toLowerCase() === user.paypal_email.toLowerCase())
-                    ) {
-                        isBlocked = true;
-                        blockReason = "Same Email/PayPal";
-                    }
-                    // 3. Household (Last Name + Zip + Street match)
-                    else if (
-                        partner.last_name && user.last_name && 
-                        partner.zip && user.zip &&
-                        partner.street && user.street &&
-                        partner.last_name.trim().toLowerCase() === user.last_name.trim().toLowerCase() &&
-                        partner.zip.trim() === user.zip.trim() &&
-                        partner.street.trim().toLowerCase() === user.street.trim().toLowerCase()
-                    ) {
-                        isBlocked = true;
-                        blockReason = "Household Match (Name+Zip+Street)";
-                    }
-
-                    if (isBlocked) {
-                        logs.push(`Skipped: Self/Household referral blocked for ${user.email} -> Partner ${partner.email}. Reason: ${blockReason}`);
-                        continue;
-                    }
-
-                    // 5. Check if ANY commission exists for this pair
+                    // Check if ANY commission exists (including declined)
                     const { data: existing } = await supabase.from('commissions')
                         .select('id')
                         .eq('source_user_id', user.id)
@@ -132,18 +85,60 @@ export default async function handler(req: any, res: any) {
                         .limit(1);
                     
                     if (!existing || existing.length === 0) {
-                        // Create Commission
+                        // --- SELF-REFERRAL BLOCKER ---
+                        let isBlocked = false;
+                        let blockReason = "";
+
+                        // 1. Same ID
+                        if (partner.id === user.id) {
+                            isBlocked = true;
+                            blockReason = "Same ID";
+                        }
+                        // 2. Same Email / PayPal
+                        else if (
+                            (partner.email && user.email && partner.email.toLowerCase() === user.email.toLowerCase()) ||
+                            (partner.paypal_email && user.paypal_email && partner.paypal_email.toLowerCase() === user.paypal_email.toLowerCase()) ||
+                            (partner.email && user.paypal_email && partner.email.toLowerCase() === user.paypal_email.toLowerCase())
+                        ) {
+                            isBlocked = true;
+                            blockReason = "Same Email/PayPal";
+                        }
+                        // 3. Household (Last Name + Zip + Street match)
+                        else if (
+                            partner.last_name && user.last_name && 
+                            partner.zip && user.zip &&
+                            partner.street && user.street &&
+                            partner.last_name.trim().toLowerCase() === user.last_name.trim().toLowerCase() &&
+                            partner.zip.trim() === user.zip.trim() &&
+                            partner.street.trim().toLowerCase() === user.street.trim().toLowerCase()
+                        ) {
+                            isBlocked = true;
+                            blockReason = "Household Match (Name+Zip+Street)";
+                        }
+
                         const price = sub.subscription_price ? Number(sub.subscription_price) : 1.99;
                         const amount = Number((price * 0.5).toFixed(2));
-                        
-                        await supabase.from('commissions').insert({
-                            partner_id: partner.id,
-                            source_user_id: user.id,
-                            amount: amount,
-                            status: 'pending'
-                        });
-                        fixedCount++;
-                        logs.push(`FIXED: Commission created for ${user.email} -> Partner ${partner.email} (${amount}€)`);
+
+                        if (isBlocked) {
+                            // INSERT AS DECLINED to track it
+                            await supabase.from('commissions').insert({
+                                partner_id: partner.id,
+                                source_user_id: user.id,
+                                amount: amount,
+                                status: 'declined'
+                            });
+                            logs.push(`MARKED DECLINED: ${user.email} -> Partner ${partner.email}. Reason: ${blockReason}`);
+                        } else {
+                            // CREATE VALID COMMISSION
+                            await supabase.from('commissions').insert({
+                                partner_id: partner.id,
+                                source_user_id: user.id,
+                                amount: amount,
+                                status: 'pending'
+                            });
+                            fixedCount++;
+                            logs.push(`FIXED: Commission created for ${user.email} -> Partner ${partner.email} (${amount}€)`);
+                        }
                     }
                 } else {
                     logs.push(`Warning: Referral code "${refCode}" found for ${user.email} but no partner exists.`);
