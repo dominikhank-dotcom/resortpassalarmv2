@@ -7,9 +7,10 @@ interface AffiliateSignupProps {
   onLoginClick: () => void;
   onRegister: () => void;
   onNavigate: (page: string) => void;
+  commissionRate: number;
 }
 
-export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginClick, onRegister, onNavigate }) => {
+export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginClick, onRegister, onNavigate, commissionRate }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -41,7 +42,8 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
     try {
       // Determine the redirect URL (Production vs Local)
       const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
-      const redirectUrl = `${siteUrl}/login`; // Redirect to login page after confirmation
+      // Redirect to affiliate login page after confirmation
+      const redirectUrl = `${siteUrl}/affiliate-login`; 
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -230,7 +232,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
               <div>
                 <h3 className="font-bold text-lg mb-1">Hohe Provision</h3>
                 <p className="text-blue-200 text-sm leading-relaxed">
-                  50% Lifetime auf alle Umsätze. Das sind knapp 1€ pro Nutzer jeden Monat.
+                  {commissionRate}% Lifetime auf alle Umsätze. Verdiene dauerhaft an jedem vermittelten Abo.
                 </p>
               </div>
             </div>
@@ -254,7 +256,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
               <div>
                 <h3 className="font-bold text-lg mb-1">Schnelle Auszahlung</h3>
                 <p className="text-blue-200 text-sm leading-relaxed">
-                  Keine langen Wartezeiten. Wir zahlen monatlich zuverlässig aus.
+                  Direkte Auszahlung auf dein Konto! (via Stripe Connect)
                 </p>
               </div>
             </div>

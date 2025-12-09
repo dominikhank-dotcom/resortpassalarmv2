@@ -277,6 +277,7 @@ const App: React.FC = () => {
      const path = window.location.pathname;
      if (path === '/dashboard') return 'dashboard';
      if (path === '/affiliate') return 'affiliate';
+     if (path === '/affiliate-login') return 'affiliate-login'; // Init this page if visited directly
      if (path === '/admin-dashboard') return 'admin-dashboard';
      return 'landing';
   });
@@ -338,10 +339,18 @@ const App: React.FC = () => {
         if (hash.includes('type=signup') || hash.includes('access_token')) {
             setLoginNotification("E-Mail erfolgreich bestätigt! Du kannst dich jetzt einloggen.");
         }
-        setCurrentPage('login');
+        
+        // Smart Redirect based on return URL path
+        if (pathname === '/affiliate-login') {
+            setCurrentPage('affiliate-login');
+        } else {
+            setCurrentPage('login');
+        }
     } else if (pathname === '/login') {
         setCurrentPage('login');
-    } 
+    } else if (pathname === '/affiliate-login') {
+        setCurrentPage('affiliate-login');
+    }
     // Logic for other pages is handled by initial state
 
     // 2. Check Session
@@ -416,7 +425,7 @@ const App: React.FC = () => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
     // Clear notification when navigating away
-    if (page !== 'login') setLoginNotification(null);
+    if (page !== 'login' && page !== 'affiliate-login') setLoginNotification(null);
   };
 
   const handleSetRole = (newRole: UserRole) => {
@@ -445,7 +454,12 @@ const App: React.FC = () => {
           />
         );
       case 'affiliate-signup':
-        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => { /* Wait for auth listener */ }} onNavigate={navigate} />;
+        return <AffiliateSignupPage 
+            onLoginClick={() => navigate('affiliate-login')} 
+            onRegister={() => { /* Wait for auth listener */ }} 
+            onNavigate={navigate} 
+            commissionRate={globalCommissionRate}
+        />;
       case 'affiliate-login':
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       case 'user-signup':
