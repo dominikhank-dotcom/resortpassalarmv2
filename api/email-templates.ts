@@ -6,12 +6,36 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+// Define default templates to ensure they exist in the dashboard
+const REQUIRED_TEMPLATES = [
+    {
+        id: 'cust_sub_active',
+        name: 'Abo Aktiviert (Kunde)',
+        description: 'Bestätigung nach erfolgreicher Bezahlung',
+        category: 'CUSTOMER',
+        subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
+        body: '<h1>Das ging schnell!</h1><p>Hallo {firstName},</p><p>Deine Zahlung war erfolgreich. Die Überwachung für deinen ResortPass ist ab sofort aktiv.</p><p>Du kannst dich zurücklehnen. Wir melden uns, sobald Tickets verfügbar sind.</p><p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Dashboard</a></p>',
+        variables: ['{firstName}', '{dashboardLink}'],
+        isEnabled: true
+    },
+    {
+        id: 'cust_sub_cancel',
+        name: 'Abo Gekündigt (Kunde)',
+        description: 'Bestätigung der Kündigung zum Laufzeitende',
+        category: 'CUSTOMER',
+        subject: 'Bestätigung deiner Kündigung',
+        body: '<h1>Schade, dass du gehst!</h1><p>Hallo {firstName},</p><p>Wir bestätigen hiermit den Eingang deiner Kündigung.</p><p><strong>Dein Abo läuft noch bis zum: {endDate}</strong></p><p>Bis dahin erhältst du weiterhin Alarme. Nach diesem Datum stoppen alle Benachrichtigungen automatisch.</p><hr><p>Es hat sich eine gute Chance ergeben? Du kannst dein Abo jederzeit vor Ablauf mit einem Klick im Dashboard verlängern:</p><p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Kündigung zurücknehmen</a></p>',
+        variables: ['{firstName}', '{endDate}', '{dashboardLink}'],
+        isEnabled: true
+    }
+];
+
 export default async function handler(req: any, res: any) {
   // Allow GET to fetch templates
   if (req.method === 'GET') {
       try {
           console.log(">>> Fetching Email Templates...");
-          const { data, error } = await supabase
+          let { data: existing, error } = await supabase
             .from('email_templates')
             .select('*')
             .order('id');
@@ -20,9 +44,36 @@ export default async function handler(req: any, res: any) {
               console.error(">>> DB Error fetching templates:", error);
               throw error;
           }
+
+          // SEEDING LOGIC: Check if required templates are missing
+          const missing = REQUIRED_TEMPLATES.filter(reqT => !existing?.find(exT => exT.id === reqT.id));
+
+          if (missing.length > 0) {
+              console.log(`>>> Seeding ${missing.length} missing templates...`);
+              const toInsert = missing.map(t => ({
+                  id: t.id,
+                  name: t.name,
+                  description: t.description,
+                  category: t.category,
+                  subject: t.subject,
+                  body: t.body,
+                  variables: t.variables,
+                  is_enabled: t.isEnabled,
+                  updated_at: new Date().toISOString()
+              }));
+
+              const { error: seedError } = await supabase.from('email_templates').upsert(toInsert);
+              if (seedError) {
+                  console.error(">>> Seeding Error:", seedError);
+              } else {
+                  // Refetch to include new ones
+                  const { data: refreshed } = await supabase.from('email_templates').select('*').order('id');
+                  existing = refreshed;
+              }
+          }
           
-          console.log(`>>> Templates found: ${data?.length || 0}`);
-          return res.status(200).json(data);
+          console.log(`>>> Templates returned: ${existing?.length || 0}`);
+          return res.status(200).json(existing);
       } catch (error: any) {
           console.error(">>> API Error:", error.message);
           return res.status(500).json({ error: error.message });

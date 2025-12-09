@@ -1,3 +1,4 @@
+
 import { Buffer } from 'buffer';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
@@ -35,6 +36,12 @@ function parseAddressLine(line1: string) {
     const match = line1.match(/^(.*?)\s+(\d+[a-zA-Z]?(-\d+)?)$/);
     if (match) return { street: match[1], houseNumber: match[2] };
     return { street: line1, houseNumber: '' };
+}
+
+// Helper to fetch template from DB
+async function getTemplate(id: string) {
+    const { data } = await supabase.from('email_templates').select('*').eq('id', id).single();
+    return data;
 }
 
 export default async function handler(req: any, res: any) {
@@ -101,7 +108,7 @@ export default async function handler(req: any, res: any) {
                   else await supabase.from('subscriptions').insert(subData);
               } catch (dbErr) { console.error("DB Update Error:", dbErr); }
 
-              // Send Activation Email
+              // Send Activation Email using Template
               if (resend) {
                   try {
                       // Retrieve fresh profile to get name and correct email
@@ -110,17 +117,30 @@ export default async function handler(req: any, res: any) {
                       const recipientEmail = session.customer_email || profile?.email;
                       
                       if (recipientEmail) {
-                          await resend.emails.send({
-                              from: 'ResortPass Alarm <support@resortpassalarm.com>',
-                              to: recipientEmail,
-                              subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
-                              html: `
+                          // Fetch Template from DB
+                          const template = await getTemplate('cust_sub_active');
+                          
+                          // Default Fallback
+                          let subject = template?.subject || 'Dein Premium-Schutz ist aktiv! 🛡️';
+                          let htmlBody = template?.body || `
                                 <h1>Das ging schnell!</h1>
-                                <p>Hallo ${profile?.first_name || 'Fan'},</p>
+                                <p>Hallo {firstName},</p>
                                 <p>Deine Zahlung war erfolgreich. Die Überwachung für deinen ResortPass ist ab sofort aktiv.</p>
                                 <p>Du kannst dich zurücklehnen. Wir melden uns, sobald Tickets verfügbar sind.</p>
                                 <p><a href="https://resortpassalarm.com/dashboard" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Dashboard</a></p>
-                              `
+                          `;
+
+                          // Replace Variables
+                          const dashboardLink = "https://resortpassalarm.com/dashboard";
+                          htmlBody = htmlBody.replace(/{firstName}/g, profile?.first_name || 'Fan');
+                          htmlBody = htmlBody.replace(/{dashboardLink}/g, dashboardLink);
+                          subject = subject.replace(/{firstName}/g, profile?.first_name || 'Fan');
+
+                          await resend.emails.send({
+                              from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                              to: recipientEmail,
+                              subject: subject,
+                              html: htmlBody
                           });
                           console.log(`Activation email sent to ${recipientEmail}`);
                       } else {
@@ -283,21 +303,35 @@ export default async function handler(req: any, res: any) {
                           
                           if (profile && profile.email) {
                               const endDate = new Date(subscription.current_period_end * 1000).toLocaleDateString('de-DE');
-                              
-                              await resend.emails.send({
-                                  from: 'ResortPass Alarm <support@resortpassalarm.com>',
-                                  to: profile.email,
-                                  subject: 'Bestätigung deiner Kündigung',
-                                  html: `
+                              const dashboardLink = "https://resortpassalarm.com/dashboard";
+
+                              // Fetch Template from DB
+                              const template = await getTemplate('cust_sub_cancel');
+
+                              // Default Fallback
+                              let subject = template?.subject || 'Bestätigung deiner Kündigung';
+                              let htmlBody = template?.body || `
                                     <h1>Schade, dass du gehst!</h1>
-                                    <p>Hallo ${profile.first_name || 'Fan'},</p>
+                                    <p>Hallo {firstName},</p>
                                     <p>Wir bestätigen hiermit den Eingang deiner Kündigung.</p>
-                                    <p><strong>Dein Abo läuft noch bis zum: ${endDate}</strong></p>
+                                    <p><strong>Dein Abo läuft noch bis zum: {endDate}</strong></p>
                                     <p>Bis dahin erhältst du weiterhin Alarme. Nach diesem Datum stoppen alle Benachrichtigungen automatisch.</p>
                                     <hr>
                                     <p>Es hat sich eine gute Chance ergeben? Du kannst dein Abo jederzeit vor Ablauf mit einem Klick im Dashboard verlängern:</p>
-                                    <p><a href="https://resortpassalarm.com/dashboard" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Kündigung zurücknehmen</a></p>
-                                  `
+                                    <p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Kündigung zurücknehmen</a></p>
+                              `;
+                              
+                              // Replace Variables
+                              htmlBody = htmlBody.replace(/{firstName}/g, profile.first_name || 'Fan');
+                              htmlBody = htmlBody.replace(/{endDate}/g, endDate);
+                              htmlBody = htmlBody.replace(/{dashboardLink}/g, dashboardLink);
+                              subject = subject.replace(/{firstName}/g, profile.first_name || 'Fan');
+
+                              await resend.emails.send({
+                                  from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                                  to: profile.email,
+                                  subject: subject,
+                                  html: htmlBody
                               });
                               console.log(`Cancellation confirmation sent to ${profile.email}`);
                           }
