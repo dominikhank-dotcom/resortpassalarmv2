@@ -31,7 +31,11 @@ export default async function handler(req: any, res: any) {
               email_enabled: p.email_enabled,
               sub_status: sub ? sub.status : 'NO_SUB',
               plan: sub ? sub.plan_type : 'N/A',
-              sub_stripe_id: sub ? sub.stripe_subscription_id : 'N/A'
+              sub_stripe_id: sub ? sub.stripe_subscription_id : 'N/A',
+              role: p.role,
+              referred_by: p.referred_by,
+              ref_code: p.referral_code,
+              website: p.website
           };
       });
 

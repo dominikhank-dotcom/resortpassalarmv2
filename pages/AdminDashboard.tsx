@@ -209,7 +209,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSavePrices = async () => {
     try {
       await updateSystemSettings('price_new_customers', prices.new.toString());
-      await updateSystemSettings('price_existing_customers', prices.existing.toString());
+      // No existing customers update needed
       alert("Preise gespeichert!");
     } catch(e: any) { alert("Fehler: " + e.message); }
   };
@@ -376,8 +376,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                               <div className="text-[10px] text-slate-400 mt-0.5">{u.plan}</div>
                                           </td>
                                           <td className="px-4 py-3">
-                                              {/* Note: debug-users needs to return referred_by. Assuming update in backend if needed, or fetch details. 
-                                                  For list view, if not present, we skip. */}
                                               {u.referred_by ? <span className="font-mono bg-indigo-50 text-indigo-600 px-1 rounded">{u.referred_by}</span> : <span className="text-slate-300">-</span>}
                                           </td>
                                           <td className="px-4 py-3 text-right">
@@ -546,16 +544,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   className="w-full p-2 border rounded"
                               />
                           </div>
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Preis für Bestandskunden (Anzeige)</label>
-                              <input 
-                                  type="number" 
-                                  step="0.01" 
-                                  value={prices.existing}
-                                  onChange={e => onUpdatePrices({...prices, existing: Number(e.target.value)})}
-                                  className="w-full p-2 border rounded"
-                              />
-                          </div>
+                          {/* Existing Customer Price Display Removed */}
                       </div>
                       <div className="mt-4 flex justify-end">
                           <Button size="sm" onClick={handleSavePrices}>Preise Speichern</Button>
