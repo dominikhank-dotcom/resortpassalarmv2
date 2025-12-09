@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/Button';

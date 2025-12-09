@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
@@ -386,9 +385,13 @@ const App: React.FC = () => {
             setRole(UserRole.GUEST);
             setUserName('');
             
-            // Only redirect to landing if NOT currently on a login page.
+            // Allow staying on dashboard pages so users can see login screen there
             const page = currentPageRef.current;
-            if (page !== 'login' && page !== 'affiliate-login' && page !== 'admin-login') {
+            const protectedPages = ['dashboard', 'affiliate', 'admin-dashboard'];
+            const loginPages = ['login', 'affiliate-login', 'admin-login'];
+            
+            // Only redirect to landing if we are NOT on a protected page AND NOT on a login page
+            if (!protectedPages.includes(page) && !loginPages.includes(page)) {
                 setCurrentPage('landing');
             }
         } else if (event === 'SIGNED_IN' && session) {

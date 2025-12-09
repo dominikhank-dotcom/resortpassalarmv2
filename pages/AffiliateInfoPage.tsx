@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { ArrowRight, Check, DollarSign, TrendingUp, Users, Shield, Calculator, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';

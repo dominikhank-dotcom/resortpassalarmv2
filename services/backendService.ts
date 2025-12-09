@@ -1,4 +1,3 @@
-
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
