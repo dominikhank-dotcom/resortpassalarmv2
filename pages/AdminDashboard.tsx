@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, Users, Settings, Briefcase, 
-  TrendingUp, DollarSign, Activity, Database, Mail, 
-  Sparkles, Key, ArrowLeft, UserX, Gift, Lock, Link, RefreshCw, Wallet, Check, Save, Terminal, Calendar, UserPlus, XCircle, Wrench, PiggyBank, Search, MessageSquare, Copy, ChevronRight, AlertCircle, Send, CheckCircle, Handshake, CreditCard, Sliders
+  LayoutDashboard, Users, Settings, 
+  TrendingUp, DollarSign, Activity, Mail, 
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { generateAdminInsights } from '../services/geminiService';
-import { sendTemplateTest, testBrowseAiConnection, testGeminiConnection, manageSubscription, getCustomerDetails, updateSystemSettings, updateSystemStatus, getSystemSettings, getAdminPayouts, markPayoutComplete, adminUpdateCustomer, getEmailTemplates, saveEmailTemplate } from '../services/backendService';
+import { 
+  sendTemplateTest, 
+  testBrowseAiConnection, 
+  testGeminiConnection, 
+  manageSubscription, 
+  getCustomerDetails, 
+  updateSystemSettings, 
+  updateSystemStatus, 
+  getSystemSettings, 
+  getAdminPayouts, 
+  markPayoutComplete, 
+  getEmailTemplates, 
+  saveEmailTemplate 
+} from '../services/backendService';
 import { EmailTemplate } from '../types';
 
 interface AdminDashboardProps {
@@ -194,13 +207,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     u.id?.includes(searchTerm)
   );
 
-  const affiliateUsers = userList.filter(u => u.sub_status === 'NO_SUB' && u.plan === 'N/A' && !u.sub_stripe_id); // Basic filter, improved if API returns role
-  // Since debug-users might not return role explicitly in the root object (it does in the new implementation of debug-users if updated, but let's assume we filter by logic or update the API).
-  // Actually, the previous debug-users API returns a flat object. I should update debug-users API to include role or rely on what I have.
-  // Ideally, I filter by checking if they are not in the subscription list or if I add role to debug-users. 
-  // Let's assume for now we list all users in Partners tab who have a referral code or are marked as affiliate?
-  // Since I don't want to change the API right now, I'll rely on the User List tab for full management and just show Commission settings in Partners tab.
-
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="bg-[#001529] text-white py-4 px-6 shadow-md sticky top-0 z-40">
@@ -344,7 +350,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
                       {/* URL Config */}
                       <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Link size={18} /> Ziel-URLs</h3>
+                          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Link2 size={18} /> Ziel-URLs</h3>
                           <div className="space-y-4">
                               <div>
                                   <label className="text-xs font-bold text-slate-500 uppercase">ResortPass Gold URL</label>
@@ -647,5 +653,3 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     </div>
   );
 };
-
-const UserSearch = ({ size }: { size: number }) => <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><path d="M10 14a4 4 0 0 0-4-4"/></svg>;
