@@ -106,15 +106,17 @@ export default async function handler(req: any, res: any) {
                         isBlocked = true;
                         blockReason = "Same Email/PayPal";
                     }
-                    // 3. Household (Last Name + Zip match)
+                    // 3. Household (Last Name + Zip + Street match)
                     else if (
                         partner.last_name && user.last_name && 
                         partner.zip && user.zip &&
+                        partner.street && user.street &&
                         partner.last_name.trim().toLowerCase() === user.last_name.trim().toLowerCase() &&
-                        partner.zip.trim() === user.zip.trim()
+                        partner.zip.trim() === user.zip.trim() &&
+                        partner.street.trim().toLowerCase() === user.street.trim().toLowerCase()
                     ) {
                         isBlocked = true;
-                        blockReason = "Household Match (Name+Zip)";
+                        blockReason = "Household Match (Name+Zip+Street)";
                     }
 
                     if (isBlocked) {

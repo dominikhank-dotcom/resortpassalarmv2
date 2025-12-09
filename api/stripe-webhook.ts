@@ -160,15 +160,18 @@ export default async function handler(req: any, res: any) {
                               isBlocked = true;
                               blockReason = "Same Email/PayPal";
                           }
-                          // 3. Household (Last Name + Zip match)
+                          // 3. Household (Last Name + Zip + Street match)
+                          // Strict check to avoid flagging random neighbors, but catch obvious self-referrals
                           else if (
                               partner.last_name && userProfile.last_name && 
                               partner.zip && userProfile.zip &&
+                              partner.street && userProfile.street &&
                               partner.last_name.trim().toLowerCase() === userProfile.last_name.trim().toLowerCase() &&
-                              partner.zip.trim() === userProfile.zip.trim()
+                              partner.zip.trim() === userProfile.zip.trim() &&
+                              partner.street.trim().toLowerCase() === userProfile.street.trim().toLowerCase()
                           ) {
                               isBlocked = true;
-                              blockReason = "Household Match (Name+Zip)";
+                              blockReason = "Household Match (Name+Zip+Street)";
                           }
 
                           if (isBlocked) {
