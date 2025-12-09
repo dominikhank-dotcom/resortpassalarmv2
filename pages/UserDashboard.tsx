@@ -104,8 +104,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
             });
 
             // --- WELCOME MAIL TRIGGER (Strict Check) ---
-            // Trigger ONLY if explicitly FALSE or NULL.
-            // If undefined (e.g. column not in query/cache error), do NOTHING.
             if (profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) {
                 const sessionKey = `welcome_sent_${user.id}`;
                 const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
@@ -181,17 +179,26 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   useEffect(() => {
     fetchSystemStatus(); 
     const interval = setInterval(fetchSystemStatus, 60000); 
+    
+    // Check for payment success or portal return
     const query = new URLSearchParams(window.location.search);
-    if (query.get('payment_success')) {
+    if (query.get('payment_success') || query.get('portal_return')) {
       setIsSyncing(true);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
       syncSubscription().then(() => {
           fetchProfileAndSub();
           setIsSyncing(false);
-          setSubscriptionStatus('PAID');
-          window.history.replaceState({}, document.title, window.location.pathname);
-          alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+          if (query.get('payment_success')) {
+              setSubscriptionStatus('PAID');
+              alert("Zahlung erfolgreich! Dein Abo ist jetzt aktiv.");
+          } else {
+              // Just a sync without alert on portal return (cancellation etc)
+          }
       }).catch(() => { setIsSyncing(false); });
     }
+    
     return () => clearInterval(interval);
   }, []);
 
@@ -216,16 +223,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   
   const saveSms = async () => { 
       // STRICT FORMAT CHECK: +4917012345678 (E.164 format)
-      // Must start with +
-      // Must have digits
-      // Length between 9 and 16
       const phoneRegex = /^\+[1-9]\d{7,14}$/;
-      
       if (!phoneRegex.test(tempData.sms)) {
            setErrors(prev => ({ ...prev, sms: "Ungültiges Format! Muss mit + (Ländercode) beginnen und nur Ziffern enthalten." })); 
            return; 
       } 
-      
       setNotifications(prev => ({ ...prev, sms: tempData.sms })); 
       await updateProfileColumn('phone', tempData.sms); 
       setEditMode(prev => ({ ...prev, sms: false })); 
@@ -245,44 +247,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
       setIsSendingAlarm(true); 
       try { 
-          // Result contains detailed status, e.g. { email: 'sent', sms: null, errors: ['SMS Failure'] }
           const result = await sendTestAlarm(user.id, notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled); 
-          
           if (result.errors && result.errors.length > 0) {
-              // If partial success (some sent, some not), still log it
               if (result.email === 'sent' || result.sms === 'sent') {
                   const msg = `Teil-Erfolg: ${result.email ? 'Email OK' : ''} ${result.sms ? 'SMS OK' : ''}`;
                   await supabase.from('notification_logs').insert({ user_id: user.id, type: 'EMAIL', message: msg });
-                  fetchProfileAndSub(); // Refresh profile to update last_test_config
+                  fetchProfileAndSub();
               }
               alert(`Test teilweise gesendet oder blockiert.\n\nMeldung:\n${result.errors.join('\n')}`);
           } else {
               const msg = `Test erfolgreich: ${activeMethods.join(', ')}`;
               await supabase.from('notification_logs').insert({ user_id: user.id, type: 'EMAIL', message: msg });
-              
-              // Refresh logs and config
               await fetchProfileAndSub();
               alert("Test erfolgreich verschickt!"); 
           }
-      } catch (error: any) { 
-          alert("Fehler: " + error.message); 
-      } finally { 
-          setIsSendingAlarm(false); 
-      } 
+      } catch (error: any) { alert("Fehler: " + error.message); } finally { setIsSendingAlarm(false); } 
   };
 
   const handleSubscribe = async () => { 
       const localReferral = localStorage.getItem('resortpass_referral');
       const dbReferral = userProfile?.referred_by;
       const referralCode = localReferral || dbReferral;
-      console.log("Starting subscription with referral:", referralCode);
-
       await createCheckoutSession(personalData.email, referralCode); 
   };
   
   const handleManageBilling = async () => { await createPortalSession(); }
 
-  // Check if test is allowed (Duplicates)
   const isDuplicateTest = () => {
       if (!userProfile?.last_test_config) return false;
       const last = userProfile.last_test_config;
@@ -291,28 +281,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       
       let emailDuplicate = false;
       let smsDuplicate = false;
-
-      // If email enabled, check if matches last
       if (notifications.emailEnabled && last.email === currentEmail) emailDuplicate = true;
-      // If sms enabled, check if matches last
       if (notifications.smsEnabled && last.phone === currentPhone) smsDuplicate = true;
-
-      // Logic:
-      // If BOTH enabled: Block if BOTH match.
-      // If ONLY Email enabled: Block if Email matches.
-      // If ONLY SMS enabled: Block if SMS matches.
       
-      if (notifications.emailEnabled && notifications.smsEnabled) {
-          return emailDuplicate && smsDuplicate;
-      }
+      if (notifications.emailEnabled && notifications.smsEnabled) return emailDuplicate && smsDuplicate;
       if (notifications.emailEnabled) return emailDuplicate;
       if (notifications.smsEnabled) return smsDuplicate;
-      
       return false;
   };
   
   const testLimitReached = testAlarmCount >= 5;
-
   const testButtonDisabled = !hasActiveSubscription || isDuplicateTest() || testLimitReached;
   
   let testButtonText = "Test-Alarm senden";
@@ -330,8 +308,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     <Ticket className={type === 'gold' ? 'text-yellow-500' : 'text-slate-400'} fill="currentColor" size={20} />
                     <h2 className="font-bold text-slate-900">{title}</h2>
                 </div>
-                
-                {/* Toggle Switch with Label */}
                 <div className="flex items-center gap-2">
                     <span className="text-xs text-slate-500 font-medium uppercase tracking-wide">Alarm an/aus:</span>
                     <label className="relative inline-flex items-center cursor-pointer">
@@ -379,14 +355,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
           {hasActiveSubscription ? (<div className="flex items-center gap-2 bg-[#00305e] text-white px-4 py-2 rounded-lg shadow-sm text-sm font-medium animate-in fade-in"><Shield size={16} className="text-[#ffcc00]" />Premium Schutz Aktiv</div>) : (<div className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg shadow-md text-sm font-bold animate-pulse"><AlertOctagon size={18} />WARNUNG: SCHUTZ INAKTIV</div>)}
         </div>
 
-        {/* Global Warning if Both Disabled */}
         {hasActiveSubscription && !prefs.gold && !prefs.silver && (
             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg flex items-start gap-3 animate-pulse">
                 <AlertTriangle className="text-red-500 shrink-0 mt-0.5" size={20} />
-                <div>
-                    <h3 className="font-bold text-red-800">Keine Überwachung aktiv!</h3>
-                    <p className="text-sm text-red-700">Du hast sowohl Gold als auch Silver Alarme deaktiviert. Du wirst keine Benachrichtigungen erhalten.</p>
-                </div>
+                <div><h3 className="font-bold text-red-800">Keine Überwachung aktiv!</h3><p className="text-sm text-red-700">Du hast sowohl Gold als auch Silver Alarme deaktiviert.</p></div>
             </div>
         )}
 
@@ -398,14 +370,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col">
             <div className="p-6 border-b border-slate-100"><div className="flex items-center gap-3"><div className="bg-blue-50 p-2 rounded-lg text-blue-600"><Bell size={20} /></div><h3 className="font-semibold text-slate-900">Benachrichtigungen</h3></div></div>
-            
-            {(!notifications.emailEnabled || !notifications.smsEnabled) && (
-                <div className="bg-amber-50 border-b border-amber-100 p-3 flex items-start gap-3">
-                  <AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} />
-                  <p className="text-xs text-amber-800">Empfehlung: Aktiviere beide Kanäle!</p>
-                </div>
-            )}
-            
+            {(!notifications.emailEnabled || !notifications.smsEnabled) && (<div className="bg-amber-50 border-b border-amber-100 p-3 flex items-start gap-3"><AlertTriangle className="text-amber-500 shrink-0 mt-0.5" size={16} /><p className="text-xs text-amber-800">Empfehlung: Aktiviere beide Kanäle!</p></div>)}
             <div className="p-6 space-y-4 flex-1">
                 <div className="flex flex-col p-4 border border-slate-100 rounded-xl hover:border-indigo-100 transition-colors">
                     <div className="flex items-center justify-between w-full mb-2">
@@ -419,46 +384,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         <div className="flex items-center gap-3"><MessageSquare className={notifications.smsEnabled ? "text-blue-600" : "text-slate-300"} size={20} /><p className="font-medium text-slate-900">SMS Alarm</p></div>
                         <div className="flex items-center gap-3"><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={notifications.smsEnabled} onChange={(e) => handleToggleSms(e.target.checked)} /><div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>{!editMode.sms ? ( <button onClick={startEditSms} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={16} /></button> ) : ( <div className="flex gap-1"><button onClick={saveSms} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button><button onClick={cancelEditSms} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button></div> )}</div>
                     </div>
-                    
-                    <div className="ml-8">
-                        {editMode.sms ? ( 
-                            <div className="space-y-2">
-                                <input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} className="w-full text-sm p-2 border rounded" placeholder="+4917012345678" />
-                                <p className="text-xs text-slate-500">Format: +49... (Ländercode + Nummer ohne 0)</p>
-                                {errors.sms && <p className="text-xs text-red-500">{errors.sms}</p>}
-                            </div> 
-                        ) : ( 
-                            <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> 
-                        )}
-                    </div>
+                    <div className="ml-8">{editMode.sms ? ( <div className="space-y-2"><input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} className="w-full text-sm p-2 border rounded" placeholder="+4917012345678" /><p className="text-xs text-slate-500">Format: +49... (Ländercode + Nummer ohne 0)</p>{errors.sms && <p className="text-xs text-red-500">{errors.sms}</p>}</div> ) : ( <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> )}</div>
                 </div>
                 
                 <div className="pt-4 mt-4 border-t border-slate-100">
-                    <div className="flex justify-between items-center mb-2">
-                        <p className="text-xs text-slate-500">Testalarm prüfen!</p>
-                        <span className="text-xs text-slate-400">{testAlarmCount} / 5 Tests genutzt</span>
-                    </div>
-                    
-                    <Button 
-                        onClick={handleTestAlarm} 
-                        disabled={testButtonDisabled || isSendingAlarm} 
-                        variant="secondary" 
-                        size="sm" 
-                        className={`w-full justify-center ${testButtonDisabled ? 'opacity-50 cursor-not-allowed text-slate-500 border-slate-200 bg-slate-50' : ''}`}
-                    >
-                        {testButtonText}
-                    </Button>
-                    
-                    {isDuplicateTest() && !testLimitReached && (
-                        <p className="text-xs text-amber-600 mt-2 text-center">
-                            Hinweis: Ändere deine E-Mail oder Handynummer, um einen erneuten Test durchzuführen.
-                        </p>
-                    )}
-                    {testLimitReached && (
-                         <p className="text-xs text-red-500 mt-2 text-center">
-                            Du hast das Limit für Test-Alarme erreicht.
-                        </p>
-                    )}
+                    <div className="flex justify-between items-center mb-2"><p className="text-xs text-slate-500">Testalarm prüfen!</p><span className="text-xs text-slate-400">{testAlarmCount} / 5 Tests genutzt</span></div>
+                    <Button onClick={handleTestAlarm} disabled={testButtonDisabled || isSendingAlarm} variant="secondary" size="sm" className={`w-full justify-center ${testButtonDisabled ? 'opacity-50 cursor-not-allowed text-slate-500 border-slate-200 bg-slate-50' : ''}`}>{testButtonText}</Button>
+                    {isDuplicateTest() && !testLimitReached && (<p className="text-xs text-amber-600 mt-2 text-center">Hinweis: Ändere deine E-Mail oder Handynummer, um einen erneuten Test durchzuführen.</p>)}
+                    {testLimitReached && (<p className="text-xs text-red-500 mt-2 text-center">Du hast das Limit für Test-Alarme erreicht.</p>)}
                 </div>
             </div>
           </div>
@@ -472,7 +405,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                      <div className="bg-purple-50 rounded-xl p-4 border border-purple-100 mb-4"><div className="flex justify-between items-center mb-2"><span className="text-purple-700 font-medium flex items-center gap-2"><Gift size={16} /> Geschenk / Admin</span><span className="bg-purple-200 text-purple-800 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span></div><div className="text-xl font-bold text-slate-900 mb-1">Kostenlos</div></div>
                   ) : (
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 mb-4">
-                        <div className="flex justify-between items-center mb-2"><span className="text-slate-600 font-medium flex items-center gap-2"><CreditCard size={14} /> Stripe Checkout</span><span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span></div>
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-slate-600 font-medium flex items-center gap-2"><CreditCard size={14} /> Stripe Checkout</span>
+                            {/* UPDATED BADGE LOGIC */}
+                            {subscriptionDetails.isCanceled ? (
+                                <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold uppercase">Gekündigt</span>
+                            ) : (
+                                <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold uppercase">Aktiv</span>
+                            )}
+                        </div>
                         <div className="text-3xl font-bold text-slate-900 mb-1">{subscriptionDetails.price ? subscriptionDetails.price.toFixed(2).replace('.', ',') : prices.existing.toFixed(2).replace('.', ',')} € <span className="text-sm font-normal text-slate-500">/ Monat</span></div>
                         {subscriptionDetails.isCanceled ? (
                             <p className="text-sm text-amber-600 font-bold">

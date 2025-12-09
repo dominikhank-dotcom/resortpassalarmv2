@@ -332,6 +332,12 @@ const App: React.FC = () => {
         setCurrentPage('login');
     } else if (pathname === '/login') {
         setCurrentPage('login');
+    } else if (pathname === '/dashboard') {
+        setCurrentPage('dashboard');
+    } else if (pathname === '/affiliate') {
+        setCurrentPage('affiliate');
+    } else if (pathname === '/admin-dashboard') {
+        setCurrentPage('admin-dashboard');
     }
 
     // 2. Check Session
@@ -348,6 +354,9 @@ const App: React.FC = () => {
               if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
               
               // Only redirect if we are not already on a specific intended page
+              // Note: If we already set currentPage to 'dashboard' via pathname above, this block might be skipped for redirection
+              // but we still update the role, which allows the dashboard component to render.
+              
               if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
                   if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
@@ -355,9 +364,6 @@ const App: React.FC = () => {
               }
           } else {
                // Fallback if profile missing
-               // Don't default to CUSTOMER blindly if session exists but no profile. 
-               // This prevents "Kunde" showing up momentarily for Partners.
-               // We keep GUEST until we know for sure or handle error.
                console.error("Session exists but Profile missing");
                await supabase.auth.signOut(); // Safety logout if DB invalid
                setRole(UserRole.GUEST);
@@ -379,14 +385,11 @@ const App: React.FC = () => {
             setUserName('');
             
             // Only redirect to landing if NOT currently on a login page.
-            // This prevents the error message (e.g. "Wrong Role") from being cleared 
-            // when the LoginScreen component forces a sign out.
             const page = currentPageRef.current;
             if (page !== 'login' && page !== 'affiliate-login' && page !== 'admin-login') {
                 setCurrentPage('landing');
             }
         } else if (event === 'SIGNED_IN' && session) {
-            // Re-fetch logic (same as above for robustness)
              supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single()
              .then(({ data }) => {
                 if (data) {
@@ -415,11 +418,9 @@ const App: React.FC = () => {
     setRole(newRole);
   };
 
-  // Smart Navigation after Login: Redirects based on actual role, not just the login page
+  // Smart Navigation after Login
   const handlePostLogin = (detectedRole?: UserRole) => {
-      // Use the detected role from LoginScreen if available, otherwise fallback to state
       const targetRole = detectedRole || role;
-
       if (targetRole === UserRole.ADMIN) navigate('admin-dashboard');
       else if (targetRole === UserRole.AFFILIATE) navigate('affiliate');
       else navigate('dashboard');

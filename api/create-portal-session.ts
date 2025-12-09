@@ -1,3 +1,4 @@
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,9 +35,10 @@ export default async function handler(req: any, res: any) {
     }
 
     // 2. Create Portal Session
+    // Add ?portal_return=true to trigger immediate sync in UserDashboard
     const session = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: `${req.headers.origin}/dashboard`,
+      return_url: `${req.headers.origin}/dashboard?portal_return=true`,
     });
 
     res.status(200).json({ url: session.url });
