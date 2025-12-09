@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -41,6 +41,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       start: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString().split('T')[0],
       end: new Date().toISOString().split('T')[0]
   });
+  const [datePreset, setDatePreset] = useState('last28');
 
   const [stats, setStats] = useState<any>({
     activeUsers: 0,
@@ -121,9 +122,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         if (data.users) {
             setUserList(data.users);
             // Filter partners
-            const partners = data.users.filter((u: any) => u.role === 'AFFILIATE' || u.ref_code); // Assuming role check logic in backend or added here
-            // Since debug-users might not return role explicitly if not updated, let's rely on role field if present
-            setPartnerList(data.users.filter((u: any) => u.role === 'AFFILIATE')); 
+            const partners = data.users.filter((u: any) => u.role === 'AFFILIATE' || u.ref_code); 
+            setPartnerList(partners); 
         }
     } catch (e) { console.error("Load Users Error", e); }
   };
@@ -131,6 +131,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const loadTemplates = async () => {
       const t = await getEmailTemplates();
       if (t) setTemplates(t);
+  };
+
+  const handleDatePresetChange = (preset: string) => {
+    setDatePreset(preset);
+    const end = new Date();
+    let start = new Date();
+    
+    if (preset === 'last28') {
+        start.setDate(end.getDate() - 28);
+    } else if (preset === 'lastMonth') {
+        // First day of previous month
+        start.setDate(1); 
+        start.setMonth(start.getMonth() - 1);
+        // Last day of previous month
+        const lastDayPrevMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+        end.setTime(lastDayPrevMonth.getTime());
+    } else if (preset === 'thisYear') {
+        start = new Date(new Date().getFullYear(), 0, 1);
+    } else if (preset === 'custom') {
+        return; // Don't change range automatically
+    }
+
+    setDateRange({
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+    });
   };
 
   const handleUpdateStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
@@ -272,18 +298,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {/* Date Filter */}
                   <div className="flex justify-end mb-4">
                       <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center gap-2 shadow-sm">
+                          <div className="border-r border-slate-200 pr-2 mr-2">
+                             <select 
+                                value={datePreset} 
+                                onChange={(e) => handleDatePresetChange(e.target.value)}
+                                className="bg-transparent text-sm outline-none font-medium text-slate-700"
+                             >
+                                 <option value="last28">Letzte 28 Tage</option>
+                                 <option value="lastMonth">Letzter Monat</option>
+                                 <option value="thisYear">Dieses Jahr</option>
+                                 <option value="custom">Benutzerdefiniert</option>
+                             </select>
+                          </div>
+
                           <Calendar size={16} className="text-slate-500" />
                           <input 
                               type="date" 
                               value={dateRange.start}
-                              onChange={e => setDateRange({...dateRange, start: e.target.value})}
+                              onChange={e => { setDateRange({...dateRange, start: e.target.value}); setDatePreset('custom'); }}
                               className="text-sm outline-none bg-transparent"
                           />
                           <span className="text-slate-400">-</span>
                           <input 
                               type="date" 
                               value={dateRange.end}
-                              onChange={e => setDateRange({...dateRange, end: e.target.value})}
+                              onChange={e => { setDateRange({...dateRange, end: e.target.value}); setDatePreset('custom'); }}
                               className="text-sm outline-none bg-transparent"
                           />
                       </div>
@@ -414,7 +453,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <p className="text-xs text-slate-500 mt-2">Ändert die Anzeige auf der Landingpage & die Default-Rate für neue Registrierungen.</p>
                           </div>
-                          {/* OLD COMMISSION RATE REMOVED AS REQUESTED */}
                       </div>
                   </div>
 
@@ -427,6 +465,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   <th className="px-4 py-3">Partner</th>
                                   <th className="px-4 py-3">Affiliate Code</th>
                                   <th className="px-4 py-3">Webseite</th>
+                                  <th className="px-4 py-3">Gesamtprovision</th>
                                   <th className="px-4 py-3">Status</th>
                               </tr>
                           </thead>
@@ -443,7 +482,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                           </span>
                                       </td>
                                       <td className="px-4 py-3 text-slate-500">{p.website || '-'}</td>
-                                      <td className="px-4 py-3"><span className="text-green-600 text-xs font-bold uppercase">Aktiv</span></td>
+                                      <td className="px-4 py-3 font-bold text-slate-900">
+                                          {p.total_commission ? p.total_commission.toFixed(2) : '0.00'} €
+                                      </td>
+                                      <td className="px-4 py-3">
+                                          {p.referred_count > 0 ? (
+                                              <span className="text-green-600 text-xs font-bold uppercase bg-green-100 px-2 py-1 rounded">Aktiv ({p.referred_count} Refs)</span>
+                                          ) : (
+                                              <span className="text-slate-400 text-xs uppercase bg-slate-100 px-2 py-1 rounded">Keine Refs</span>
+                                          )}
+                                      </td>
                                   </tr>
                               ))}
                           </tbody>
@@ -538,7 +586,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                   className="w-full p-2 border rounded"
                               />
                           </div>
-                          {/* Existing Customer Price Display Removed */}
                       </div>
                       <div className="mt-4 flex justify-end">
                           <Button size="sm" onClick={handleSavePrices}>Preise Speichern</Button>
@@ -617,7 +664,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <div className="flex justify-between items-center">
                               <div>
                                   <p className="text-lg font-bold">
-                                    {selectedCustomer.subscription?.status === 'active' ? <span className="text-green-600">Aktiv</span> : <span className="text-slate-500">Inaktiv / Gekündigt</span>}
+                                    {selectedCustomer.subscription?.status === 'active' ? (
+                                        selectedCustomer.subscription?.cancel_at_period_end ? (
+                                            <span className="text-amber-600">Gekündigt (läuft aus)</span>
+                                        ) : (
+                                            <span className="text-green-600">Aktiv</span>
+                                        )
+                                    ) : (
+                                        <span className="text-slate-500">Inaktiv / Gekündigt</span>
+                                    )}
                                   </p>
                                   <p className="text-sm text-slate-500">Plan: {selectedCustomer.subscription?.plan_type || 'None'}</p>
                               </div>

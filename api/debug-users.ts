@@ -8,9 +8,6 @@ const supabase = createClient(
 export default async function handler(req: any, res: any) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Simple Auth Check (should be better in prod, but for admin debug ok if only called from dashboard)
-  // Ideally check for a secret or user session if passed
-  
   try {
       // Get all Profiles
       const { data: profiles, error: pError } = await supabase.from('profiles').select('*');
@@ -20,9 +17,25 @@ export default async function handler(req: any, res: any) {
       const { data: subs, error: sError } = await supabase.from('subscriptions').select('*');
       if (sError) throw sError;
 
+      // Get all Commissions (to calc total for partners)
+      const { data: commissions, error: cError } = await supabase.from('commissions').select('partner_id, amount');
+      if (cError) throw cError;
+
       // Combine
       const report = profiles.map(p => {
           const sub = subs.find(s => s.user_id === p.id);
+          
+          // Calculate Partner Stats
+          const userCommissions = commissions?.filter(c => c.partner_id === p.id) || [];
+          const totalCommission = userCommissions.reduce((sum, c) => sum + Number(c.amount), 0);
+          
+          // Count Referrals (People who have 'referred_by' matching this user's 'referral_code')
+          // Only count if referral_code is set
+          let referredCount = 0;
+          if (p.referral_code) {
+             referredCount = profiles.filter(user => user.referred_by === p.referral_code).length;
+          }
+
           return {
               id: p.id,
               email: p.email,
@@ -36,7 +49,9 @@ export default async function handler(req: any, res: any) {
               role: p.role,
               referred_by: p.referred_by,
               ref_code: p.referral_code,
-              website: p.website
+              website: p.website,
+              total_commission: totalCommission,
+              referred_count: referredCount
           };
       });
 
