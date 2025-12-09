@@ -101,9 +101,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 silver: profile.notify_silver !== false
             });
 
-            // --- WELCOME MAIL TRIGGER (Safety Checked) ---
-            // Only trigger if database says it hasn't been sent yet.
-            if (profile.welcome_mail_sent !== true) {
+            // --- WELCOME MAIL TRIGGER (Strict Check) ---
+            // Trigger ONLY if explicitly FALSE or NULL.
+            // If undefined (e.g. column not in query/cache error), do NOTHING.
+            if (profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) {
                 const sessionKey = `welcome_sent_${user.id}`;
                 const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
 
@@ -129,7 +130,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     });
                 }
             } else {
-                console.log("Dashboard: Welcome mail already marked sent in DB. Skipping.");
+                console.log("Dashboard: Welcome mail status checked. Sent:", profile.welcome_mail_sent);
             }
         }
 

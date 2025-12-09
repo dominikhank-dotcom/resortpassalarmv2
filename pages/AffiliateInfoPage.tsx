@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { ArrowRight, Check, DollarSign, TrendingUp, Users, Shield, Calculator, ArrowLeft } from 'lucide-react';
 import { Button } from '../components/Button';
@@ -77,7 +78,7 @@ export const AffiliateInfoPage: React.FC<AffiliateInfoProps> = ({ onSignup, onBa
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">Monatliche Auszahlung</h3>
                 <p className="text-slate-600 leading-relaxed">
-                Wir überweisen dein Guthaben pünktlich zum Monatsanfang direkt auf dein Bankkonto oder PayPal. Zuverlässig und schnell.
+                Wir überweisen dein Guthaben pünktlich zum Monatsanfang direkt auf dein Bankkonto (via Stripe). Zuverlässig und schnell.
                 </p>
             </div>
             </div>

@@ -223,7 +223,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
   // Partner Settings & Payouts
   const [aiInsights, setAiInsights] = useState<string>("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [pendingPayouts, setPendingPayouts] = useState<any[]>([]);
   const [isRepairing, setIsRepairing] = useState(false);
 
   const [isTestingConnection, setIsTestingConnection] = useState(false);
@@ -316,13 +315,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             });
         }
 
-        // 6. Fetch Pending Payouts (Only if tab is partners)
-        if (activeTab === 'partners') {
-            const payouts = await getAdminPayouts();
-            if (payouts) setPendingPayouts(payouts);
-        }
-
-        // 7. Fetch Email Templates
+        // 6. Fetch Email Templates
         if (activeTab === 'emails') {
             const dbTemplates = await getEmailTemplates();
             if (dbTemplates) {
@@ -490,16 +483,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
     } catch (error: any) { alert("Fehler: " + error.message); }
   };
 
-  const handleMarkPayoutComplete = async (payoutId: string) => {
-    if (confirm("Geld gesendet?")) {
-        try {
-            await markPayoutComplete(payoutId);
-            setPendingPayouts(prev => prev.filter(p => p.id !== payoutId));
-            alert("Markiert.");
-        } catch (e: any) { alert("Fehler: " + e.message); }
-    }
-  }
-
   const handleRepairCommissions = async () => {
       setIsRepairing(true);
       try {
@@ -627,7 +610,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
       {activeTab === 'partners' && !selectedCustomerId && (
           <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><div className="flex justify-between items-start mb-4"><h3 className="font-bold text-slate-900 flex items-center gap-2"><Settings size={20} className="text-blue-600" /> Programm Konfiguration</h3><Button onClick={handleRepairCommissions} disabled={isRepairing} size="sm" variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"><Wrench size={16} className={isRepairing ? "animate-spin mr-2" : "mr-2"} />{isRepairing ? "Prüfe..." : "Provisionen Reparieren"}</Button></div><div className="flex items-end gap-4"><div className="flex-1 max-w-xs"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Globale Provision (%)</label><input type="number" min="0" max="100" value={commissionRate} onChange={(e) => onUpdateCommission(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-blue-500 outline-none font-bold text-lg" /></div><div className="flex-1"><p className="text-sm text-slate-500 mb-2">Änderungen wirken sich sofort auf alle Anzeigetexte, Rechenbeispiele und zukünftige Abrechnungen aus.</p></div><Button onClick={handleSaveCommission}><Save size={16} className="mr-2" /> Speichern</Button></div></div>
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8"><div className="p-6 border-b border-slate-100 bg-amber-50"><h3 className="font-bold text-amber-900 flex items-center gap-2"><Wallet size={20} /> Offene Auszahlungen (PayPal)</h3></div><table className="w-full text-left"><thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold"><tr><th className="px-6 py-3">Datum</th><th className="px-6 py-3">Partner</th><th className="px-6 py-3">PayPal Email</th><th className="px-6 py-3 text-right">Betrag</th><th className="px-6 py-3 text-right">Aktion</th></tr></thead><tbody className="divide-y divide-slate-100">{pendingPayouts.map((payout) => (<tr key={payout.id}><td className="px-6 py-4 text-slate-500 text-sm">{new Date(payout.requested_at).toLocaleDateString()}</td><td className="px-6 py-4 font-medium text-slate-900">{payout.profiles?.first_name} {payout.profiles?.last_name}</td><td className="px-6 py-4 text-slate-600 font-mono text-sm bg-slate-50">{payout.paypal_email}</td><td className="px-6 py-4 text-right font-bold text-green-600">{Number(payout.amount).toFixed(2)} €</td><td className="px-6 py-4 text-right"><Button size="sm" onClick={() => handleMarkPayoutComplete(payout.id)}><Check size={14} className="mr-1" /> Geld gesendet</Button></td></tr>))}</tbody></table></div>
+          
           <div className="grid grid-cols-1 lg:grid-cols-1 gap-8"><div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden"><div className="p-6 border-b border-slate-100"><h3 className="font-bold text-slate-900">Partner Liste ({partners.length})</h3></div><table className="w-full text-left"><thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold"><tr><th className="px-6 py-3">#</th><th className="px-6 py-3">Name</th><th className="px-6 py-3">Email</th><th className="px-6 py-3">Code</th><th className="px-6 py-3 text-right">Registriert</th></tr></thead><tbody className="divide-y divide-slate-100">{partners.map((partner, index) => (<tr key={partner.id}><td className="px-6 py-3 text-slate-500 font-mono text-xs">{index + 1}</td><td className="px-6 py-3 font-medium text-slate-900">{partner.first_name} {partner.last_name}</td><td className="px-6 py-3 text-slate-600">{partner.email}</td><td className="px-6 py-3"><span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded border border-slate-200 block w-fit">{partner.referral_code || '—'}</span></td><td className="px-6 py-3 text-right text-slate-700">{new Date(partner.created_at).toLocaleDateString()}</td></tr>))}</tbody></table></div></div>
           </div>
       )}

@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { ArrowLeft, Shield, Scale, FileText, Lock } from 'lucide-react';
 import { Button } from '../components/Button';
@@ -141,7 +142,7 @@ export const TermsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     </p>
     <ul className="list-disc pl-5">
       <li>Anmeldung über den eigenen Partnerlink für den eigenen Bedarf.</li>
-      <li>Verwendung identischer E-Mail-Adressen oder Zahlungskonten (PayPal) für Partner- und Kundenkonto.</li>
+      <li>Verwendung identischer E-Mail-Adressen oder Auszahlungskonten (Stripe) für Partner- und Kundenkonto.</li>
       <li>Anmeldung von Personen, die im selben Haushalt wie der Partner leben (gleiche Anschrift).</li>
     </ul>
     <p>

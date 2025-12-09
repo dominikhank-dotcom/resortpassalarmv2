@@ -63,13 +63,10 @@ export default async function handler(req: any, res: any) {
         
         if (updateError) {
              console.error(">>> DB UPDATE ERROR:", updateError);
-             // Handle Schema Cache Error (PGRST204)
-             if (updateError.code === 'PGRST204' || updateError.code === '42703' || updateError.message?.includes('schema cache')) {
-                 console.warn(">>> SCHEMA CACHE ISSUE: Column 'welcome_mail_sent' not visible. Using FALLBACK MODE (Sending email without lock).");
-                 shouldSendEmail = true;
-             } else {
-                 throw updateError;
-             }
+             // STRICT MODE: If DB update fails (e.g. Schema Cache, Connection), abort email.
+             // Better to miss an email than to spam the user on every login.
+             console.warn(">>> ABORTING: Could not acquire lock (DB Error). Email NOT sent.");
+             return res.status(200).json({ success: true, message: 'DB Lock Error - Email skipped' });
         } else {
             if (updatedRows && updatedRows.length > 0) {
                 console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
@@ -80,8 +77,11 @@ export default async function handler(req: any, res: any) {
             }
         }
     } else {
-        // Fallback if profile missing completely
-        shouldSendEmail = true; 
+        // Fallback if profile missing completely (Rare race condition where DB trigger failed entirely)
+        // In this case, we can't lock, so we might risk a double email, but it's better than none for a new user.
+        // However, given the spam issue, we will be conservative.
+        console.warn(">>> PROFILE MISSING: Aborting to prevent potential loop/spam.");
+        return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
     }
 
     if (shouldSendEmail) {
@@ -94,7 +94,7 @@ export default async function handler(req: any, res: any) {
         const emailResponse = await resend.emails.send({
             from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
             to: email,
-            subject: `Willkommen bei ResortPassAlarm${firstName ? ', ' + firstName : ''}!`,
+            subject: `Willkommen bei ResortPassAlarm, ${firstName || ''}!`,
             html: `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>
             <p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p>
             <p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>

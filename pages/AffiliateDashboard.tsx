@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet, Info } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
 import { supabase, getEnv } from '../lib/supabase';
-import { updateAffiliateProfile, connectStripe, requestStripePayout, requestPaypalPayout } from '../services/backendService';
+import { updateAffiliateProfile, connectStripe, requestStripePayout } from '../services/backendService';
 
 // Mock Stats (Revenue history would come from commissions table in real DB)
 const INITIAL_STATS: AffiliateStats = {
@@ -39,8 +39,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     firstName: '',
     lastName: '',
     email: '',
-    website: '', // New field
-    referralCode: '', // New field
+    website: '', 
+    referralCode: '',
     street: '',
     houseNumber: '',
     zip: '',
@@ -48,7 +48,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     country: 'Deutschland',
     company: '',
     vatId: '',
-    paypalEmail: '',
     currentPassword: '',
     newPassword: '',
     confirmNewPassword: ''
@@ -70,8 +69,9 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 .single();
             
             if (profile) {
-                // --- TRIGGER WELCOME MAIL (Partner) - Safety Check ---
-                if (profile.partner_welcome_sent !== true) {
+                // --- TRIGGER WELCOME MAIL (Partner) - Strict Safety Check ---
+                // Trigger ONLY if explicitly FALSE or NULL.
+                if (profile.partner_welcome_sent === false || profile.partner_welcome_sent === null) {
                     const sessionKey = `partner_welcome_sent_${user.id}`;
                     const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
 
@@ -96,8 +96,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         })
                         .catch(e => console.error("Welcome trigger failed:", e));
                     }
-                } else {
-                    console.log("AffiliateDashboard: Welcome mail already marked sent in DB. Skipping.");
                 }
 
                 const loadedCode = profile.referral_code || profile.id;
@@ -114,7 +112,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     country: profile.country || 'Deutschland',
                     company: '', // Add columns if needed in DB
                     vatId: '',
-                    paypalEmail: profile.paypal_email || '',
                     currentPassword: '',
                     newPassword: '',
                     confirmNewPassword: ''
@@ -188,7 +185,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     settings.houseNumber.trim() !== '' &&
     settings.zip.trim() !== '' &&
     settings.city.trim() !== '' &&
-    (settings.paypalEmail.trim() !== '' || stripeConnected);
+    stripeConnected;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(refLink);
@@ -205,31 +202,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       setAiText("Fehler bei der Generierung.");
     } finally {
       setIsGenerating(false);
-    }
-  };
-
-  const handlePayoutPayPal = async () => {
-    if (stats.earnings < 20) {
-      alert("Auszahlung erst ab 20,00 € möglich.");
-      return;
-    }
-    if (!settings.paypalEmail) {
-        alert("Bitte hinterlege zuerst deine PayPal-Adresse in den Einstellungen.");
-        setActiveTab('settings');
-        return;
-    }
-
-    if (confirm(`Auszahlung von ${stats.earnings.toFixed(2)} € an ${settings.paypalEmail} anfordern?`)) {
-        setIsPayoutLoading(true);
-        try {
-            await requestPaypalPayout();
-            alert("Auszahlung angefordert! Das Geld ist in 1-3 Werktagen auf deinem PayPal Konto.");
-            setStats(prev => ({ ...prev, earnings: 0 })); // Reset visible earnings
-        } catch (error: any) {
-            alert("Fehler bei der Anforderung: " + error.message);
-        } finally {
-            setIsPayoutLoading(false);
-        }
     }
   };
 
@@ -278,16 +250,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
           } else {
               alert("Fehler beim Speichern: " + error.message);
           }
-      }
-  }
-
-  const handleSavePayPal = async (e: React.MouseEvent) => {
-      e.preventDefault();
-      try {
-          await updateAffiliateProfile(settings);
-          alert("PayPal Adresse erfolgreich gespeichert! Du kannst jetzt in der Übersicht eine Auszahlung anfordern.");
-      } catch (error: any) {
-          alert("Fehler beim Speichern: " + error.message);
       }
   }
 
@@ -405,18 +367,17 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     </Button>
                 ) : (
                     <Button 
-                        onClick={handlePayoutPayPal} 
+                        onClick={() => setActiveTab('settings')} 
                         size="sm" 
-                        variant="outline" 
-                        className="w-full text-blue-700 border-blue-200 hover:bg-blue-50"
-                        disabled={stats.earnings < 20 || !settings.paypalEmail || isPayoutLoading}
+                        variant="primary" 
+                        className="w-full bg-[#635BFF] hover:bg-[#5851E3] text-white"
                     >
-                        <Wallet size={16} /> 
-                        {isPayoutLoading ? 'Verarbeite...' : 'Auszahlen (PayPal)'}
+                        <CreditCard size={16} /> 
+                        Auszahlungskonto verbinden
                     </Button>
                 )}
-                {(!areSettingsComplete || (stats.earnings >= 20 && !stripeConnected && !settings.paypalEmail)) && (
-                  <p className="text-xs text-red-500 mt-2 text-center font-medium">Pflichtangaben (PayPal/Stripe) fehlen</p>
+                {(!areSettingsComplete || (stats.earnings >= 20 && !stripeConnected)) && (
+                  <p className="text-xs text-red-500 mt-2 text-center font-medium">Bitte Auszahlungsdaten (Stripe) vervollständigen</p>
                 )}
               </div>
             </div>
@@ -569,7 +530,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
 
               <hr className="border-slate-100" />
 
-              {/* Partner Code Section (New) */}
+              {/* Partner Code Section */}
               <section className="bg-indigo-50 rounded-xl p-6 border border-indigo-100">
                  <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Hash size={16} /> Partner Code (Ref-ID)
@@ -597,7 +558,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         </Button>
                     </div>
                     
-                    {/* Warning Box */}
                     <div className="flex items-start gap-3 bg-indigo-100/50 p-3 rounded-lg border border-indigo-200">
                         <AlertTriangle className="text-indigo-500 shrink-0 mt-0.5" size={16} />
                         <div className="text-xs text-indigo-800">
@@ -719,7 +679,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                                    <CreditCard size={18} className="text-slate-700" /> Stripe Connect (Empfohlen)
+                                    <CreditCard size={18} className="text-slate-700" /> Stripe Connect (Erforderlich)
                                 </h4>
                                 <p className="text-sm text-slate-500 mt-1">
                                     Automatische Auszahlung direkt auf dein Bankkonto.
@@ -735,54 +695,26 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                         </div>
                         
                         {!stripeConnected ? (
-                            <Button 
-                                type="button" 
-                                onClick={handleConnectStripe}
-                                className="bg-[#635BFF] hover:bg-[#5851E3] text-white w-full sm:w-auto"
-                            >
-                                Mit Stripe verbinden
-                            </Button>
+                            <>
+                                <div className="bg-blue-50 p-4 rounded-lg mb-4 border border-blue-100 flex items-start gap-2">
+                                    <Info className="text-blue-500 mt-0.5 shrink-0" size={16} />
+                                    <p className="text-sm text-blue-800">
+                                        Wir nutzen Stripe Connect für sichere und schnelle Auszahlungen. Bitte verknüpfe dein Bankkonto, um Provisionen zu erhalten.
+                                    </p>
+                                </div>
+                                <Button 
+                                    type="button" 
+                                    onClick={handleConnectStripe}
+                                    className="bg-[#635BFF] hover:bg-[#5851E3] text-white w-full sm:w-auto"
+                                >
+                                    Mit Stripe verbinden
+                                </Button>
+                            </>
                         ) : (
                             <div className="text-sm text-green-700">
                                 Dein Konto ist erfolgreich verknüpft. Du kannst Auszahlungen im Dashboard anfordern.
                             </div>
                         )}
-                    </div>
-
-                    {/* PayPal Option */}
-                    <div className="rounded-xl p-6 border bg-white border-slate-200">
-                        <h4 className="font-bold text-slate-900 flex items-center gap-2 mb-2">
-                            <Wallet size={18} className="text-blue-700" /> PayPal (Alternativ)
-                        </h4>
-                        <p className="text-sm text-slate-500 mb-4">
-                            Für manuelle Auszahlungen.
-                        </p>
-                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
-                            <div className="flex-1">
-                                <label className="block text-sm font-medium text-slate-700 mb-1">PayPal E-Mail Adresse</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="email" 
-                                        value={settings.paypalEmail}
-                                        onChange={(e) => setSettings({...settings, paypalEmail: e.target.value})}
-                                        className="w-full px-4 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none" 
-                                        placeholder="deine-email@paypal.com"
-                                    />
-                                    <Button 
-                                        type="button" 
-                                        onClick={handleSavePayPal}
-                                        size="sm" 
-                                        variant="primary" 
-                                        className="bg-blue-600 hover:bg-blue-700 whitespace-nowrap"
-                                    >
-                                        <Save size={16} className="mr-1" /> Speichern
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mt-3 text-xs text-slate-500 flex items-center gap-1">
-                            Gespeichert? Hier <button type="button" onClick={() => setActiveTab('overview')} className="text-blue-600 hover:underline font-bold">Auszahlung anfordern</button>.
-                        </div>
                     </div>
                 </div>
               </section>

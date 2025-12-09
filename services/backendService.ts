@@ -173,8 +173,8 @@ export const updateAffiliateProfile = async (settings: any) => {
         house_number: settings.houseNumber,
         zip: settings.zip,
         city: settings.city,
-        country: settings.country,
-        paypal_email: settings.paypalEmail
+        country: settings.country
+        // PayPal email removed as we are moving to Stripe only
     }).eq('id', user.id);
 
     if (error) throw error;
@@ -313,25 +313,6 @@ export const requestStripePayout = async () => {
         return await handleResponse(response);
     } catch (error: any) {
         console.error("Request Payout Error:", error);
-        throw error;
-    }
-};
-
-// --- PAYPAL PAYOUTS ---
-
-export const requestPaypalPayout = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Nicht eingeloggt");
-
-    try {
-        const response = await fetch('/api/request-payout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.id })
-        });
-        return await handleResponse(response);
-    } catch (error: any) {
-        console.error("Request PayPal Payout Error:", error);
         throw error;
     }
 };
