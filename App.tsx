@@ -271,7 +271,17 @@ const LoginScreen: React.FC<{
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [userName, setUserName] = useState<string>(''); // Added state for User Name
-  const [currentPage, setCurrentPage] = useState('landing');
+  
+  // LAZY INITIALIZATION of Current Page to prevent routing glitch (redirect to landing)
+  // when browser refreshes on /dashboard or /affiliate
+  const [currentPage, setCurrentPage] = useState(() => {
+     const path = window.location.pathname;
+     if (path === '/dashboard') return 'dashboard';
+     if (path === '/affiliate') return 'affiliate';
+     if (path === '/admin-dashboard') return 'admin-dashboard';
+     return 'landing';
+  });
+  
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
   const [isAppInitializing, setIsAppInitializing] = useState(true); // Global Loading State
   
@@ -332,13 +342,8 @@ const App: React.FC = () => {
         setCurrentPage('login');
     } else if (pathname === '/login') {
         setCurrentPage('login');
-    } else if (pathname === '/dashboard') {
-        setCurrentPage('dashboard');
-    } else if (pathname === '/affiliate') {
-        setCurrentPage('affiliate');
-    } else if (pathname === '/admin-dashboard') {
-        setCurrentPage('admin-dashboard');
-    }
+    } 
+    // Logic for other pages is handled by initial state
 
     // 2. Check Session
     const checkSession = async () => {
@@ -353,10 +358,7 @@ const App: React.FC = () => {
               if (profile.role) setRole(profile.role as UserRole);
               if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
               
-              // Only redirect if we are not already on a specific intended page
-              // Note: If we already set currentPage to 'dashboard' via pathname above, this block might be skipped for redirection
-              // but we still update the role, which allows the dashboard component to render.
-              
+              // Smart Redirect on load if stuck on generic login/landing but user is auth'd
               if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
                   if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');

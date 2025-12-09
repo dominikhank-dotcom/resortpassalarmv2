@@ -268,10 +268,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
            setAdminAuth(prev => ({ ...prev, currentEmail: user.email! }));
         }
 
-        // 2. Fetch Customers
+        // 2. Fetch Customers with Subscription Status
         const { data: customerData } = await supabase
           .from('profiles')
-          .select('*')
+          .select('*, subscriptions(status, plan_type, current_period_end, cancel_at_period_end)')
           .eq('role', 'CUSTOMER')
           .order('created_at', { ascending: false });
         
@@ -591,7 +591,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ commissionRate, 
             {!selectedCustomerId ? (
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-bottom-4">
                     <div className="p-6 border-b border-slate-100 flex justify-between items-center"><h3 className="text-lg font-bold text-slate-900">Kundenverzeichnis ({customers.length})</h3></div>
-                    <div className="overflow-x-auto"><table className="w-full text-left"><thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold"><tr><th className="px-6 py-4">Kunden ID</th><th className="px-6 py-4">Name</th><th className="px-6 py-4">Email</th><th className="px-6 py-4">Beigetreten am</th><th className="px-6 py-4 text-right">Aktionen</th></tr></thead><tbody className="divide-y divide-slate-100">{customers.map((customer) => (<tr key={customer.id} className="hover:bg-slate-50 transition-colors"><td className="px-6 py-4 font-mono text-xs text-slate-500">{customer.id.substring(0,8)}...</td><td className="px-6 py-4 font-medium text-slate-900">{customer.first_name} {customer.last_name}</td><td className="px-6 py-4 text-slate-600">{customer.email}</td><td className="px-6 py-4 text-slate-500 text-sm">{new Date(customer.created_at).toLocaleDateString()}</td><td className="px-6 py-4 text-right"><button onClick={() => handleSelectCustomer(customer)} className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded hover:bg-blue-50">Details</button></td></tr>))}</tbody></table></div>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="bg-slate-50 text-slate-500 text-xs uppercase font-semibold">
+                                <tr>
+                                    <th className="px-6 py-4">Kunden ID</th>
+                                    <th className="px-6 py-4">Name</th>
+                                    <th className="px-6 py-4">Email</th>
+                                    <th className="px-6 py-4">Abo Status</th>
+                                    <th className="px-6 py-4">Beigetreten am</th>
+                                    <th className="px-6 py-4 text-right">Aktionen</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {customers.map((customer) => {
+                                    // Subscription Logic for Badge
+                                    const subs = customer.subscriptions || [];
+                                    const activeSub = subs.find((s: any) => s.status === 'active' || s.status === 'trialing');
+                                    let statusBadge = <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded font-bold">Inaktiv</span>;
+
+                                    if (activeSub) {
+                                        if (activeSub.cancel_at_period_end) {
+                                            statusBadge = <span className="bg-amber-100 text-amber-700 text-xs px-2 py-1 rounded font-bold">Gekündigt</span>;
+                                        } else {
+                                            statusBadge = <span className="bg-green-100 text-green-700 text-xs px-2 py-1 rounded font-bold">Aktiv</span>;
+                                        }
+                                    } else if (subs.length > 0) {
+                                        // Has old subs
+                                        statusBadge = <span className="bg-slate-100 text-slate-500 text-xs px-2 py-1 rounded font-bold">Inaktiv</span>;
+                                    }
+
+                                    return (
+                                        <tr key={customer.id} className="hover:bg-slate-50 transition-colors">
+                                            <td className="px-6 py-4 font-mono text-xs text-slate-500">{customer.id.substring(0,8)}...</td>
+                                            <td className="px-6 py-4 font-medium text-slate-900">{customer.first_name} {customer.last_name}</td>
+                                            <td className="px-6 py-4 text-slate-600">{customer.email}</td>
+                                            <td className="px-6 py-4">{statusBadge}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-sm">{new Date(customer.created_at).toLocaleDateString()}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <button onClick={() => handleSelectCustomer(customer)} className="text-blue-600 hover:text-blue-800 text-sm font-medium px-3 py-1 rounded hover:bg-blue-50">Details</button>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             ) : (
                 <div className="animate-in fade-in slide-in-from-right-4">
