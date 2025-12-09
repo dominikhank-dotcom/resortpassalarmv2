@@ -32,13 +32,19 @@ export default async function handler(req: any, res: any) {
       return res.status(403).json({ errors: ["Test-Alarm nur mit aktivem Abo möglich."] });
   }
 
-  // --- 2. DUPLICATE CHECK (Cost Savings) ---
+  // --- 1.5 TEST LIMIT CHECK ---
   const { data: profile } = await supabase
       .from('profiles')
-      .select('last_test_config')
+      .select('last_test_config, test_alarm_count')
       .eq('id', userId)
       .single();
-  
+
+  const currentCount = profile?.test_alarm_count || 0;
+  if (currentCount >= 5) {
+      return res.status(403).json({ errors: ["Du hast das Limit von 5 Test-Alarmen erreicht."] });
+  }
+
+  // --- 2. DUPLICATE CHECK (Cost Savings) ---
   const lastConfig = profile?.last_test_config || {};
   let performEmail = sendEmail;
   let performSms = sendSms;
@@ -169,7 +175,12 @@ export default async function handler(req: any, res: any) {
           email: results.email === 'sent' ? email : lastConfig.email,
           phone: results.sms?.startsWith('sent') ? phone : lastConfig.phone
       };
-      await supabase.from('profiles').update({ last_test_config: newConfig }).eq('id', userId);
+      
+      // Update config AND increment counter
+      await supabase.from('profiles').update({ 
+          last_test_config: newConfig,
+          test_alarm_count: currentCount + 1
+      }).eq('id', userId);
   }
 
   // Partial success (e.g. Email sent, SMS failed) is still a 200 for the client to process

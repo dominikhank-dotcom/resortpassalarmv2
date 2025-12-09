@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
 import { UserDashboard } from './pages/UserDashboard';
@@ -274,6 +275,10 @@ const App: React.FC = () => {
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
   const [isAppInitializing, setIsAppInitializing] = useState(true); // Global Loading State
   
+  // Use ref to access current page inside closures/effects if needed
+  const currentPageRef = useRef(currentPage);
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+  
   // Global Commission & Price State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
   const [prices, setPrices] = useState({ new: 1.99, existing: 1.99 });
@@ -372,7 +377,14 @@ const App: React.FC = () => {
         if (event === 'SIGNED_OUT') {
             setRole(UserRole.GUEST);
             setUserName('');
-            setCurrentPage('landing');
+            
+            // Only redirect to landing if NOT currently on a login page.
+            // This prevents the error message (e.g. "Wrong Role") from being cleared 
+            // when the LoginScreen component forces a sign out.
+            const page = currentPageRef.current;
+            if (page !== 'login' && page !== 'affiliate-login' && page !== 'admin-login') {
+                setCurrentPage('landing');
+            }
         } else if (event === 'SIGNED_IN' && session) {
             // Re-fetch logic (same as above for robustness)
              supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single()

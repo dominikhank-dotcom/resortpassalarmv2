@@ -33,6 +33,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [isChecking, setIsChecking] = useState<string | null>(null); 
   const [isSendingAlarm, setIsSendingAlarm] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [testAlarmCount, setTestAlarmCount] = useState(0); // Track usage
 
   const [monitorGold, setMonitorGold] = useState<MonitorStatus>({
     isActive: true, lastChecked: "Lade...", isAvailable: false, url: productUrls.gold
@@ -80,6 +81,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
 
         if (profile) {
             setUserProfile(profile);
+            setTestAlarmCount(profile.test_alarm_count || 0); // Load count
             setPersonalData({
                 firstName: profile.first_name || '', 
                 lastName: profile.last_name || '', 
@@ -211,7 +213,25 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const saveEmail = async () => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; if (!emailRegex.test(tempData.email)) { setErrors(prev => ({ ...prev, email: "Ungültige E-Mail." })); return; } setNotifications(prev => ({ ...prev, email: tempData.email })); await updateProfileColumn('notification_email', tempData.email); setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
   const cancelEditEmail = () => { setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
   const startEditSms = () => { setTempData(prev => ({ ...prev, sms: notifications.sms })); setEditMode(prev => ({ ...prev, sms: true })); setErrors(prev => ({ ...prev, sms: '' })); };
-  const saveSms = async () => { if (!tempData.sms.startsWith('+') || tempData.sms.length < 9) { setErrors(prev => ({ ...prev, sms: "Format ungültig (+49...)." })); return; } setNotifications(prev => ({ ...prev, sms: tempData.sms })); await updateProfileColumn('phone', tempData.sms); setEditMode(prev => ({ ...prev, sms: false })); setErrors(prev => ({ ...prev, sms: '' })); };
+  
+  const saveSms = async () => { 
+      // STRICT FORMAT CHECK: +4917012345678 (E.164 format)
+      // Must start with +
+      // Must have digits
+      // Length between 9 and 16
+      const phoneRegex = /^\+[1-9]\d{7,14}$/;
+      
+      if (!phoneRegex.test(tempData.sms)) {
+           setErrors(prev => ({ ...prev, sms: "Ungültiges Format! Muss mit + (Ländercode) beginnen und nur Ziffern enthalten." })); 
+           return; 
+      } 
+      
+      setNotifications(prev => ({ ...prev, sms: tempData.sms })); 
+      await updateProfileColumn('phone', tempData.sms); 
+      setEditMode(prev => ({ ...prev, sms: false })); 
+      setErrors(prev => ({ ...prev, sms: '' })); 
+  };
+  
   const cancelEditSms = () => { setEditMode(prev => ({ ...prev, sms: false })); setErrors(prev => ({ ...prev, sms: '' })); };
 
   const handleTestAlarm = async () => { 
@@ -290,15 +310,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       
       return false;
   };
+  
+  const testLimitReached = testAlarmCount >= 5;
 
-  const testButtonDisabled = !hasActiveSubscription || isDuplicateTest();
-  const testButtonText = !hasActiveSubscription 
-        ? "Nur mit aktivem Abo" 
-        : isDuplicateTest() 
-            ? "Bereits getestet" 
-            : isSendingAlarm 
-                ? "Sende..." 
-                : "Test-Alarm senden";
+  const testButtonDisabled = !hasActiveSubscription || isDuplicateTest() || testLimitReached;
+  
+  let testButtonText = "Test-Alarm senden";
+  if (!hasActiveSubscription) testButtonText = "Nur mit aktivem Abo";
+  else if (testLimitReached) testButtonText = "Limit erreicht (5/5)";
+  else if (isDuplicateTest()) testButtonText = "Bereits getestet";
+  else if (isSendingAlarm) testButtonText = "Sende...";
 
   const StatusCard = ({ title, type, monitor, enabled, onToggle }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus, enabled: boolean, onToggle: (val: boolean) => void }) => { 
       const isLoading = isChecking === type; 
@@ -398,23 +419,44 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                         <div className="flex items-center gap-3"><MessageSquare className={notifications.smsEnabled ? "text-blue-600" : "text-slate-300"} size={20} /><p className="font-medium text-slate-900">SMS Alarm</p></div>
                         <div className="flex items-center gap-3"><label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" className="sr-only peer" checked={notifications.smsEnabled} onChange={(e) => handleToggleSms(e.target.checked)} /><div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-blue-600"></div></label>{!editMode.sms ? ( <button onClick={startEditSms} className="text-slate-400 hover:text-blue-600 p-1"><Pencil size={16} /></button> ) : ( <div className="flex gap-1"><button onClick={saveSms} className="text-green-600 hover:text-green-700 p-1"><Save size={16} /></button><button onClick={cancelEditSms} className="text-red-400 hover:text-red-600 p-1"><X size={16} /></button></div> )}</div>
                     </div>
-                    <div className="ml-8">{editMode.sms ? ( <div className="space-y-1"><input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} className="w-full text-sm p-2 border rounded" /></div> ) : ( <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> )}</div>
+                    
+                    <div className="ml-8">
+                        {editMode.sms ? ( 
+                            <div className="space-y-2">
+                                <input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} className="w-full text-sm p-2 border rounded" placeholder="+4917012345678" />
+                                <p className="text-xs text-slate-500">Format: +49... (Ländercode + Nummer ohne 0)</p>
+                                {errors.sms && <p className="text-xs text-red-500">{errors.sms}</p>}
+                            </div> 
+                        ) : ( 
+                            <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> 
+                        )}
+                    </div>
                 </div>
                 
                 <div className="pt-4 mt-4 border-t border-slate-100">
-                    <p className="text-xs text-slate-500 mb-3">Testalarm prüfen!</p>
+                    <div className="flex justify-between items-center mb-2">
+                        <p className="text-xs text-slate-500">Testalarm prüfen!</p>
+                        <span className="text-xs text-slate-400">{testAlarmCount} / 5 Tests genutzt</span>
+                    </div>
+                    
                     <Button 
                         onClick={handleTestAlarm} 
                         disabled={testButtonDisabled || isSendingAlarm} 
                         variant="secondary" 
                         size="sm" 
-                        className={`w-full justify-center ${isDuplicateTest() ? 'opacity-50 cursor-not-allowed text-slate-500 border-slate-200 bg-slate-50' : ''}`}
+                        className={`w-full justify-center ${testButtonDisabled ? 'opacity-50 cursor-not-allowed text-slate-500 border-slate-200 bg-slate-50' : ''}`}
                     >
                         {testButtonText}
                     </Button>
-                    {isDuplicateTest() && (
+                    
+                    {isDuplicateTest() && !testLimitReached && (
                         <p className="text-xs text-amber-600 mt-2 text-center">
                             Hinweis: Ändere deine E-Mail oder Handynummer, um einen erneuten Test durchzuführen.
+                        </p>
+                    )}
+                    {testLimitReached && (
+                         <p className="text-xs text-red-500 mt-2 text-center">
+                            Du hast das Limit für Test-Alarme erreicht.
                         </p>
                     )}
                 </div>
