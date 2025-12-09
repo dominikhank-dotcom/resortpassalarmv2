@@ -59,10 +59,12 @@ export default async function handler(req: any, res: any) {
   const processEvent = async () => {
       const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
+      // --- HANDLE NEW SUBSCRIPTION (ACTIVATION) ---
       if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
           let userId = session.client_reference_id;
 
+          // Fallback: Try to find user by email if client_reference_id is missing
           if (!userId && session.customer_email) {
               const { data: user } = await supabase.from('profiles').select('id').eq('email', session.customer_email).single();
               if (user) userId = user.id;
@@ -82,6 +84,7 @@ export default async function handler(req: any, res: any) {
                   }
               }
 
+              // Update DB
               try {
                   const { data: existingSub } = await supabase.from('subscriptions').select('id').eq('user_id', userId).maybeSingle();
                   const subData = {
@@ -98,20 +101,37 @@ export default async function handler(req: any, res: any) {
                   else await supabase.from('subscriptions').insert(subData);
               } catch (dbErr) { console.error("DB Update Error:", dbErr); }
 
-              if (resend && session.customer_email) {
+              // Send Activation Email
+              if (resend) {
                   try {
-                      const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
-                      await resend.emails.send({
-                          from: 'ResortPass Alarm <support@resortpassalarm.com>',
-                          to: session.customer_email,
-                          subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
-                          html: `<h1>Das ging schnell!</h1><p>Danke ${profile?.first_name || 'Kunde'}, deine Zahlung war erfolgreich. Die Überwachung ist aktiv.</p><p><a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>`
-                      });
+                      // Retrieve fresh profile to get name and correct email
+                      const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', userId).single();
+                      // Prefer session email, fallback to profile email
+                      const recipientEmail = session.customer_email || profile?.email;
+                      
+                      if (recipientEmail) {
+                          await resend.emails.send({
+                              from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                              to: recipientEmail,
+                              subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
+                              html: `
+                                <h1>Das ging schnell!</h1>
+                                <p>Hallo ${profile?.first_name || 'Fan'},</p>
+                                <p>Deine Zahlung war erfolgreich. Die Überwachung für deinen ResortPass ist ab sofort aktiv.</p>
+                                <p>Du kannst dich zurücklehnen. Wir melden uns, sobald Tickets verfügbar sind.</p>
+                                <p><a href="https://resortpassalarm.com/dashboard" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Dashboard</a></p>
+                              `
+                          });
+                          console.log(`Activation email sent to ${recipientEmail}`);
+                      } else {
+                          console.warn("Could not find email for activation notification.");
+                      }
                   } catch (emailErr) { console.error("Failed to send confirmation email:", emailErr); }
               }
           }
       }
 
+      // --- HANDLE INVOICE PAYMENT (RENEWAL) ---
       if (event.type === 'invoice.payment_succeeded') {
           const invoice = event.data.object;
           let userId = null;
@@ -139,7 +159,6 @@ export default async function handler(req: any, res: any) {
           if (userId && amountPaid > 0) {
               try {
                   // --- SYNC STRIPE ADDRESS TO PROFILE (Auto-Fill) ---
-                  // This ensures fraud checks work even if user didn't enter address in app
                   let userProfile = null;
                   const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
                   userProfile = profile;
@@ -158,13 +177,11 @@ export default async function handler(req: any, res: any) {
                           
                           // Update DB
                           await supabase.from('profiles').update(updateData).eq('id', userId);
-                          
-                          // Update local object for the check below
                           userProfile = { ...userProfile, ...updateData };
-                          console.log(`Synced Stripe Address to Profile for ${userId}`);
                       }
                   }
 
+                  // --- COMMISSION LOGIC ---
                   if (userProfile && userProfile.referred_by) {
                       const refCode = userProfile.referred_by;
                       let { data: partner } = await supabase.from('profiles').select('*').ilike('referral_code', refCode.trim()).maybeSingle();
@@ -180,32 +197,14 @@ export default async function handler(req: any, res: any) {
                           let isBlocked = false;
                           let blockReason = "";
 
-                          // 1. Same ID
                           if (partner.id === userProfile.id) {
                               isBlocked = true;
                               blockReason = "Same ID";
-                          }
-                          // 2. Same Email / PayPal
-                          else if (
-                              (partner.email && userProfile.email && partner.email.toLowerCase() === userProfile.email.toLowerCase()) ||
-                              (partner.paypal_email && userProfile.paypal_email && partner.paypal_email.toLowerCase() === userProfile.paypal_email.toLowerCase()) ||
-                              (partner.email && userProfile.paypal_email && partner.email.toLowerCase() === userProfile.paypal_email.toLowerCase())
+                          } else if (
+                              (partner.email && userProfile.email && partner.email.toLowerCase() === userProfile.email.toLowerCase())
                           ) {
                               isBlocked = true;
-                              blockReason = "Same Email/PayPal";
-                          }
-                          // 3. Household (Last Name + Zip + Street match)
-                          // Strict check to avoid flagging random neighbors, but catch obvious self-referrals
-                          else if (
-                              partner.last_name && userProfile.last_name && 
-                              partner.zip && userProfile.zip &&
-                              partner.street && userProfile.street &&
-                              partner.last_name.trim().toLowerCase() === userProfile.last_name.trim().toLowerCase() &&
-                              partner.zip.trim() === userProfile.zip.trim() &&
-                              partner.street.trim().toLowerCase() === userProfile.street.trim().toLowerCase()
-                          ) {
-                              isBlocked = true;
-                              blockReason = "Household Match (Name+Zip+Street)";
+                              blockReason = "Same Email";
                           }
 
                           // Fetch Global Commission Rate
@@ -223,13 +222,11 @@ export default async function handler(req: any, res: any) {
                           const commissionAmount = Number((amountPaid * commissionRate).toFixed(2));
                           
                           if (isBlocked) {
-                              console.warn(`Commission DECLINED for User ${userId} -> Partner ${partner.id}. Reason: ${blockReason}`);
-                              // Record the declined commission so it's visible in DB/Admin
                               await supabase.from('commissions').insert({ 
                                   partner_id: partner.id, 
                                   source_user_id: userId, 
                                   amount: commissionAmount, 
-                                  status: 'declined' // New status for blocked items
+                                  status: 'declined' 
                               });
                           } else {
                               await supabase.from('commissions').insert({ 
@@ -252,19 +249,67 @@ export default async function handler(req: any, res: any) {
                   from: 'ResortPass Alarm <support@resortpassalarm.com>',
                   to: invoice.customer_email,
                   subject: 'Wichtig: Zahlung fehlgeschlagen ⚠️',
-                  html: `<p>Hallo,</p><p>Leider ist die Zahlung für dein Abo fehlgeschlagen. Bitte prüfe deine Daten.</p><p><a href="https://resortpassalarm.com/dashboard">Dashboard</a></p>`
+                  html: `<p>Hallo,</p><p>Leider ist die Zahlung für dein Abo fehlgeschlagen. Bitte prüfe deine Daten im Dashboard, um weiterhin Alarme zu erhalten.</p><p><a href="https://resortpassalarm.com/dashboard">Dashboard</a></p>`
               });
           }
       }
 
+      // --- HANDLE CANCELLATION (Triggered when user clicks cancel in Stripe) ---
       if (event.type === 'customer.subscription.updated') {
           const subscription = event.data.object;
+          const previousAttributes = event.data.previous_attributes;
+
+          // 1. Update DB Status
           await supabase.from('subscriptions').update({ 
               cancel_at_period_end: subscription.cancel_at_period_end,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
           }).eq('stripe_subscription_id', subscription.id);
+
+          // 2. Check if this update IS a cancellation
+          // Logic: cancel_at_period_end changed from false (or undefined) to true
+          if (subscription.cancel_at_period_end === true && previousAttributes && previousAttributes.cancel_at_period_end === false) {
+              
+              if (resend) {
+                  try {
+                      // Fetch user info using Stripe Sub ID to be sure
+                      const { data: sub } = await supabase
+                          .from('subscriptions')
+                          .select('user_id')
+                          .eq('stripe_subscription_id', subscription.id)
+                          .single();
+
+                      if (sub && sub.user_id) {
+                          const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', sub.user_id).single();
+                          
+                          if (profile && profile.email) {
+                              const endDate = new Date(subscription.current_period_end * 1000).toLocaleDateString('de-DE');
+                              
+                              await resend.emails.send({
+                                  from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                                  to: profile.email,
+                                  subject: 'Bestätigung deiner Kündigung',
+                                  html: `
+                                    <h1>Schade, dass du gehst!</h1>
+                                    <p>Hallo ${profile.first_name || 'Fan'},</p>
+                                    <p>Wir bestätigen hiermit den Eingang deiner Kündigung.</p>
+                                    <p><strong>Dein Abo läuft noch bis zum: ${endDate}</strong></p>
+                                    <p>Bis dahin erhältst du weiterhin Alarme. Nach diesem Datum stoppen alle Benachrichtigungen automatisch.</p>
+                                    <hr>
+                                    <p>Es hat sich eine gute Chance ergeben? Du kannst dein Abo jederzeit vor Ablauf mit einem Klick im Dashboard verlängern:</p>
+                                    <p><a href="https://resortpassalarm.com/dashboard" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Kündigung zurücknehmen</a></p>
+                                  `
+                              });
+                              console.log(`Cancellation confirmation sent to ${profile.email}`);
+                          }
+                      }
+                  } catch (e: any) {
+                      console.error("Failed to send cancellation email:", e);
+                  }
+              }
+          }
       }
 
+      // --- HANDLE FINAL DELETION (Period ended) ---
       if (event.type === 'customer.subscription.deleted') {
           const subscription = event.data.object;
           await supabase.from('subscriptions').update({ status: 'canceled' }).eq('stripe_subscription_id', subscription.id);
@@ -276,8 +321,8 @@ export default async function handler(req: any, res: any) {
                    await resend.emails.send({
                       from: 'ResortPass Alarm <support@resortpassalarm.com>',
                       to: profile.email,
-                      subject: 'Dein Abo wurde beendet',
-                      html: `<p>Hallo ${profile.first_name || ''},</p><p>Dein ResortPassAlarm Abo ist nun ausgelaufen.</p>`
+                      subject: 'Dein Abo ist beendet',
+                      html: `<p>Hallo ${profile.first_name || ''},</p><p>Dein ResortPassAlarm Abo ist heute ausgelaufen. Du erhältst keine Benachrichtigungen mehr.</p><p>Du kannst jederzeit ein neues Abo im Dashboard starten.</p>`
                   });
                }
           }

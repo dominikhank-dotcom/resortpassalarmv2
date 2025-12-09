@@ -59,12 +59,7 @@ const LoginScreen: React.FC<{
             const userRole = profile.role as UserRole;
 
             // --- STRICT ROLE SEPARATION CHECK ---
-            // If I am on "Affiliate Login" page (role prop = AFFILIATE), I must be an AFFILIATE.
-            // If I am on "Customer Login" page (role prop = CUSTOMER), I must be a CUSTOMER.
-            // Admin can only login on Admin page.
-            
             if (role !== UserRole.GUEST && userRole !== role) {
-                // Determine user friendly names
                 const roleNames: Record<string, string> = {
                     [UserRole.ADMIN]: 'Admin',
                     [UserRole.AFFILIATE]: 'Partner',
@@ -351,16 +346,38 @@ const App: React.FC = () => {
     } else if (pathname === '/affiliate-login') {
         setCurrentPage('affiliate-login');
     }
-    // Logic for other pages is handled by initial state
 
     // 2. Check Session
     const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session) {
+      // Check if we are returning from Stripe (params present)
+      const urlParams = new URLSearchParams(window.location.search);
+      const isStripeReturn = urlParams.get('payment_success') || urlParams.get('portal_return');
+
+      // If returning from Stripe, give Supabase extra time to rehydrate from localStorage
+      // before giving up and showing the login screen.
+      let attempts = 0;
+      let maxAttempts = isStripeReturn ? 5 : 1; 
+      
+      let sessionData = null;
+
+      while (attempts < maxAttempts) {
+          try {
+            const { data } = await supabase.auth.getSession();
+            if (data.session) {
+                sessionData = data;
+                break;
+            }
+          } catch (e) { console.error("Session check error", e); }
+          
+          if (isStripeReturn) {
+              await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+          }
+          attempts++;
+      }
+
+      if (sessionData && sessionData.session) {
           // Fetch role AND Name
-          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single();
+          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', sessionData.session.user.id).single();
           
           if (profile) {
               if (profile.role) setRole(profile.role as UserRole);
@@ -375,16 +392,17 @@ const App: React.FC = () => {
           } else {
                // Fallback if profile missing
                console.error("Session exists but Profile missing");
-               await supabase.auth.signOut(); // Safety logout if DB invalid
+               await supabase.auth.signOut(); 
                setRole(UserRole.GUEST);
           }
-        }
-      } catch (error) {
-        console.error("Session check error", error);
-      } finally {
-        // Only stop loading after we determined role
-        setIsAppInitializing(false);
+      } else {
+          // No session found after retries
+          // If we came from Stripe, we might want to ensure we stay on 'dashboard' page so LoginScreen is rendered there 
+          // (which is handled by default fallthrough in renderContent)
       }
+      
+      // Stop loading
+      setIsAppInitializing(false);
     };
     
     checkSession();
@@ -394,12 +412,10 @@ const App: React.FC = () => {
             setRole(UserRole.GUEST);
             setUserName('');
             
-            // Allow staying on dashboard pages so users can see login screen there
             const page = currentPageRef.current;
             const protectedPages = ['dashboard', 'affiliate', 'admin-dashboard'];
             const loginPages = ['login', 'affiliate-login', 'admin-login'];
             
-            // Only redirect to landing if we are NOT on a protected page AND NOT on a login page
             if (!protectedPages.includes(page) && !loginPages.includes(page)) {
                 setCurrentPage('landing');
             }
@@ -424,7 +440,6 @@ const App: React.FC = () => {
   const navigate = (page: string) => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
-    // Clear notification when navigating away
     if (page !== 'login' && page !== 'affiliate-login') setLoginNotification(null);
   };
 
@@ -432,7 +447,6 @@ const App: React.FC = () => {
     setRole(newRole);
   };
 
-  // Smart Navigation after Login
   const handlePostLogin = (detectedRole?: UserRole) => {
       const targetRole = detectedRole || role;
       if (targetRole === UserRole.ADMIN) navigate('admin-dashboard');
