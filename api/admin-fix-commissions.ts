@@ -21,6 +21,17 @@ export default async function handler(req: any, res: any) {
 
     try {
         console.log("Starting Commission Repair...");
+
+        // 1.5 Get Global Commission Rate
+        let commissionRate = 0.5;
+        const { data: commSetting } = await supabase
+            .from('system_settings')
+            .select('value')
+            .eq('key', 'global_commission_rate')
+            .single();
+        if (commSetting && commSetting.value) {
+            commissionRate = parseFloat(commSetting.value) / 100;
+        }
         
         // 2. Get all active subscriptions
         const { data: subs } = await supabase
@@ -117,7 +128,7 @@ export default async function handler(req: any, res: any) {
                         }
 
                         const price = sub.subscription_price ? Number(sub.subscription_price) : 1.99;
-                        const amount = Number((price * 0.5).toFixed(2));
+                        const amount = Number((price * commissionRate).toFixed(2));
 
                         if (isBlocked) {
                             // INSERT AS DECLINED to track it

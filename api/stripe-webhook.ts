@@ -208,7 +208,19 @@ export default async function handler(req: any, res: any) {
                               blockReason = "Household Match (Name+Zip+Street)";
                           }
 
-                          const commissionAmount = Number((amountPaid * 0.50).toFixed(2));
+                          // Fetch Global Commission Rate
+                          let commissionRate = 0.5; // Default 50%
+                          const { data: commSetting } = await supabase
+                              .from('system_settings')
+                              .select('value')
+                              .eq('key', 'global_commission_rate')
+                              .single();
+                          
+                          if (commSetting && commSetting.value) {
+                              commissionRate = parseFloat(commSetting.value) / 100;
+                          }
+
+                          const commissionAmount = Number((amountPaid * commissionRate).toFixed(2));
                           
                           if (isBlocked) {
                               console.warn(`Commission DECLINED for User ${userId} -> Partner ${partner.id}. Reason: ${blockReason}`);
