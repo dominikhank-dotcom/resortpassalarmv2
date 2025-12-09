@@ -10,7 +10,7 @@ import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
 import { UserRole } from './types';
 import { supabase, getEnv } from './lib/supabase';
-import { CheckCircle } from 'lucide-react';
+import { CheckCircle, Loader2 } from 'lucide-react';
 import { getSystemSettings } from './services/backendService';
 
 // Simple mock Login screen with Forgot Password flow
@@ -58,11 +58,26 @@ const LoginScreen: React.FC<{
          if (profile) {
             const userRole = profile.role as UserRole;
 
-            // PERMISSION CHECK for ADMIN only
-            // For Customer/Affiliate mix-ups, we will handle redirection in onLogin
-            if (role === UserRole.ADMIN && userRole !== UserRole.ADMIN) {
-                await supabase.auth.signOut(); // Logout immediately
-                throw new Error("Keine Berechtigung für diesen Bereich.");
+            // --- STRICT ROLE SEPARATION CHECK ---
+            // If I am on "Affiliate Login" page (role prop = AFFILIATE), I must be an AFFILIATE.
+            // If I am on "Customer Login" page (role prop = CUSTOMER), I must be a CUSTOMER.
+            // Admin can only login on Admin page.
+            
+            if (role !== UserRole.GUEST && userRole !== role) {
+                // Determine user friendly names
+                const roleNames: Record<string, string> = {
+                    [UserRole.ADMIN]: 'Admin',
+                    [UserRole.AFFILIATE]: 'Partner',
+                    [UserRole.CUSTOMER]: 'Kunde'
+                };
+                
+                const expected = roleNames[role] || role;
+                const actual = roleNames[userRole] || userRole;
+
+                // LOGOUT IMMEDIATELY
+                await supabase.auth.signOut();
+                
+                throw new Error(`Falscher Bereich. Du hast versucht dich mit einem ${actual}-Konto im ${expected}-Login anzumelden.`);
             }
 
             // Update global state
@@ -257,6 +272,7 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState<string>(''); // Added state for User Name
   const [currentPage, setCurrentPage] = useState('landing');
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
+  const [isAppInitializing, setIsAppInitializing] = useState(true); // Global Loading State
   
   // Global Commission & Price State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
@@ -315,26 +331,38 @@ const App: React.FC = () => {
 
     // 2. Check Session
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session) {
-        // Fetch role AND Name
-        const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single();
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
         
-        if (profile) {
-            if (profile.role) setRole(profile.role as UserRole);
-            if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
-            
-            // Only redirect if we are not already on a specific intended page
-            if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
-                if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
-                else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
-                else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
-            }
-        } else {
-             // Fallback if profile missing
-             setRole(UserRole.CUSTOMER);
+        if (session) {
+          // Fetch role AND Name
+          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single();
+          
+          if (profile) {
+              if (profile.role) setRole(profile.role as UserRole);
+              if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
+              
+              // Only redirect if we are not already on a specific intended page
+              if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
+                  if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                  else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
+                  else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
+              }
+          } else {
+               // Fallback if profile missing
+               // Don't default to CUSTOMER blindly if session exists but no profile. 
+               // This prevents "Kunde" showing up momentarily for Partners.
+               // We keep GUEST until we know for sure or handle error.
+               console.error("Session exists but Profile missing");
+               await supabase.auth.signOut(); // Safety logout if DB invalid
+               setRole(UserRole.GUEST);
+          }
         }
+      } catch (error) {
+        console.error("Session check error", error);
+      } finally {
+        // Only stop loading after we determined role
+        setIsAppInitializing(false);
       }
     };
     
@@ -443,6 +471,17 @@ const App: React.FC = () => {
         return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} />;
     }
   };
+
+  if (isAppInitializing) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+         <div className="text-center">
+             <Loader2 size={48} className="animate-spin text-[#00305e] mx-auto mb-4" />
+             <h2 className="text-slate-900 font-bold text-lg">Lade System...</h2>
+         </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
