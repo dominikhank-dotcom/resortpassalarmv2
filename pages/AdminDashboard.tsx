@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle
 } from 'lucide-react';
 import { Button } from '../components/Button';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { generateAdminInsights } from '../services/geminiService';
 import { 
   sendTemplateTest, 
@@ -15,10 +16,9 @@ import {
   updateSystemSettings, 
   updateSystemStatus, 
   getSystemSettings, 
-  getAdminPayouts, 
-  markPayoutComplete, 
   getEmailTemplates, 
-  saveEmailTemplate 
+  saveEmailTemplate,
+  adminUpdateCustomer
 } from '../services/backendService';
 import { EmailTemplate } from '../types';
 
@@ -34,14 +34,22 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   commissionRate, onUpdateCommission, prices, onUpdatePrices, productUrls, onUpdateProductUrls 
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'partners' | 'finance' | 'settings' | 'system' | 'emails'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'emails' | 'settings'>('overview');
+  
+  // Date Picker State
+  const [dateRange, setDateRange] = useState({
+      start: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString().split('T')[0],
+      end: new Date().toISOString().split('T')[0]
+  });
+
   const [stats, setStats] = useState<any>({
     activeUsers: 0,
     revenue: 0,
     profit: 0,
     newCustomers: 0,
-    conversionRate: 0
+    history: []
   });
+  
   const [loading, setLoading] = useState(false);
   const [aiInsights, setAiInsights] = useState("");
 
@@ -56,26 +64,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Users Management State
   const [userList, setUserList] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchUserId, setSearchUserId] = useState("");
-  const [foundUser, setFoundUser] = useState<any>(null);
+  
+  // Customer Detail Modal State
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [editCustomerMode, setEditCustomerMode] = useState(false);
+  const [customerForm, setCustomerForm] = useState<any>({});
 
-  // Finance State
-  const [payouts, setPayouts] = useState<any[]>([]);
+  // Partners State
+  const [partnerList, setPartnerList] = useState<any[]>([]);
+  const [partnerSettings, setPartnerSettings] = useState({ newRate: commissionRate, oldRate: commissionRate }); // oldRate is visual for now
 
   useEffect(() => {
     loadStats();
     loadSystemSettings();
-  }, []);
+  }, [dateRange]); // Reload stats when date changes
 
   useEffect(() => {
-    if (activeTab === 'users' || activeTab === 'partners') loadAllUsers();
-    if (activeTab === 'finance') loadPayouts();
+    if (activeTab === 'customers') loadAllUsers();
+    if (activeTab === 'partners') loadAllUsers(); // Partners are also in profiles
     if (activeTab === 'emails') loadTemplates();
   }, [activeTab]);
 
   const loadStats = async () => {
     try {
-        const response = await fetch('/api/admin-stats');
+        const query = `?startDate=${dateRange.start}&endDate=${dateRange.end}`;
+        const response = await fetch(`/api/admin-stats${query}`);
         const data = await response.json();
         if (data && !data.error) setStats(data);
     } catch (e) {
@@ -91,6 +105,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               silver: s.status_silver || 'sold_out',
               lastChecked: s.last_checked || '...'
           });
+          // Load Partner Settings
+          if (s.global_commission_rate) {
+              const rate = Number(s.global_commission_rate);
+              setPartnerSettings({ newRate: rate, oldRate: rate });
+              onUpdateCommission(rate);
+          }
       }
   };
 
@@ -98,15 +118,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     try {
         const res = await fetch('/api/debug-users');
         const data = await res.json();
-        if (data.users) setUserList(data.users);
+        if (data.users) {
+            setUserList(data.users);
+            // Filter partners
+            const partners = data.users.filter((u: any) => u.role === 'AFFILIATE' || u.ref_code); // Assuming role check logic in backend or added here
+            // Since debug-users might not return role explicitly if not updated, let's rely on role field if present
+            setPartnerList(data.users.filter((u: any) => u.role === 'AFFILIATE')); 
+        }
     } catch (e) { console.error("Load Users Error", e); }
-  };
-
-  const loadPayouts = async () => {
-      try {
-          const data = await getAdminPayouts();
-          if (data) setPayouts(data);
-      } catch (e) { console.error("Load Payouts Error", e); }
   };
 
   const loadTemplates = async () => {
@@ -114,43 +133,94 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (t) setTemplates(t);
   };
 
-  const handleGenerateInsights = async () => {
-      setLoading(true);
-      try {
-          const text = await generateAdminInsights(stats);
-          setAiInsights(text);
-      } catch (e) {
-          setAiInsights("Fehler bei der Generierung.");
-      } finally {
-          setLoading(false);
-      }
-  };
-
   const handleUpdateStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       if (!confirm(`Bist du sicher? Dies sendet Alarme für ${type.toUpperCase()} wenn 'available'!`)) return;
       try {
           await updateSystemStatus(type, status);
-          alert(`Status für ${type} auf ${status} gesetzt. Alarme werden versendet.`);
+          alert(`Status für ${type} auf ${status} gesetzt.`);
           loadSystemSettings();
       } catch (e: any) {
           alert("Fehler: " + e.message);
       }
   };
 
-  const handleUserSearch = async () => {
-      if (!searchUserId) return;
+  const handleOpenCustomerDetail = async (userId: string) => {
+      setIsDetailLoading(true);
+      setSelectedCustomer(null);
       try {
-          const data = await getCustomerDetails(searchUserId);
+          const data = await getCustomerDetails(userId);
           if (data.success) {
-              setFoundUser({ profile: data.profile, subscription: data.subscription });
-          } else {
-              alert("User nicht gefunden.");
-              setFoundUser(null);
+              setSelectedCustomer({ profile: data.profile, subscription: data.subscription });
+              setCustomerForm({
+                  firstName: data.profile.first_name || '',
+                  lastName: data.profile.last_name || '',
+                  email: data.profile.email || '',
+                  street: data.profile.street || '',
+                  houseNumber: data.profile.house_number || '',
+                  zip: data.profile.zip || '',
+                  city: data.profile.city || '',
+                  country: data.profile.country || 'Deutschland'
+              });
           }
-      } catch (e: any) {
-          alert(e.message);
-      }
+      } catch (e: any) { alert(e.message); }
+      finally { setIsDetailLoading(false); }
   };
+
+  const handleSaveCustomer = async () => {
+      if (!selectedCustomer) return;
+      try {
+          await adminUpdateCustomer({
+              targetUserId: selectedCustomer.profile.id,
+              email: customerForm.email,
+              firstName: customerForm.firstName,
+              lastName: customerForm.lastName,
+              address: {
+                  street: customerForm.street,
+                  houseNumber: customerForm.houseNumber,
+                  zip: customerForm.zip,
+                  city: customerForm.city,
+                  country: customerForm.country
+              }
+          });
+          alert("Kunde gespeichert!");
+          setEditCustomerMode(false);
+          handleOpenCustomerDetail(selectedCustomer.profile.id); // Refresh
+      } catch (e: any) { alert("Fehler: " + e.message); }
+  };
+
+  const handleManageSub = async (action: 'grant_free' | 'revoke_free' | 'cancel_sub') => {
+      if (!selectedCustomer) return;
+      if (!confirm("Bist du sicher?")) return;
+      try {
+          await manageSubscription(selectedCustomer.profile.id, action);
+          handleOpenCustomerDetail(selectedCustomer.profile.id);
+          alert("Status aktualisiert.");
+      } catch (e: any) { alert(e.message); }
+  };
+
+  const handleSavePartnerSettings = async () => {
+      try {
+          await updateSystemSettings('global_commission_rate', partnerSettings.newRate.toString());
+          onUpdateCommission(partnerSettings.newRate);
+          alert("Partner Provision gespeichert! Neue Partner erhalten nun " + partnerSettings.newRate + "%.");
+      } catch (e: any) { alert(e.message); }
+  };
+
+  const handleSavePrices = async () => {
+    try {
+      await updateSystemSettings('price_new_customers', prices.new.toString());
+      await updateSystemSettings('price_existing_customers', prices.existing.toString());
+      alert("Preise gespeichert!");
+    } catch(e: any) { alert("Fehler: " + e.message); }
+  };
+  
+  const handleSaveUrls = async () => {
+      try {
+        await updateSystemSettings('url_gold', productUrls.gold);
+        await updateSystemSettings('url_silver', productUrls.silver);
+        alert("URLs gespeichert!");
+      } catch(e:any) { alert(e.message); }
+  }
 
   const handleSaveTemplate = async () => {
       if (!selectedTemplate) return;
@@ -158,53 +228,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           await saveEmailTemplate(selectedTemplate);
           alert("Template gespeichert!");
           loadTemplates();
-      } catch (e: any) {
-          alert("Fehler: " + e.message);
-      }
-  };
-
-  const handleTestEmail = async () => {
-      if (!selectedTemplate || !testEmailAddr) return alert("Template wählen und Email angeben");
-      try {
-          await sendTemplateTest(selectedTemplate, testEmailAddr);
-          alert("Test Email gesendet!");
-      } catch (e: any) {
-          alert("Fehler: " + e.message);
-      }
-  };
-
-  const handleMarkPaid = async (id: string) => {
-      if (!confirm("Als bezahlt markieren?")) return;
-      try {
-          await markPayoutComplete(id);
-          loadPayouts();
-      } catch (e: any) {
-          alert("Fehler: " + e.message);
-      }
-  };
-
-  const handleSaveCommission = async () => {
-    try {
-      await updateSystemSettings('global_commission_rate', commissionRate.toString());
-      alert("Provision erfolgreich gespeichert!");
-    } catch(e: any) { alert("Fehler: " + e.message); }
-  };
-
-  const handleSavePrices = async () => {
-    try {
-      await updateSystemSettings('price_new_customers', prices.new.toString());
-      await updateSystemSettings('price_existing_customers', prices.existing.toString());
-      // Also save URLs here as they are part of settings now
-      await updateSystemSettings('url_gold', productUrls.gold);
-      await updateSystemSettings('url_silver', productUrls.silver);
-      alert("Einstellungen erfolgreich gespeichert!");
-    } catch(e: any) { alert("Fehler: " + e.message); }
+      } catch (e: any) { alert("Fehler: " + e.message); }
   };
 
   const filteredUsers = userList.filter(u => 
-    u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.id?.includes(searchTerm)
+    u.id?.includes(searchTerm)) && u.role === 'CUSTOMER'
   );
 
   return (
@@ -214,13 +244,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              <h1 className="text-xl font-bold flex items-center gap-2"><LayoutDashboard className="text-blue-400"/> Admin Konsole</h1>
              <div className="flex gap-1 bg-slate-800 p-1 rounded-lg overflow-x-auto max-w-full no-scrollbar">
                  {[
-                   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-                   { id: 'users', label: 'Users', icon: Users },
+                   { id: 'overview', label: 'Übersicht', icon: LayoutDashboard },
+                   { id: 'customers', label: 'Kunden', icon: Users },
                    { id: 'partners', label: 'Partner', icon: Handshake },
-                   { id: 'finance', label: 'Finance', icon: DollarSign },
-                   { id: 'settings', label: 'Einstellungen', icon: Sliders },
-                   { id: 'system', label: 'System', icon: Activity },
-                   { id: 'emails', label: 'Emails', icon: Mail }
+                   { id: 'emails', label: 'E-Mails', icon: Mail },
+                   { id: 'settings', label: 'Einstellungen', icon: Sliders }
                  ].map(tab => (
                      <button 
                         key={tab.id}
@@ -236,233 +264,82 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       </div>
 
       <div className="max-w-7xl mx-auto p-6">
+          
+          {/* OVERVIEW TAB */}
           {activeTab === 'overview' && (
               <div className="space-y-6 animate-in fade-in">
+                  
+                  {/* Date Filter */}
+                  <div className="flex justify-end mb-4">
+                      <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center gap-2 shadow-sm">
+                          <Calendar size={16} className="text-slate-500" />
+                          <input 
+                              type="date" 
+                              value={dateRange.start}
+                              onChange={e => setDateRange({...dateRange, start: e.target.value})}
+                              className="text-sm outline-none bg-transparent"
+                          />
+                          <span className="text-slate-400">-</span>
+                          <input 
+                              type="date" 
+                              value={dateRange.end}
+                              onChange={e => setDateRange({...dateRange, end: e.target.value})}
+                              className="text-sm outline-none bg-transparent"
+                          />
+                      </div>
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                           <p className="text-slate-500 text-xs uppercase font-bold">Aktive Abos</p>
                           <p className="text-2xl font-bold text-slate-900">{stats.activeUsers}</p>
                       </div>
                       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                          <p className="text-slate-500 text-xs uppercase font-bold">MRR (Umsatz)</p>
+                          <p className="text-slate-500 text-xs uppercase font-bold">Umsatz (MRR)</p>
                           <p className="text-2xl font-bold text-green-600">{stats.revenue.toFixed(2)} €</p>
                       </div>
                       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
                           <p className="text-slate-500 text-xs uppercase font-bold">Gewinn (Est.)</p>
                           <p className="text-2xl font-bold text-blue-600">{stats.profit.toFixed(2)} €</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                          <p className="text-slate-500 text-xs uppercase font-bold">Conversion Rate</p>
-                          <p className="text-2xl font-bold text-purple-600">{stats.conversionRate}%</p>
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 bg-indigo-50 border-indigo-100">
+                          <p className="text-indigo-800 text-xs uppercase font-bold">Neue Kunden</p>
+                          <p className="text-2xl font-bold text-indigo-700">+{stats.newCustomers}</p>
+                          <p className="text-[10px] text-indigo-400">im gewählten Zeitraum</p>
                       </div>
                   </div>
 
+                  {/* Chart */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><TrendingUp size={18} /> Entwicklung</h3>
+                      <div className="h-[300px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                              <AreaChart data={stats.history}>
+                                  <defs>
+                                      <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                          <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/>
+                                          <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
+                                      </linearGradient>
+                                  </defs>
+                                  <XAxis dataKey="date" tick={{fontSize: 12}} />
+                                  <YAxis tick={{fontSize: 12}} />
+                                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                                  <Tooltip />
+                                  <Area type="monotone" dataKey="revenue" stroke="#4F46E5" fillOpacity={1} fill="url(#colorRevenue)" name="Est. Revenue Increase" />
+                                  <Area type="monotone" dataKey="newSubs" stroke="#10b981" fill="none" name="New Subs" />
+                              </AreaChart>
+                          </ResponsiveContainer>
+                      </div>
+                  </div>
+              </div>
+          )}
+
+          {/* CUSTOMERS TAB */}
+          {activeTab === 'customers' && (
+              <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <div className="flex justify-between items-center mb-4">
-                          <h3 className="font-bold text-slate-900 flex items-center gap-2"><Sparkles className="text-yellow-500" size={18} /> KI Business Analyst</h3>
-                          <Button size="sm" onClick={handleGenerateInsights} disabled={loading}>{loading ? 'Analysiere...' : 'Bericht generieren'}</Button>
-                      </div>
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-100 min-h-[100px]">
-                          {aiInsights ? <p className="whitespace-pre-line text-sm text-slate-700">{aiInsights}</p> : <p className="text-slate-400 text-sm italic">Klicke auf Generieren für eine Analyse...</p>}
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'partners' && (
-              <div className="space-y-6 animate-in fade-in">
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><Handshake size={18} /> Partner Konditionen</h3>
-                      
-                      <div className="max-w-md space-y-4">
-                          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
-                              <p className="text-sm text-blue-800">
-                                  Diese Einstellung betrifft alle Partner. Die Provision wird automatisch berechnet, wenn ein geworbener Kunde bezahlt.
-                              </p>
-                          </div>
-
-                          <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Globale Provision (%)</label>
-                              <div className="flex items-center gap-4">
-                                  <input 
-                                      type="number" 
-                                      min="0" 
-                                      max="100" 
-                                      step="1"
-                                      value={commissionRate} 
-                                      onChange={(e) => onUpdateCommission(Number(e.target.value))} 
-                                      className="w-32 px-4 py-2 border rounded-lg font-bold text-lg" 
-                                  />
-                                  <span className="text-slate-500 font-medium">% vom Umsatz</span>
-                              </div>
-                              <p className="text-xs text-slate-500 mt-2">Standard: 50%. Gilt für alle zukünftigen Transaktionen.</p>
-                          </div>
-
-                          <div className="pt-4">
-                              <Button onClick={handleSaveCommission}>
-                                  <Save size={16} className="mr-2" />
-                                  Provision speichern
-                              </Button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'settings' && (
-              <div className="space-y-6 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Pricing Config */}
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18} /> Preis-Gestaltung</h3>
-                          <div className="space-y-6">
-                              <div>
-                                  <label className="block text-sm font-medium text-slate-700 mb-1">Preis für Neukunden (monatlich)</label>
-                                  <div className="relative">
-                                      <input 
-                                          type="number" 
-                                          step="0.01" 
-                                          value={prices.new} 
-                                          onChange={(e) => onUpdatePrices({...prices, new: Number(e.target.value)})} 
-                                          className="w-full px-4 py-2 pl-8 border rounded-lg" 
-                                      />
-                                      <span className="absolute left-3 top-2.5 text-slate-400">€</span>
-                                  </div>
-                                  <p className="text-xs text-slate-400 mt-1">Ändert den Preis auf der Landing Page & im Stripe Checkout.</p>
-                              </div>
-
-                              <div>
-                                  <label className="block text-sm font-medium text-slate-700 mb-1">Preis für Bestandskunden (Anzeige)</label>
-                                  <div className="relative">
-                                      <input 
-                                          type="number" 
-                                          step="0.01" 
-                                          value={prices.existing} 
-                                          onChange={(e) => onUpdatePrices({...prices, existing: Number(e.target.value)})} 
-                                          className="w-full px-4 py-2 pl-8 border rounded-lg" 
-                                      />
-                                      <span className="absolute left-3 top-2.5 text-slate-400">€</span>
-                                  </div>
-                                  <p className="text-xs text-slate-400 mt-1">Nur visuell im Dashboard für alte Abos. Ändert keine laufenden Stripe Abos!</p>
-                              </div>
-                          </div>
-                      </div>
-
-                      {/* URL Config */}
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Link2 size={18} /> Ziel-URLs</h3>
-                          <div className="space-y-4">
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase">ResortPass Gold URL</label>
-                                  <input 
-                                      type="text" 
-                                      value={productUrls.gold} 
-                                      onChange={e => onUpdateProductUrls({...productUrls, gold: e.target.value})} 
-                                      className="w-full p-2 border rounded text-sm mt-1" 
-                                  />
-                              </div>
-                              <div>
-                                  <label className="text-xs font-bold text-slate-500 uppercase">ResortPass Silver URL</label>
-                                  <input 
-                                      type="text" 
-                                      value={productUrls.silver} 
-                                      onChange={e => onUpdateProductUrls({...productUrls, silver: e.target.value})} 
-                                      className="w-full p-2 border rounded text-sm mt-1" 
-                                  />
-                              </div>
-                              <div className="bg-amber-50 p-3 rounded text-xs text-amber-800 mt-2">
-                                  <AlertCircle size={14} className="inline mr-1"/>
-                                  Diese Links werden in den Alarm-Emails und SMS verwendet.
-                              </div>
-                          </div>
-                      </div>
-                  </div>
-
-                  <div className="flex justify-end">
-                      <Button size="lg" onClick={handleSavePrices} className="bg-[#00305e]">
-                          <Save size={18} className="mr-2" />
-                          Alle Einstellungen speichern
-                      </Button>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'system' && (
-              <div className="space-y-6 animate-in fade-in">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                          <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity size={18} /> Manueller Status Override</h3>
-                          <div className="space-y-4">
-                              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                                  <span className="font-medium text-slate-700">Gold Status</span>
-                                  <div className="flex gap-2">
-                                      <Button size="sm" variant={sysStatus.gold === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('gold', 'available')}>Available</Button>
-                                      <Button size="sm" variant={sysStatus.gold === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('gold', 'sold_out')}>Sold Out</Button>
-                                  </div>
-                              </div>
-                              <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                                  <span className="font-medium text-slate-700">Silver Status</span>
-                                  <div className="flex gap-2">
-                                      <Button size="sm" variant={sysStatus.silver === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('silver', 'available')}>Available</Button>
-                                      <Button size="sm" variant={sysStatus.silver === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('silver', 'sold_out')}>Sold Out</Button>
-                                  </div>
-                              </div>
-                              <p className="text-xs text-slate-400 mt-2">Letzter Check: {sysStatus.lastChecked}</p>
-                          </div>
-                      </div>
-                      
-                      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                          <h3 className="font-bold text-slate-900 mb-4">Verbindungs-Tests</h3>
-                          <div className="flex gap-4">
-                              <Button size="sm" variant="outline" onClick={async () => {
-                                  try { const res = await testBrowseAiConnection(); alert(JSON.stringify(res)); } catch(e:any) { alert(e.message); }
-                              }}>Test Browse.ai</Button>
-                              <Button size="sm" variant="outline" onClick={async () => {
-                                  try { const res = await testGeminiConnection(); alert(JSON.stringify(res)); } catch(e:any) { alert(e.message); }
-                              }}>Test Gemini AI</Button>
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'users' && (
-              <div className="space-y-6 animate-in fade-in">
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                    <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Search size={18} /> Detail-Suche & Aktionen</h3>
-                    <div className="flex gap-2 mb-6">
-                        <input type="text" placeholder="User UUID eingeben..." value={searchUserId} onChange={(e) => setSearchUserId(e.target.value)} className="flex-1 p-2 border rounded" />
-                        <Button onClick={handleUserSearch}>Laden</Button>
-                    </div>
-                    {foundUser && (
-                      <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
-                          <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-bold">{foundUser.profile?.first_name} {foundUser.profile?.last_name}</h4>
-                                <span className="text-xs font-mono text-slate-500 block">{foundUser.profile?.id}</span>
-                              </div>
-                              <span className={`px-2 py-1 rounded text-xs font-bold ${foundUser.subscription?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                {foundUser.subscription?.status || 'Kein Abo'}
-                              </span>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                              <div><span className="font-bold text-slate-500">Email:</span> {foundUser.profile?.email}</div>
-                              <div><span className="font-bold text-slate-500">Rolle:</span> {foundUser.profile?.role}</div>
-                              <div><span className="font-bold text-slate-500">Plan:</span> {foundUser.subscription?.plan_type || '-'}</div>
-                              <div><span className="font-bold text-slate-500">Stripe ID:</span> {foundUser.subscription?.stripe_customer_id || '-'}</div>
-                          </div>
-                          <div className="flex gap-2 pt-2 border-t border-slate-200">
-                              <Button size="sm" variant="outline" onClick={() => manageSubscription(foundUser.profile.id, 'grant_free').then(() => handleUserSearch())}><Gift size={14} className="mr-2"/> Gratis Abo</Button>
-                              <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => manageSubscription(foundUser.profile.id, 'revoke_free').then(() => handleUserSearch())}><UserX size={14} className="mr-2"/> Gratis entfernen</Button>
-                              <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => manageSubscription(foundUser.profile.id, 'cancel_sub').then(() => handleUserSearch())}><XCircle size={14} className="mr-2"/> Stripe Kündigen</Button>
-                          </div>
-                      </div>
-                  )}
-                  </div>
-
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> User Liste ({userList.length})</h3>
+                        <h3 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Kunden ({filteredUsers.length})</h3>
                         <div className="relative">
                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
@@ -478,86 +355,114 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <table className="w-full text-sm text-left">
                               <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
                                   <tr>
-                                      <th className="px-4 py-3">User</th>
-                                      <th className="px-4 py-3">ID</th>
-                                      <th className="px-4 py-3">Sub Status</th>
-                                      <th className="px-4 py-3">Plan</th>
-                                      <th className="px-4 py-3">Aktion</th>
+                                      <th className="px-4 py-3">Kunde</th>
+                                      <th className="px-4 py-3">Status</th>
+                                      <th className="px-4 py-3">Partner-Code</th>
+                                      <th className="px-4 py-3 text-right">Aktion</th>
                                   </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                   {filteredUsers.slice(0, 50).map((u: any) => (
                                       <tr key={u.id} className="hover:bg-slate-50">
                                           <td className="px-4 py-3">
-                                              <div className="font-medium text-slate-900">{u.name}</div>
+                                              <div className="font-bold text-slate-900">{u.name}</div>
                                               <div className="text-slate-500 text-xs">{u.email}</div>
                                           </td>
-                                          <td className="px-4 py-3 font-mono text-xs text-slate-400 select-all">{u.id}</td>
                                           <td className="px-4 py-3">
                                               {u.sub_status === 'active' || u.sub_status === 'trialing' ? 
                                                 <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">Aktiv</span> : 
-                                                <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs">Inaktiv</span>
+                                                (u.sub_status === 'canceled' ? <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs">Gekündigt</span> : <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs">Inaktiv</span>)
                                               }
+                                              <div className="text-[10px] text-slate-400 mt-0.5">{u.plan}</div>
                                           </td>
-                                          <td className="px-4 py-3 text-slate-600">{u.plan || '-'}</td>
                                           <td className="px-4 py-3">
-                                              <button onClick={() => { setSearchUserId(u.id); handleUserSearch(); window.scrollTo(0,0); }} className="text-blue-600 hover:underline">
-                                                  Details
-                                              </button>
+                                              {/* Note: debug-users needs to return referred_by. Assuming update in backend if needed, or fetch details. 
+                                                  For list view, if not present, we skip. */}
+                                              {u.referred_by ? <span className="font-mono bg-indigo-50 text-indigo-600 px-1 rounded">{u.referred_by}</span> : <span className="text-slate-300">-</span>}
+                                          </td>
+                                          <td className="px-4 py-3 text-right">
+                                              <Button size="sm" variant="outline" onClick={() => handleOpenCustomerDetail(u.id)}>Details</Button>
                                           </td>
                                       </tr>
                                   ))}
                               </tbody>
                           </table>
-                          {filteredUsers.length === 0 && <p className="text-center py-8 text-slate-400">Keine User gefunden.</p>}
                       </div>
                   </div>
               </div>
           )}
 
-          {activeTab === 'finance' && (
+          {/* PARTNERS TAB */}
+          {activeTab === 'partners' && (
               <div className="space-y-6 animate-in fade-in">
+                  
+                  {/* Commission Settings */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><DollarSign size={18} /> Auszahlungsanfragen</h3>
-                      <div className="overflow-x-auto">
-                          <table className="w-full text-sm text-left">
-                              <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
-                                  <tr>
-                                      <th className="px-4 py-3">Datum</th>
-                                      <th className="px-4 py-3">Partner</th>
-                                      <th className="px-4 py-3">Betrag</th>
-                                      <th className="px-4 py-3">Methode</th>
-                                      <th className="px-4 py-3">Aktion</th>
-                                  </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-100">
-                                  {payouts.map((p: any) => (
-                                      <tr key={p.id}>
-                                          <td className="px-4 py-3 text-slate-500">{new Date(p.requested_at).toLocaleDateString()}</td>
-                                          <td className="px-4 py-3 font-medium">
-                                              {p.profiles?.first_name} {p.profiles?.last_name}
-                                              <div className="text-xs text-slate-400">{p.profiles?.email}</div>
-                                          </td>
-                                          <td className="px-4 py-3 font-bold text-slate-900">{p.amount.toFixed(2)} €</td>
-                                          <td className="px-4 py-3 text-slate-500">{p.paypal_email || 'Stripe'}</td>
-                                          <td className="px-4 py-3">
-                                              <Button size="sm" onClick={() => handleMarkPaid(p.id)} className="bg-green-600 hover:bg-green-700 text-white">
-                                                  <Check size={14} className="mr-1" /> Mark Paid
-                                              </Button>
-                                          </td>
-                                      </tr>
-                                  ))}
-                              </tbody>
-                          </table>
-                          {payouts.length === 0 && <div className="text-center py-12 text-slate-400">Keine offenen Anfragen.</div>}
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Handshake size={18} /> Partner Provisionen</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                          <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Provision für NEUE Partner (%)</label>
+                              <div className="flex gap-2">
+                                  <input 
+                                      type="number" 
+                                      value={partnerSettings.newRate}
+                                      onChange={e => setPartnerSettings({...partnerSettings, newRate: Number(e.target.value)})}
+                                      className="border rounded px-3 py-2 w-24 font-bold text-lg"
+                                  />
+                                  <Button onClick={handleSavePartnerSettings}>Speichern</Button>
+                              </div>
+                              <p className="text-xs text-slate-500 mt-2">Ändert die Anzeige auf der Landingpage & die Default-Rate für neue Registrierungen.</p>
+                          </div>
+                          <div className="opacity-70 pointer-events-none grayscale">
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Provision für ALT-Partner (%)</label>
+                              <input 
+                                  type="number" 
+                                  value={partnerSettings.oldRate}
+                                  readOnly
+                                  className="border rounded px-3 py-2 w-24 font-bold text-lg bg-slate-50"
+                              />
+                              <p className="text-xs text-slate-500 mt-2">Aktuell global gesteuert. Manuelle Overrides demnächst verfügbar.</p>
+                          </div>
                       </div>
+                  </div>
+
+                  {/* Partner List */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4">Partner Liste</h3>
+                      <table className="w-full text-sm text-left">
+                          <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                              <tr>
+                                  <th className="px-4 py-3">Partner</th>
+                                  <th className="px-4 py-3">Affiliate Code</th>
+                                  <th className="px-4 py-3">Webseite</th>
+                                  <th className="px-4 py-3">Status</th>
+                              </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                              {partnerList.map((p: any) => (
+                                  <tr key={p.id}>
+                                      <td className="px-4 py-3">
+                                          <div className="font-bold text-slate-900">{p.name}</div>
+                                          <div className="text-xs text-slate-500">{p.email}</div>
+                                      </td>
+                                      <td className="px-4 py-3">
+                                          <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold border border-blue-100">
+                                            {p.ref_code || 'pending'}
+                                          </span>
+                                      </td>
+                                      <td className="px-4 py-3 text-slate-500">{p.website || '-'}</td>
+                                      <td className="px-4 py-3"><span className="text-green-600 text-xs font-bold uppercase">Aktiv</span></td>
+                                  </tr>
+                              ))}
+                          </tbody>
+                      </table>
                   </div>
               </div>
           )}
 
+          {/* EMAILS TAB */}
           {activeTab === 'emails' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)] animate-in fade-in">
-                 {/* List */}
                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                      <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700 flex justify-between items-center">
                         <span>Templates</span>
@@ -571,17 +476,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 className={`p-3 rounded-lg cursor-pointer border transition-all ${selectedTemplate?.id === t.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
                              >
                                  <div className="font-bold text-slate-900 text-sm">{t.name}</div>
-                                 <div className="text-xs text-slate-500 truncate">{t.subject}</div>
+                                 <div className="text-xs text-slate-500 truncate">{t.subject || 'SMS Template'}</div>
                                  <div className="mt-1 flex gap-2">
                                      <span className="text-[10px] uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{t.category}</span>
-                                     {t.isEnabled ? <span className="text-[10px] text-green-600 flex items-center"><CheckCircle size={10} className="mr-1"/> Aktiv</span> : <span className="text-[10px] text-slate-400">Inaktiv</span>}
+                                     {t.id.includes('sms') && <span className="text-[10px] uppercase bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-bold">SMS</span>}
                                  </div>
                              </div>
                          ))}
                      </div>
                  </div>
 
-                 {/* Editor */}
                  <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
                      {selectedTemplate ? (
                          <>
@@ -590,54 +494,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                      <h3 className="font-bold text-slate-900">{selectedTemplate.name}</h3>
                                      <p className="text-xs text-slate-500">{selectedTemplate.description}</p>
                                  </div>
-                                 <div className="flex gap-2">
-                                    <label className="flex items-center gap-2 text-sm mr-2 cursor-pointer">
-                                        <input type="checkbox" checked={selectedTemplate.isEnabled} onChange={e => setSelectedTemplate({...selectedTemplate, isEnabled: e.target.checked})} />
-                                        Aktiv
-                                    </label>
-                                     <Button size="sm" onClick={handleSaveTemplate}><Save size={14} className="mr-2"/> Speichern</Button>
-                                 </div>
+                                 <Button size="sm" onClick={handleSaveTemplate}><Save size={14} className="mr-2"/> Speichern</Button>
                              </div>
                              <div className="p-6 flex-1 overflow-y-auto space-y-4">
-                                 <div>
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
-                                     <input 
-                                        type="text" 
-                                        value={selectedTemplate.subject} 
-                                        onChange={e => setSelectedTemplate({...selectedTemplate, subject: e.target.value})}
-                                        className="w-full p-2 border rounded font-medium"
-                                     />
-                                 </div>
+                                 {!selectedTemplate.id.includes('sms') && (
+                                     <div>
+                                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Betreff</label>
+                                         <input 
+                                            type="text" 
+                                            value={selectedTemplate.subject} 
+                                            onChange={e => setSelectedTemplate({...selectedTemplate, subject: e.target.value})}
+                                            className="w-full p-2 border rounded font-medium"
+                                         />
+                                     </div>
+                                 )}
                                  <div className="flex-1 flex flex-col h-full">
-                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt (HTML)</label>
+                                     <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Inhalt {selectedTemplate.id.includes('sms') ? '(Plain Text)' : '(HTML)'}</label>
                                      <textarea 
                                         value={selectedTemplate.body} 
                                         onChange={e => setSelectedTemplate({...selectedTemplate, body: e.target.value})}
                                         className="w-full flex-1 p-2 border rounded font-mono text-sm min-h-[300px]"
                                      />
                                  </div>
-                                 <div className="bg-slate-50 p-3 rounded border border-slate-100">
-                                     <p className="text-xs font-bold text-slate-500 mb-2">Verfügbare Variablen:</p>
-                                     <div className="flex flex-wrap gap-2">
-                                         {selectedTemplate.variables?.map(v => (
-                                             <span key={v} className="bg-white border px-2 py-1 rounded text-xs font-mono text-slate-600 cursor-pointer hover:border-blue-300" onClick={() => {
-                                                 alert(`Variable ${v} kopiert (simuliert)`);
-                                             }}>
-                                                 {v}
-                                             </span>
-                                         ))}
-                                     </div>
-                                 </div>
-                             </div>
-                             <div className="p-4 border-t border-slate-100 bg-slate-50 flex gap-2 items-center">
-                                 <input 
-                                    type="email" 
-                                    placeholder="Test Email Adresse" 
-                                    value={testEmailAddr}
-                                    onChange={e => setTestEmailAddr(e.target.value)}
-                                    className="flex-1 p-2 text-sm border rounded"
-                                 />
-                                 <Button size="sm" variant="secondary" onClick={handleTestEmail}><Send size={14} className="mr-2"/> Test Senden</Button>
                              </div>
                          </>
                      ) : (
@@ -649,7 +527,192 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  </div>
              </div>
           )}
+
+          {/* SETTINGS TAB (formerly System) */}
+          {activeTab === 'settings' && (
+              <div className="space-y-6 animate-in fade-in">
+                  
+                  {/* Prices */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18} /> Abo Preise</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Preis für Neukunden (€)</label>
+                              <input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={prices.new}
+                                  onChange={e => onUpdatePrices({...prices, new: Number(e.target.value)})}
+                                  className="w-full p-2 border rounded"
+                              />
+                          </div>
+                          <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Preis für Bestandskunden (Anzeige)</label>
+                              <input 
+                                  type="number" 
+                                  step="0.01" 
+                                  value={prices.existing}
+                                  onChange={e => onUpdatePrices({...prices, existing: Number(e.target.value)})}
+                                  className="w-full p-2 border rounded"
+                              />
+                          </div>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                          <Button size="sm" onClick={handleSavePrices}>Preise Speichern</Button>
+                      </div>
+                  </div>
+
+                  {/* System Status (Legacy System Tab Logic) */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity size={18} /> System Status Override</h3>
+                      <div className="space-y-4">
+                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                              <span className="font-medium text-slate-700">Gold Status</span>
+                              <div className="flex gap-2">
+                                  <Button size="sm" variant={sysStatus.gold === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('gold', 'available')}>Available</Button>
+                                  <Button size="sm" variant={sysStatus.gold === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('gold', 'sold_out')}>Sold Out</Button>
+                              </div>
+                          </div>
+                          <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                              <span className="font-medium text-slate-700">Silver Status</span>
+                              <div className="flex gap-2">
+                                  <Button size="sm" variant={sysStatus.silver === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('silver', 'available')}>Available</Button>
+                                  <Button size="sm" variant={sysStatus.silver === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('silver', 'sold_out')}>Sold Out</Button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* URLs */}
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Link2 size={18} /> Ticket URLs</h3>
+                      <div className="space-y-4">
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">ResortPass Gold URL</label>
+                              <input 
+                                  type="text" 
+                                  value={productUrls.gold} 
+                                  onChange={e => onUpdateProductUrls({...productUrls, gold: e.target.value})} 
+                                  className="w-full p-2 border rounded text-sm mt-1" 
+                              />
+                          </div>
+                          <div>
+                              <label className="text-xs font-bold text-slate-500 uppercase">ResortPass Silver URL</label>
+                              <input 
+                                  type="text" 
+                                  value={productUrls.silver} 
+                                  onChange={e => onUpdateProductUrls({...productUrls, silver: e.target.value})} 
+                                  className="w-full p-2 border rounded text-sm mt-1" 
+                              />
+                          </div>
+                      </div>
+                      <div className="mt-4 flex justify-end">
+                          <Button size="sm" onClick={handleSaveUrls}>URLs Speichern</Button>
+                      </div>
+                  </div>
+              </div>
+          )}
+
       </div>
+
+      {/* CUSTOMER DETAIL MODAL */}
+      {selectedCustomer && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                  <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
+                      <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                          <Users className="text-blue-600" />
+                          Kundendetails
+                      </h2>
+                      <button onClick={() => setSelectedCustomer(null)} className="text-slate-400 hover:text-slate-600"><X size={24}/></button>
+                  </div>
+                  
+                  <div className="p-6 space-y-6">
+                      {/* Subscription Info */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                          <h3 className="font-bold text-slate-700 mb-2 text-sm uppercase">Abo Status</h3>
+                          <div className="flex justify-between items-center">
+                              <div>
+                                  <p className="text-lg font-bold">
+                                    {selectedCustomer.subscription?.status === 'active' ? <span className="text-green-600">Aktiv</span> : <span className="text-slate-500">Inaktiv / Gekündigt</span>}
+                                  </p>
+                                  <p className="text-sm text-slate-500">Plan: {selectedCustomer.subscription?.plan_type || 'None'}</p>
+                              </div>
+                              <div className="flex flex-col gap-2">
+                                  {selectedCustomer.subscription?.plan_type !== 'Manuell (Gratis)' && (
+                                    <Button size="sm" variant="outline" onClick={() => handleManageSub('grant_free')}><Gift size={14} className="mr-2"/> Gratis Abo aktivieren</Button>
+                                  )}
+                                  {selectedCustomer.subscription?.plan_type === 'Manuell (Gratis)' && (
+                                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleManageSub('revoke_free')}><UserX size={14} className="mr-2"/> Gratis entfernen</Button>
+                                  )}
+                                  {selectedCustomer.subscription?.status === 'active' && selectedCustomer.subscription?.stripe_subscription_id && (
+                                    <Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleManageSub('cancel_sub')}><XCircle size={14} className="mr-2"/> Stripe Kündigen</Button>
+                                  )}
+                              </div>
+                          </div>
+                      </div>
+
+                      {/* Partner Info */}
+                      <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                          <h3 className="font-bold text-indigo-800 mb-2 text-sm uppercase">Geworben von</h3>
+                          <div className="flex items-center gap-2">
+                              <Handshake size={20} className="text-indigo-500" />
+                              {selectedCustomer.profile.referred_by ? (
+                                  <span className="font-mono text-lg font-bold text-indigo-700">{selectedCustomer.profile.referred_by}</span>
+                              ) : (
+                                  <span className="text-slate-400 italic">Kein Partner (Organisch)</span>
+                              )}
+                          </div>
+                      </div>
+
+                      {/* Personal Data Form */}
+                      <div>
+                          <div className="flex justify-between items-center mb-4">
+                              <h3 className="font-bold text-slate-900">Stammdaten</h3>
+                              {!editCustomerMode ? (
+                                  <Button size="sm" variant="outline" onClick={() => setEditCustomerMode(true)}><Edit2 size={14} className="mr-2"/> Bearbeiten</Button>
+                              ) : (
+                                  <div className="flex gap-2">
+                                      <Button size="sm" onClick={handleSaveCustomer}><Save size={14} className="mr-2"/> Speichern</Button>
+                                      <Button size="sm" variant="outline" onClick={() => setEditCustomerMode(false)}>Abbrechen</Button>
+                                  </div>
+                              )}
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vorname</label>
+                                  <input type="text" disabled={!editCustomerMode} value={customerForm.firstName} onChange={e => setCustomerForm({...customerForm, firstName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachname</label>
+                                  <input type="text" disabled={!editCustomerMode} value={customerForm.lastName} onChange={e => setCustomerForm({...customerForm, lastName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" />
+                              </div>
+                              <div className="col-span-2">
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label>
+                                  <input type="email" disabled={!editCustomerMode} value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" />
+                              </div>
+                              <div className="col-span-2">
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Straße & Nr.</label>
+                                  <div className="flex gap-2">
+                                      <input type="text" disabled={!editCustomerMode} value={customerForm.street} onChange={e => setCustomerForm({...customerForm, street: e.target.value})} className="flex-1 p-2 border rounded disabled:bg-slate-50" placeholder="Straße" />
+                                      <input type="text" disabled={!editCustomerMode} value={customerForm.houseNumber} onChange={e => setCustomerForm({...customerForm, houseNumber: e.target.value})} className="w-20 p-2 border rounded disabled:bg-slate-50" placeholder="Nr" />
+                                  </div>
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">PLZ</label>
+                                  <input type="text" disabled={!editCustomerMode} value={customerForm.zip} onChange={e => setCustomerForm({...customerForm, zip: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" />
+                              </div>
+                              <div>
+                                  <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Stadt</label>
+                                  <input type="text" disabled={!editCustomerMode} value={customerForm.city} onChange={e => setCustomerForm({...customerForm, city: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" />
+                              </div>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
     </div>
   );
 };

@@ -10,14 +10,21 @@ export default async function handler(req: any, res: any) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check if Service Role Key is available
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error("CRITICAL: SUPABASE_SERVICE_ROLE_KEY missing in api/admin-stats.ts");
-      return res.status(200).json({ activeUsers: 0, revenue: 0, profit: 0, newCustomers: 0, conversionRate: 0, error: 'Config Missing' });
+      return res.status(200).json({ activeUsers: 0, revenue: 0, profit: 0, newCustomers: 0, conversionRate: 0, history: [], error: 'Config Missing' });
   }
 
   try {
     const { startDate, endDate } = req.query;
+    
+    // Default to last 28 days if not provided
+    const end = endDate ? new Date(endDate) : new Date();
+    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(end.getDate() - 28));
+    
+    // Adjust end date to end of day
+    end.setHours(23, 59, 59, 999);
+    start.setHours(0, 0, 0, 0);
 
     // --- 1. GLOBAL SETTINGS ---
     const { data: settings } = await supabase
@@ -29,17 +36,13 @@ export default async function handler(req: any, res: any) {
     const commSetting = settings?.find(s => s.key === 'global_commission_rate');
     
     const fallbackPrice = priceSetting ? parseFloat(priceSetting.value) : 1.99;
-    const commissionRate = commSetting ? parseFloat(commSetting.value) / 100 : 0.5; // Default 50%
+    const commissionRate = commSetting ? parseFloat(commSetting.value) / 100 : 0.5;
 
-    // --- 2. GLOBAL STATS (Total MRR, Commission Liability, Profit) ---
-    // Count ALL subscriptions that are currently providing access
-    // Join with profiles to check if the user was referred
-    const { data: allActiveSubs, error: subError } = await supabase
+    // --- 2. CURRENT SNAPSHOT STATS ---
+    const { data: allActiveSubs } = await supabase
       .from('subscriptions')
       .select('subscription_price, plan_type, status, user_id, profiles:user_id(referred_by)')
-      .in('status', ['active', 'trialing', 'Active']);
-
-    if (subError) throw subError;
+      .in('status', ['active', 'trialing', 'Active', 'Trialing']);
 
     let currentMRR = 0;
     let currentCommissionCost = 0;
@@ -47,15 +50,10 @@ export default async function handler(req: any, res: any) {
     if (allActiveSubs) {
         allActiveSubs.forEach(sub => {
             if (sub.plan_type === 'Manuell (Gratis)') return;
-            
-            // Ensure we handle numbers correctly
             const price = sub.subscription_price !== null ? Number(sub.subscription_price) : fallbackPrice;
             currentMRR += price;
-
-            // Check if referred (profiles might be an array or object depending on join, usually object for foreign key)
-            // Supabase returns an object if it's a single relation, but types can be tricky. Safe check.
+            // @ts-ignore
             const profile = Array.isArray(sub.profiles) ? sub.profiles[0] : sub.profiles;
-            
             if (profile && profile.referred_by) {
                 currentCommissionCost += (price * commissionRate);
             }
@@ -65,48 +63,47 @@ export default async function handler(req: any, res: any) {
     const totalActiveUsers = allActiveSubs ? allActiveSubs.length : 0;
     const currentProfit = currentMRR - currentCommissionCost;
 
-    // --- 3. PERIOD STATS ---
-    
-    // A. New Registrations (Profiles) - for Conversion Rate denominator
-    let registrationsQuery = supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'CUSTOMER');
-
-    // B. New Subscriptions (Sales) - for "Neue Abos" display and numerator
-    let newSubsQuery = supabase
+    // --- 3. PERIOD STATS (New Customers) ---
+    // New Subscriptions in range
+    const { count: newSubsCount, data: newSubs } = await supabase
       .from('subscriptions')
-      .select('*', { count: 'exact', head: true });
+      .select('created_at', { count: 'exact' })
+      .gte('created_at', start.toISOString())
+      .lte('created_at', end.toISOString());
 
-    if (startDate) {
-        registrationsQuery = registrationsQuery.gte('created_at', startDate);
-        newSubsQuery = newSubsQuery.gte('created_at', startDate);
-    }
-    if (endDate) {
-        const endDateTime = new Date(endDate);
-        endDateTime.setHours(23, 59, 59, 999);
-        registrationsQuery = registrationsQuery.lte('created_at', endDateTime.toISOString());
-        newSubsQuery = newSubsQuery.lte('created_at', endDateTime.toISOString());
-    }
+    // --- 4. CHART HISTORY GENERATION ---
+    // We will generate daily buckets between start and end
+    const history = [];
+    let loopDate = new Date(start);
+    
+    // Helper to get day string YYYY-MM-DD
+    const getDayStr = (d: Date) => d.toISOString().split('T')[0];
+    
+    // Pre-fetch data for chart efficiency
+    // We need sub creations per day
+    // We could also try to reconstruct MRR history but that's complex without a events table. 
+    // We will chart "New Subscriptions" and "Estimated Revenue Growth" based on new subs.
 
-    const { count: newRegistrationsCount } = await registrationsQuery;
-    const { count: newSubsCount } = await newSubsQuery;
-
-    // Calculate Conversion Rate: New Subs / New Registrations
-    let conversionRate = 0;
-    const validRegistrations = newRegistrationsCount || 0;
-    const validNewSubs = newSubsCount || 0;
-
-    if (validRegistrations > 0) {
-        conversionRate = (validNewSubs / validRegistrations) * 100;
+    while (loopDate <= end) {
+        const dayStr = getDayStr(loopDate);
+        // Count subs created on this day
+        const subsOnDay = newSubs?.filter(s => getDayStr(new Date(s.created_at)) === dayStr).length || 0;
+        
+        history.push({
+            date: dayStr,
+            newSubs: subsOnDay,
+            revenue: subsOnDay * fallbackPrice // Rough estimate of NEW revenue added that day
+        });
+        
+        loopDate.setDate(loopDate.getDate() + 1);
     }
 
     return res.status(200).json({
       activeUsers: totalActiveUsers,
       revenue: currentMRR,
       profit: currentProfit,
-      newCustomers: validNewSubs, // Return count of new SUBSCRIPTIONS
-      conversionRate: parseFloat(conversionRate.toFixed(2))
+      newCustomers: newSubsCount || 0,
+      history: history
     });
 
   } catch (error: any) {
