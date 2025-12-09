@@ -121,8 +121,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const data = await res.json();
         if (data.users) {
             setUserList(data.users);
-            // Filter partners
-            const partners = data.users.filter((u: any) => u.role === 'AFFILIATE' || u.ref_code); 
+            // Filter partners: Strict check for AFFILIATE role based on user request
+            const partners = data.users.filter((u: any) => u.role === 'AFFILIATE'); 
             setPartnerList(partners); 
         }
     } catch (e) { console.error("Load Users Error", e); }
