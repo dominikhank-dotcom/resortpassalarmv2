@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift } from 'lucide-react';
+import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift, RotateCcw } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
-import { sendTestAlarm, createCheckoutSession, getSystemSettings, createPortalSession, syncSubscription } from '../services/backendService';
+import { sendTestAlarm, createCheckoutSession, getSystemSettings, createPortalSession, syncSubscription, manageSubscription } from '../services/backendService';
 import { supabase } from '../lib/supabase';
 
 interface LogEntry {
@@ -215,6 +215,23 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const handleManualCheck = (type: 'gold' | 'silver') => { setIsChecking(type); fetchSystemStatus().then(() => { setTimeout(() => setIsChecking(null), 800); }); };
   const handleManualSync = async () => { setIsSyncing(true); try { const result = await syncSubscription(); if (result.found) { await fetchProfileAndSub(); alert("Abo synchronisiert!"); } else { alert("Kein Abo gefunden."); } } catch (e: any) { alert("Fehler: " + e.message); } finally { setIsSyncing(false); } }
   
+  const handleResumeSubscription = async () => {
+      if (!confirm("Möchtest du deine Kündigung wirklich zurücknehmen und das Abo fortsetzen?")) return;
+      setIsSyncing(true);
+      try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+          
+          await manageSubscription(user.id, 'resume_sub');
+          alert("Kündigung erfolgreich zurückgenommen! Dein Abo läuft weiter.");
+          await fetchProfileAndSub();
+      } catch (e: any) {
+          alert("Fehler: " + e.message);
+      } finally {
+          setIsSyncing(false);
+      }
+  };
+
   const startEditEmail = () => { setTempData(prev => ({ ...prev, email: notifications.email })); setEditMode(prev => ({ ...prev, email: true })); setErrors(prev => ({ ...prev, email: '' })); };
   const saveEmail = async () => { const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; if (!emailRegex.test(tempData.email)) { setErrors(prev => ({ ...prev, email: "Ungültige E-Mail." })); return; } setNotifications(prev => ({ ...prev, email: tempData.email })); await updateProfileColumn('notification_email', tempData.email); setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
   const cancelEditEmail = () => { setEditMode(prev => ({ ...prev, email: false })); setErrors(prev => ({ ...prev, email: '' })); };
@@ -432,6 +449,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                             <Button onClick={handleManageBilling} variant="outline" size="sm" className="w-full justify-between group">Rechnungen anzeigen<ExternalLink size={14} className="text-slate-400 group-hover:text-indigo-600" /></Button>
                             {!subscriptionDetails.isCanceled && (
                                 <Button variant="outline" size="sm" className="w-full justify-center text-red-600 border-red-100 hover:bg-red-50 hover:border-red-200" onClick={handleManageBilling}>Abo kündigen</Button>
+                            )}
+                            {subscriptionDetails.isCanceled && (
+                                <Button variant="secondary" size="sm" className="w-full justify-center bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200" onClick={handleResumeSubscription} disabled={isSyncing}>
+                                    <RotateCcw size={16} className={isSyncing ? "animate-spin mr-2" : "mr-2"} />
+                                    {isSyncing ? 'Reaktiviere...' : 'Kündigung zurücknehmen'}
+                                </Button>
                             )}
                         </>
                     )}

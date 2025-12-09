@@ -131,7 +131,7 @@ export const testGeminiConnection = async () => {
   }
 };
 
-export const manageSubscription = async (userId: string, action: 'grant_free' | 'revoke_free' | 'cancel_sub') => {
+export const manageSubscription = async (userId: string, action: 'grant_free' | 'revoke_free' | 'cancel_sub' | 'resume_sub') => {
   try {
     const response = await fetch('/api/manage-subscription', {
         method: 'POST',

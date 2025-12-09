@@ -73,7 +73,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Partners State
   const [partnerList, setPartnerList] = useState<any[]>([]);
-  const [partnerSettings, setPartnerSettings] = useState({ newRate: commissionRate, oldRate: commissionRate }); // oldRate is visual for now
+  const [partnerSettings, setPartnerSettings] = useState({ newRate: commissionRate });
 
   useEffect(() => {
     loadStats();
@@ -108,7 +108,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           // Load Partner Settings
           if (s.global_commission_rate) {
               const rate = Number(s.global_commission_rate);
-              setPartnerSettings({ newRate: rate, oldRate: rate });
+              setPartnerSettings({ newRate: rate });
               onUpdateCommission(rate);
           }
       }
@@ -369,10 +369,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                               <div className="text-slate-500 text-xs">{u.email}</div>
                                           </td>
                                           <td className="px-4 py-3">
-                                              {u.sub_status === 'active' || u.sub_status === 'trialing' ? 
-                                                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold">Aktiv</span> : 
-                                                (u.sub_status === 'canceled' ? <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs">Gekündigt</span> : <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs">Inaktiv</span>)
-                                              }
+                                              {/* Status Logic: Canceled(Pending) > Active > Inactive */}
+                                              {u.cancel_at_period_end ? (
+                                                  <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs font-bold border border-amber-200">Gekündigt</span>
+                                              ) : (u.sub_status === 'active' || u.sub_status === 'trialing' ? 
+                                                <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold border border-green-200">Aktiv</span> : 
+                                                <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs border border-slate-200">Inaktiv</span>
+                                              )}
                                               <div className="text-[10px] text-slate-400 mt-0.5">{u.plan}</div>
                                           </td>
                                           <td className="px-4 py-3">
@@ -411,16 +414,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <p className="text-xs text-slate-500 mt-2">Ändert die Anzeige auf der Landingpage & die Default-Rate für neue Registrierungen.</p>
                           </div>
-                          <div className="opacity-70 pointer-events-none grayscale">
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Provision für ALT-Partner (%)</label>
-                              <input 
-                                  type="number" 
-                                  value={partnerSettings.oldRate}
-                                  readOnly
-                                  className="border rounded px-3 py-2 w-24 font-bold text-lg bg-slate-50"
-                              />
-                              <p className="text-xs text-slate-500 mt-2">Aktuell global gesteuert. Manuelle Overrides demnächst verfügbar.</p>
-                          </div>
+                          {/* OLD COMMISSION RATE REMOVED AS REQUESTED */}
                       </div>
                   </div>
 

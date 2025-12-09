@@ -84,6 +84,27 @@ export default async function handler(req: any, res: any) {
                cancel_at_period_end: false, // Immediate cancel means it's done
                current_period_end: new Date().toISOString() // Ends now
            }).eq('user_id', userId);
+
+      } else if (action === 'resume_sub') {
+           // 1. Find subscription that is still active but marked as canceling
+           const { data: sub } = await supabase.from('subscriptions').select('stripe_subscription_id').eq('user_id', userId).eq('status', 'active').single();
+
+           if (sub && sub.stripe_subscription_id) {
+               try {
+                   // Remove cancellation at period end in Stripe
+                   await stripe.subscriptions.update(sub.stripe_subscription_id, { cancel_at_period_end: false });
+                   
+                   // Update DB
+                   await supabase.from('subscriptions').update({ 
+                       cancel_at_period_end: false 
+                   }).eq('user_id', userId);
+               } catch (e: any) {
+                   console.error("Stripe resume failed:", e.message);
+                   throw new Error("Konnte Abo bei Stripe nicht reaktivieren.");
+               }
+           } else {
+               throw new Error("Kein aktives Abo zum Fortsetzen gefunden.");
+           }
       }
 
       return res.status(200).json({ success: true });
