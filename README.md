@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   tips_mail_sent boolean DEFAULT false, -- NEU: Partner Tipps Mail (nach 10 Min)
   notify_gold boolean DEFAULT true, -- NEU: Gold Alarm erwünscht
   notify_silver boolean DEFAULT true, -- NEU: Silver Alarm erwünscht
+  last_test_config jsonb DEFAULT '{}'::jsonb, -- Speichert letzte Test-Konfig (Email/SMS)
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -110,6 +111,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_welcome_sent boolea
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tips_mail_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_gold boolean DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_silver boolean DEFAULT true;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_test_config jsonb DEFAULT '{}'::jsonb;
 
 -- Constraints sicherstellen (Ignorieren falls schon da)
 DO $$ BEGIN

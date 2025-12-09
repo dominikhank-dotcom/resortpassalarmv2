@@ -78,8 +78,6 @@ export default async function handler(req: any, res: any) {
         }
     } else {
         // Fallback if profile missing completely (Rare race condition where DB trigger failed entirely)
-        // In this case, we can't lock, so we might risk a double email, but it's better than none for a new user.
-        // However, given the spam issue, we will be conservative.
         console.warn(">>> PROFILE MISSING: Aborting to prevent potential loop/spam.");
         return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
     }
@@ -91,15 +89,42 @@ export default async function handler(req: any, res: any) {
         }
 
         const resend = new Resend(process.env.RESEND_API_KEY);
+        const origin = req.headers.origin || 'https://resortpassalarm.com';
+        const loginLink = `${origin}/login`;
+
+        // --- LOAD TEMPLATE FROM DB ---
+        const { data: templateData } = await supabase
+            .from('email_templates')
+            .select('*')
+            .eq('id', 'cust_welcome')
+            .single();
+
+        let subject = `Willkommen bei ResortPassAlarm, ${firstName || ''}!`;
+        let htmlBody = `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>
+            <p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p>
+            <p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>
+            <p><a href="${loginLink}">Zum Login</a></p>
+            <p>Dein ResortPassAlarm Team</p>`;
+
+        if (templateData && templateData.body) {
+            console.log(">>> Using DB Template: cust_welcome");
+            subject = templateData.subject;
+            htmlBody = templateData.body;
+            
+            // Replace variables
+            htmlBody = htmlBody.replace(/{firstName}/g, firstName || '');
+            htmlBody = htmlBody.replace(/{loginLink}/g, loginLink);
+            
+            subject = subject.replace(/{firstName}/g, firstName || '');
+        } else {
+            console.warn(">>> Template not found in DB, using fallback.");
+        }
+
         const emailResponse = await resend.emails.send({
             from: 'ResortPass Alarm <support@resortpassalarm.com>',
             to: email,
-            subject: `Willkommen bei ResortPassAlarm, ${firstName || ''}!`,
-            html: `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>
-            <p>Willkommen an Bord! Dein Account wurde erfolgreich erstellt.</p>
-            <p>Du bist jetzt bereit, deine Überwachung zu starten. Logge dich in dein Dashboard ein, um dein Abo zu aktivieren und keine Wellen mehr zu verpassen.</p>
-            <p><a href="https://resortpassalarm.com/login">Zum Login</a></p>
-            <p>Dein ResortPassAlarm Team</p>`
+            subject: subject,
+            html: htmlBody
         });
 
         if (emailResponse.error) {

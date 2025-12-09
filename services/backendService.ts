@@ -19,12 +19,12 @@ const handleResponse = async (response: Response) => {
   }
 };
 
-export const sendTestAlarm = async (email: string, phone: string, sendEmail: boolean, sendSms: boolean) => {
+export const sendTestAlarm = async (userId: string, email: string, phone: string, sendEmail: boolean, sendSms: boolean) => {
   try {
     const response = await fetch('/api/send-test-alarm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, phone, sendEmail, sendSms })
+      body: JSON.stringify({ userId, email, phone, sendEmail, sendSms })
     });
     return await handleResponse(response);
   } catch (error: any) {

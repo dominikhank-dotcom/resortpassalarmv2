@@ -220,28 +220,32 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
       if (notifications.smsEnabled) activeMethods.push("SMS"); 
       if (activeMethods.length === 0) { alert("Bitte Benachrichtigungsmethode aktivieren."); return; } 
       
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
       setIsSendingAlarm(true); 
       try { 
           // Result contains detailed status, e.g. { email: 'sent', sms: null, errors: ['SMS Failure'] }
-          const result = await sendTestAlarm(notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled); 
+          const result = await sendTestAlarm(user.id, notifications.email, notifications.sms, notifications.emailEnabled, notifications.smsEnabled); 
           
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-              const msg = `Test: ${activeMethods.join(', ')}`;
+          if (result.errors && result.errors.length > 0) {
+              // If partial success (some sent, some not), still log it
+              if (result.email === 'sent' || result.sms === 'sent') {
+                  const msg = `Teil-Erfolg: ${result.email ? 'Email OK' : ''} ${result.sms ? 'SMS OK' : ''}`;
+                  await supabase.from('notification_logs').insert({ user_id: user.id, type: 'EMAIL', message: msg });
+                  fetchProfileAndSub(); // Refresh profile to update last_test_config
+              }
+              alert(`Test teilweise gesendet oder blockiert.\n\nMeldung:\n${result.errors.join('\n')}`);
+          } else {
+              const msg = `Test erfolgreich: ${activeMethods.join(', ')}`;
               await supabase.from('notification_logs').insert({ user_id: user.id, type: 'EMAIL', message: msg });
               
-              // Refresh logs
-              const { data: logs } = await supabase.from('notification_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);
-              if (logs) setAlarmHistory(logs.map(log => ({ id: log.id, date: new Date(log.created_at).toLocaleString(), type: log.type, message: log.message })));
-          }
-
-          if (result.errors && result.errors.length > 0) {
-              alert(`Test teilweise gesendet.\n\nProbleme:\n${result.errors.join('\n')}`);
-          } else {
+              // Refresh logs and config
+              await fetchProfileAndSub();
               alert("Test erfolgreich verschickt!"); 
           }
-      } catch (error) { 
-          alert("Fehler: " + error); 
+      } catch (error: any) { 
+          alert("Fehler: " + error.message); 
       } finally { 
           setIsSendingAlarm(false); 
       } 
@@ -257,6 +261,44 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   };
   
   const handleManageBilling = async () => { await createPortalSession(); }
+
+  // Check if test is allowed (Duplicates)
+  const isDuplicateTest = () => {
+      if (!userProfile?.last_test_config) return false;
+      const last = userProfile.last_test_config;
+      const currentEmail = notifications.email;
+      const currentPhone = notifications.sms;
+      
+      let emailDuplicate = false;
+      let smsDuplicate = false;
+
+      // If email enabled, check if matches last
+      if (notifications.emailEnabled && last.email === currentEmail) emailDuplicate = true;
+      // If sms enabled, check if matches last
+      if (notifications.smsEnabled && last.phone === currentPhone) smsDuplicate = true;
+
+      // Logic:
+      // If BOTH enabled: Block if BOTH match.
+      // If ONLY Email enabled: Block if Email matches.
+      // If ONLY SMS enabled: Block if SMS matches.
+      
+      if (notifications.emailEnabled && notifications.smsEnabled) {
+          return emailDuplicate && smsDuplicate;
+      }
+      if (notifications.emailEnabled) return emailDuplicate;
+      if (notifications.smsEnabled) return smsDuplicate;
+      
+      return false;
+  };
+
+  const testButtonDisabled = !hasActiveSubscription || isDuplicateTest();
+  const testButtonText = !hasActiveSubscription 
+        ? "Nur mit aktivem Abo" 
+        : isDuplicateTest() 
+            ? "Bereits getestet" 
+            : isSendingAlarm 
+                ? "Sende..." 
+                : "Test-Alarm senden";
 
   const StatusCard = ({ title, type, monitor, enabled, onToggle }: { title: string, type: 'gold' | 'silver', monitor: MonitorStatus, enabled: boolean, onToggle: (val: boolean) => void }) => { 
       const isLoading = isChecking === type; 
@@ -358,7 +400,24 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                     </div>
                     <div className="ml-8">{editMode.sms ? ( <div className="space-y-1"><input type="tel" value={tempData.sms} onChange={(e) => setTempData({...tempData, sms: e.target.value})} className="w-full text-sm p-2 border rounded" /></div> ) : ( <p className="text-sm text-slate-500 truncate">{notifications.sms || 'Nicht konfiguriert'}</p> )}</div>
                 </div>
-                <div className="pt-4 mt-4 border-t border-slate-100"><p className="text-xs text-slate-500 mb-3">Testalarm prüfen!</p><Button onClick={handleTestAlarm} disabled={isSendingAlarm} variant="secondary" size="sm" className="w-full justify-center">{isSendingAlarm ? "Sende..." : "Test-Alarm senden"}</Button></div>
+                
+                <div className="pt-4 mt-4 border-t border-slate-100">
+                    <p className="text-xs text-slate-500 mb-3">Testalarm prüfen!</p>
+                    <Button 
+                        onClick={handleTestAlarm} 
+                        disabled={testButtonDisabled || isSendingAlarm} 
+                        variant="secondary" 
+                        size="sm" 
+                        className={`w-full justify-center ${isDuplicateTest() ? 'opacity-50 cursor-not-allowed text-slate-500 border-slate-200 bg-slate-50' : ''}`}
+                    >
+                        {testButtonText}
+                    </Button>
+                    {isDuplicateTest() && (
+                        <p className="text-xs text-amber-600 mt-2 text-center">
+                            Hinweis: Ändere deine E-Mail oder Handynummer, um einen erneuten Test durchzuführen.
+                        </p>
+                    )}
+                </div>
             </div>
           </div>
 

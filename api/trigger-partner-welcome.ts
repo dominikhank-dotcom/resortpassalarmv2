@@ -76,15 +76,39 @@ export default async function handler(req: any, res: any) {
             const origin = req.headers.origin || 'https://resortpassalarm.com';
             const dashboardLink = `${origin}/affiliate`;
             
-            const { data, error } = await resend.emails.send({
-                from: 'ResortPass Alarm <support@resortpassalarm.com>',
-                to: email,
-                subject: 'Willkommen im Partnerprogramm',
-                html: `<h1>Hallo ${firstName || 'Partner'},</h1>
+            // --- LOAD TEMPLATE FROM DB ---
+            const { data: templateData } = await supabase
+                .from('email_templates')
+                .select('*')
+                .eq('id', 'part_register')
+                .single();
+
+            let subject = 'Willkommen im Partnerprogramm';
+            let htmlBody = `<h1>Hallo ${firstName || 'Partner'},</h1>
                 <p>Wir freuen uns sehr, dich als Partner begrüßen zu dürfen.</p>
                 <p>Du verdienst ab sofort 50% an jedem vermittelten Nutzer. Deinen persönlichen Empfehlungslink findest du in deinem Dashboard.</p>
                 <p><a href="${dashboardLink}">Zum Partner-Dashboard</a></p>
-                <p>Auf gute Zusammenarbeit!</p>`
+                <p>Auf gute Zusammenarbeit!</p>`;
+
+            if (templateData && templateData.body) {
+                console.log(">>> Using DB Template: part_register");
+                subject = templateData.subject;
+                htmlBody = templateData.body;
+                
+                // Replace variables
+                htmlBody = htmlBody.replace(/{firstName}/g, firstName || 'Partner');
+                htmlBody = htmlBody.replace(/{affiliateLink}/g, dashboardLink);
+                
+                subject = subject.replace(/{firstName}/g, firstName || 'Partner');
+            } else {
+                console.warn(">>> Template not found in DB, using fallback.");
+            }
+
+            const { data, error } = await resend.emails.send({
+                from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                to: email,
+                subject: subject,
+                html: htmlBody
             });
 
             if (error) {
