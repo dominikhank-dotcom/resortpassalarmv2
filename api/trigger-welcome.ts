@@ -92,7 +92,7 @@ export default async function handler(req: any, res: any) {
 
         const resend = new Resend(process.env.RESEND_API_KEY);
         const emailResponse = await resend.emails.send({
-            from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+            from: 'ResortPass Alarm <support@resortpassalarm.com>',
             to: email,
             subject: `Willkommen bei ResortPassAlarm, ${firstName || ''}!`,
             html: `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>

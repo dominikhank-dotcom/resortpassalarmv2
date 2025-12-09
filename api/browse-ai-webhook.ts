@@ -119,7 +119,7 @@ export default async function handler(req, res) {
             }
 
             return {
-                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                from: 'ResortPass Alarm <support@resortpassalarm.com>',
                 to: user.notification_email || user.email,
                 subject: `🚨 ResortPass ${productName} VERFÜGBAR! SCHNELL SEIN!`,
                 html: `

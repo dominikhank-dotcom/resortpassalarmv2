@@ -42,7 +42,7 @@ export default async function handler(req: any, res: any) {
         if (claimed && claimed.length > 0 && resend && partner.email) {
             try {
                 await resend.emails.send({
-                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    from: 'ResortPass Alarm <support@resortpassalarm.com>',
                     to: partner.email,
                     subject: 'So verdienst du deine erste Provision 💸',
                     html: `<p>Hey ${partner.first_name || 'Partner'},</p>

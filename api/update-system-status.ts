@@ -94,7 +94,7 @@ export default async function handler(req: any, res: any) {
                       const chunk = validProfilesForEmail.slice(i, i + BATCH_SIZE);
                       
                       const emailPayloads = chunk.map(p => ({
-                          from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                          from: 'ResortPass Alarm <support@resortpassalarm.com>',
                           to: p.notification_email || p.email,
                           subject: `🚨 ${productName} VERFÜGBAR! SCHNELL SEIN!`,
                           html: `

@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
   try {
     const resend = new Resend(apiKey);
     await resend.emails.send({
-        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+        from: 'ResortPass Alarm <support@resortpassalarm.com>',
         to: toEmail,
         subject: `Willkommen bei ResortPassAlarm, ${firstName}!`,
         html: `<h1>Hallo ${firstName},</h1>

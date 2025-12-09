@@ -44,7 +44,7 @@ export default async function handler(req: any, res: any) {
         if (count > 0) {
             try {
                 await resend.emails.send({
-                    from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                    from: 'ResortPass Alarm <support@resortpassalarm.com>',
                     to: partner.email,
                     subject: `Deine Einnahmen im ${monthName}`,
                     html: `<h1>Dein Monats-Update</h1>

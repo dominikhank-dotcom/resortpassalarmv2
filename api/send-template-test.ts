@@ -49,7 +49,7 @@ export default async function handler(req, res) {
     // 2. Send Email
     const resend = new Resend(apiKey);
     await resend.emails.send({
-        from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+        from: 'ResortPass Alarm <support@resortpassalarm.com>',
         to: toEmail,
         subject: `[TEST] ${subject}`,
         html: body,

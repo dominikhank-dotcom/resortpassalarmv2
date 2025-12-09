@@ -17,7 +17,7 @@ export default async function handler(req: any, res: any) {
         try {
             const resend = new Resend(process.env.RESEND_API_KEY);
             const data = await resend.emails.send({
-                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                from: 'ResortPass Alarm <support@resortpassalarm.com>',
                 to: email,
                 subject: '🔔 Test-Alarm: Dein Wächter funktioniert!',
                 html: `

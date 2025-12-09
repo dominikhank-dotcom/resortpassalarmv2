@@ -93,7 +93,7 @@ export default async function handler(req: any, res: any) {
                   try {
                       const { data: profile } = await supabase.from('profiles').select('first_name').eq('id', userId).single();
                       await resend.emails.send({
-                          from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                          from: 'ResortPass Alarm <support@resortpassalarm.com>',
                           to: session.customer_email,
                           subject: 'Dein Premium-Schutz ist aktiv! 🛡️',
                           html: `<h1>Das ging schnell!</h1><p>Danke ${profile?.first_name || 'Kunde'}, deine Zahlung war erfolgreich. Die Überwachung ist aktiv.</p><p><a href="https://resortpassalarm.com/dashboard">Zum Dashboard</a></p>`
@@ -192,7 +192,7 @@ export default async function handler(req: any, res: any) {
           const invoice = event.data.object;
           if (invoice.customer_email && resend) {
               await resend.emails.send({
-                  from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                  from: 'ResortPass Alarm <support@resortpassalarm.com>',
                   to: invoice.customer_email,
                   subject: 'Wichtig: Zahlung fehlgeschlagen ⚠️',
                   html: `<p>Hallo,</p><p>Leider ist die Zahlung für dein Abo fehlgeschlagen. Bitte prüfe deine Daten.</p><p><a href="https://resortpassalarm.com/dashboard">Dashboard</a></p>`
@@ -217,7 +217,7 @@ export default async function handler(req: any, res: any) {
                const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', sub.user_id).single();
                if (profile && profile.email) {
                    await resend.emails.send({
-                      from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                      from: 'ResortPass Alarm <support@resortpassalarm.com>',
                       to: profile.email,
                       subject: 'Dein Abo wurde beendet',
                       html: `<p>Hallo ${profile.first_name || ''},</p><p>Dein ResortPassAlarm Abo ist nun ausgelaufen.</p>`

@@ -77,7 +77,7 @@ export default async function handler(req: any, res: any) {
             const dashboardLink = `${origin}/affiliate`;
             
             const { data, error } = await resend.emails.send({
-                from: 'ResortPass Alarm <alarm@resortpassalarm.com>',
+                from: 'ResortPass Alarm <support@resortpassalarm.com>',
                 to: email,
                 subject: 'Willkommen im Partnerprogramm',
                 html: `<h1>Hallo ${firstName || 'Partner'},</h1>
