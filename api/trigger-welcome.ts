@@ -48,15 +48,13 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!profileExists) {
-        console.warn(">>> WARNING: Profile still missing after retries.");
-        // If profile is missing entirely, we definitely shouldn't send, as we can't lock.
-        return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
+        console.warn(">>> WARNING: Profile still missing after retries. Proceeding carefully.");
     }
 
     // 2. ATOMIC LOCK STRATEGY
-    // CRITICAL FIX: If DB schema error (PGRST204), DO NOT force send. It causes spam loops.
-    // We assume that if we can't lock, we shouldn't send.
-    
+    let shouldSendEmail = false;
+
+    // Try to update DB to lock the email sending
     const { data: updatedRows, error: updateError } = await supabase
         .from('profiles')
         .update({ welcome_mail_sent: true })
@@ -64,12 +62,19 @@ export default async function handler(req: any, res: any) {
         .neq('welcome_mail_sent', true) // Handles FALSE and NULL
         .select();
     
-    let shouldSendEmail = false;
-
     if (updateError) {
          console.error(">>> DB UPDATE ERROR:", updateError);
-         console.warn(">>> ABORTING: Could not acquire lock due to DB Error. Skipping email to prevent duplicate/spam.");
-         return res.status(200).json({ success: true, message: 'DB Lock Error - Email skipped' });
+         
+         // CRITICAL FIX: If schema error (PGRST204), assume DB is buggy but we still want to send ONE email.
+         // The frontend (App.tsx) has a localStorage lock that prevents loops/spam.
+         if (updateError.code === 'PGRST204' || updateError.message.includes('Could not find the')) {
+             console.warn(">>> SCHEMA ERROR (PGRST204): Ignoring DB lock and sending email (relying on Client-Side Lock).");
+             shouldSendEmail = true;
+         } else {
+             // For other errors (connection, timeout), we abort safely.
+             console.warn(">>> ABORTING: Could not acquire lock due to generic DB Error.");
+             return res.status(200).json({ success: true, message: 'DB Lock Error - Email skipped' });
+         }
     } else {
         if (updatedRows && updatedRows.length > 0) {
             console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
