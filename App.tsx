@@ -378,7 +378,10 @@ const App: React.FC = () => {
 
       if (sessionData && sessionData.session) {
           // Fetch role AND Name
-          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', sessionData.session.user.id).single();
+          // CRITICAL FIX: Removed 'welcome_mail_sent' from this query.
+          // If the DB schema cache is stale, requesting a "missing" column causes the entire query to fail (data is null),
+          // which triggers the fallback logout below. We only fetch core fields here to ensure login stability.
+          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', sessionData.session.user.id).single();
           
           if (profile) {
               if (profile.role) setRole(profile.role as UserRole);
@@ -393,9 +396,11 @@ const App: React.FC = () => {
               }
           } else {
                // Fallback if profile missing
-               console.error("Session exists but Profile missing");
-               await supabase.auth.signOut(); 
-               setRole(UserRole.GUEST);
+               // Only sign out if we are SURE it's not a temporary glitch.
+               // For now, we log the error but don't force sign out immediately to prevent loops on partial outages.
+               console.error("Session exists but Profile missing or query failed. Check DB Schema.");
+               // await supabase.auth.signOut(); // DISABLE AGGRESSIVE SIGNOUT
+               // setRole(UserRole.GUEST);
           }
       } else {
           // If returning from portal and session check failed, set a notification for manual login
@@ -423,7 +428,8 @@ const App: React.FC = () => {
                 setCurrentPage('landing');
             }
         } else if (event === 'SIGNED_IN' && session) {
-             supabase.from('profiles').select('role, first_name, last_name, welcome_mail_sent').eq('id', session.user.id).single()
+             // Same fix here: Remove risky column
+             supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
              .then(({ data }) => {
                 if (data) {
                     if (data.role) setRole(data.role as UserRole);

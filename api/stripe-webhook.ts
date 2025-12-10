@@ -354,23 +354,29 @@ export default async function handler(req: any, res: any) {
               }
           }
 
-          // 1. Update DB Status (Sync Always)
-          // We use the ID found (or fallback to subscription.id if nothing found yet, to create/update correctly)
-          const targetId = currentDbSub ? currentDbSub.stripe_subscription_id : subscription.id;
-          
-          const { error: dbError } = await supabase.from('subscriptions').update({ 
-              cancel_at_period_end: subscription.cancel_at_period_end,
-              current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-              stripe_subscription_id: subscription.id // Ensure ID is synced if it changed
-          }).eq('stripe_subscription_id', targetId); // Use the known ID
+          // 1. Update DB Status (Sync Always) - WRAPPED IN TRY/CATCH to prevent crash on Schema error
+          try {
+              // We use the ID found (or fallback to subscription.id if nothing found yet, to create/update correctly)
+              const targetId = currentDbSub ? currentDbSub.stripe_subscription_id : subscription.id;
+              
+              const { error: dbError } = await supabase.from('subscriptions').update({ 
+                  cancel_at_period_end: subscription.cancel_at_period_end,
+                  current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+                  stripe_subscription_id: subscription.id // Ensure ID is synced if it changed
+              }).eq('stripe_subscription_id', targetId); // Use the known ID
 
-          if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
+              if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
+          } catch (dbEx: any) {
+              console.error(">>> DB Exception during update (likely schema cache):", dbEx.message);
+              // Do NOT throw here, proceed to check if we should send email
+          }
 
           // 2. Check if this update IS a cancellation
           const stripeSaysChanged = previousAttributes && previousAttributes.cancel_at_period_end === false;
           // Robust dbSaysChanged: Only true if we actually found a record AND it was active before
           const dbSaysChanged = currentDbSub && currentDbSub.cancel_at_period_end === false && subscription.cancel_at_period_end === true;
 
+          // FORCE EMAIL if Stripe explicitly says it changed, even if DB failed to update
           if (subscription.cancel_at_period_end === true && (stripeSaysChanged || dbSaysChanged)) {
               console.log(`>>> CANCELLATION DETECTED! (Source: ${stripeSaysChanged ? 'Stripe PrevAttr' : 'DB Diff'}). Sending confirmation...`);
               if (resend) {

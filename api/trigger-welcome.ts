@@ -51,7 +51,7 @@ export default async function handler(req: any, res: any) {
         console.warn(">>> WARNING: Profile still missing after retries. Proceeding with Auth email.");
     }
 
-    // 2. ATOMIC LOCK STRATEGY
+    // 2. ATOMIC LOCK STRATEGY with FALLBACK
     let shouldSendEmail = false;
 
     if (profileExists) {
@@ -67,13 +67,12 @@ export default async function handler(req: any, res: any) {
              
              // Specific Check for Schema Cache Issue
              if (updateError.code === 'PGRST204' || updateError.message.includes('Could not find the')) {
-                 console.error(">>> CRITICAL: DB Schema Cache Stale! Please run: NOTIFY pgrst, 'reload schema'; in Supabase SQL Editor.");
+                 console.error(">>> CRITICAL: DB Schema Cache Stale! Ignoring DB lock and FORCING EMAIL SEND.");
+                 // FORCE SEND because we cannot check if it was sent, but better duplicate than none.
+                 shouldSendEmail = true; 
+             } else {
+                 console.warn(">>> DB Error (non-schema). Assuming safe to skip/retry later.");
              }
-
-             // STRICT MODE: If DB update fails (e.g. Schema Cache, Connection), abort email.
-             // Better to miss an email than to spam the user on every login.
-             console.warn(">>> ABORTING: Could not acquire lock (DB Error). Email NOT sent.");
-             return res.status(200).json({ success: true, message: 'DB Lock Error - Email skipped' });
         } else {
             if (updatedRows && updatedRows.length > 0) {
                 console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
@@ -84,7 +83,7 @@ export default async function handler(req: any, res: any) {
             }
         }
     } else {
-        // Fallback if profile missing completely (Rare race condition where DB trigger failed entirely)
+        // Fallback if profile missing completely
         console.warn(">>> PROFILE MISSING: Aborting to prevent potential loop/spam.");
         return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
     }
@@ -100,11 +99,16 @@ export default async function handler(req: any, res: any) {
         const loginLink = `${origin}/login`;
 
         // --- LOAD TEMPLATE FROM DB ---
-        const { data: templateData } = await supabase
-            .from('email_templates')
-            .select('*')
-            .eq('id', 'cust_welcome')
-            .single();
+        // Wrap in try/catch in case DB fail
+        let templateData = null;
+        try {
+            const { data } = await supabase
+                .from('email_templates')
+                .select('*')
+                .eq('id', 'cust_welcome')
+                .single();
+            templateData = data;
+        } catch(e) { console.warn("Failed to load template from DB", e); }
 
         let subject = `Willkommen bei ResortPassAlarm, ${firstName || ''}!`;
         let htmlBody = `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>
@@ -123,8 +127,6 @@ export default async function handler(req: any, res: any) {
             htmlBody = htmlBody.replace(/{loginLink}/g, loginLink);
             
             subject = subject.replace(/{firstName}/g, firstName || '');
-        } else {
-            console.warn(">>> Template not found in DB, using fallback.");
         }
 
         const emailResponse = await resend.emails.send({
