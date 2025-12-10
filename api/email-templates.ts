@@ -27,6 +27,16 @@ const REQUIRED_TEMPLATES = [
         body: '<h1>Schade, dass du gehst!</h1><p>Hallo {firstName},</p><p>Wir bestätigen hiermit den Eingang deiner Kündigung.</p><p><strong>Dein Abo läuft noch bis zum: {endDate}</strong></p><p>Bis dahin erhältst du weiterhin Alarme. Nach diesem Datum stoppen alle Benachrichtigungen automatisch.</p><hr><p>Es hat sich eine gute Chance ergeben? Du kannst dein Abo jederzeit vor Ablauf mit einem Klick im Dashboard verlängern:</p><p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Kündigung zurücknehmen</a></p>',
         variables: ['{firstName}', '{endDate}', '{dashboardLink}'],
         isEnabled: true
+    },
+    {
+        id: 'part_first_commission',
+        name: 'Erste Provision (Partner)',
+        description: 'Glückwunsch zur ersten Einnahme',
+        category: 'PARTNER',
+        subject: 'Glückwunsch! Deine erste Provision 💸',
+        body: '<h1>Stark, {firstName}!</h1><p>Du hast soeben deine allererste Provision verdient.</p><p>Jemand hat über deinen Link gebucht. Das Guthaben wurde deinem Konto gutgeschrieben.</p><p>Mach weiter so – das ist erst der Anfang!</p><p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Partner Dashboard</a></p>',
+        variables: ['{firstName}', '{dashboardLink}'],
+        isEnabled: true
     }
 ];
 

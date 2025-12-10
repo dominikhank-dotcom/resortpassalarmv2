@@ -43,7 +43,9 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
       // Determine the redirect URL (Production vs Local)
       const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
       // Redirect to affiliate login page after confirmation
-      const redirectUrl = `${siteUrl}/affiliate-login`; 
+      // Remove trailing slash if present to avoid double slash issues
+      const cleanSiteUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
+      const redirectUrl = `${cleanSiteUrl}/affiliate-login`; 
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
@@ -86,7 +88,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
                 Dein Partner-Account wurde erstellt. Wir haben eine Bestätigungs-E-Mail an <strong>{formData.email}</strong> gesendet.
               </p>
               <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-8 text-sm text-blue-800 text-left">
-                <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Danach kannst du dich im Partner-Bereich einloggen.
+                <strong>Wichtig:</strong> Bitte klicke auf den Link in der E-Mail, um deinen Account zu aktivieren. Du wirst anschließend zum Partner-Login weitergeleitet.
               </div>
               
               <Button onClick={onLoginClick} className="w-full justify-center bg-[#00305e]">
@@ -256,7 +258,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
               <div>
                 <h3 className="font-bold text-lg mb-1">Schnelle Auszahlung</h3>
                 <p className="text-blue-200 text-sm leading-relaxed">
-                  Direkte Auszahlung auf dein Konto! (via Stripe Connect)
+                  Direkte Auszahlung auf dein Konto!
                 </p>
               </div>
             </div>

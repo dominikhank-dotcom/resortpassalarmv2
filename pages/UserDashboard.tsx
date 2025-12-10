@@ -57,7 +57,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Prevent double firing of welcome mail in React lifecycle
+  // Prevent double firing of welcome mail in React lifecycle (per mount)
   const welcomeTriggeredRef = useRef(false);
 
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
@@ -102,34 +102,30 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 silver: profile.notify_silver !== false
             });
 
-            // --- WELCOME MAIL TRIGGER (Strict Check) ---
-            if (profile.welcome_mail_sent === false || profile.welcome_mail_sent === null) {
-                const sessionKey = `welcome_sent_${user.id}`;
-                const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
-
-                if (!welcomeTriggeredRef.current && !alreadyTriggeredSession) {
-                    welcomeTriggeredRef.current = true;
-                    sessionStorage.setItem(sessionKey, 'true');
-                    
-                    console.log("Dashboard: Initiating Welcome Mail Check via API for:", user.email);
-                    
-                    fetch('/api/trigger-welcome', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({ 
-                            userId: user.id, 
-                            email: user.email,
-                            firstName: user.user_metadata?.first_name 
-                        })
-                    }).then(async res => {
-                        const json = await res.json();
-                        console.log("Dashboard: Welcome API Response:", res.status, json);
-                    }).catch(err => {
-                        console.error("Dashboard: Welcome API Network Fail:", err);
-                    });
-                }
-            } else {
-                console.log("Dashboard: Welcome mail status checked. Sent:", profile.welcome_mail_sent);
+            // --- WELCOME MAIL TRIGGER (Robust) ---
+            // Removed frontend check for 'welcome_mail_sent' to prevent stale data issues.
+            // We blindly fire the trigger once per mount, and let the backend handle the atomic lock.
+            if (!welcomeTriggeredRef.current) {
+                welcomeTriggeredRef.current = true;
+                
+                console.log("Dashboard: Triggering Welcome Mail API for:", user.email);
+                
+                fetch('/api/trigger-welcome', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ 
+                        userId: user.id, 
+                        email: user.email,
+                        // Use profile first name which we just fetched, fallback to metadata
+                        firstName: profile.first_name || user.user_metadata?.first_name 
+                    })
+                }).then(async res => {
+                    const json = await res.json();
+                    console.log("Dashboard: Welcome API Result:", json);
+                }).catch(err => {
+                    console.error("Dashboard: Welcome API Failed:", err);
+                    // Do not reset ref, to avoid spamming on network error loop
+                });
             }
         }
 

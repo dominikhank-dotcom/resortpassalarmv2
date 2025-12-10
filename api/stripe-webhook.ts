@@ -64,7 +64,13 @@ export default async function handler(req: any, res: any) {
 
   // 2. Define the Heavy Lifting Logic
   const processEvent = async () => {
-      const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+      // Initialize Resend
+      let resend: Resend | null = null;
+      if (process.env.RESEND_API_KEY) {
+          resend = new Resend(process.env.RESEND_API_KEY);
+      } else {
+          console.warn("Webhook: RESEND_API_KEY missing. Emails will not be sent.");
+      }
 
       // --- HANDLE NEW SUBSCRIPTION (ACTIVATION) ---
       if (event.type === 'checkout.session.completed') {
@@ -146,7 +152,7 @@ export default async function handler(req: any, res: any) {
                       } else {
                           console.warn("Could not find email for activation notification.");
                       }
-                  } catch (emailErr) { console.error("Failed to send confirmation email:", emailErr); }
+                  } catch (emailErr) { console.error("Failed to send activation email:", emailErr); }
               }
           }
       }
@@ -241,6 +247,8 @@ export default async function handler(req: any, res: any) {
 
                           const commissionAmount = Number((amountPaid * commissionRate).toFixed(2));
                           
+                          let commissionId = null;
+
                           if (isBlocked) {
                               await supabase.from('commissions').insert({ 
                                   partner_id: partner.id, 
@@ -249,12 +257,54 @@ export default async function handler(req: any, res: any) {
                                   status: 'declined' 
                               });
                           } else {
-                              await supabase.from('commissions').insert({ 
+                              const { data: insertedComm } = await supabase.from('commissions').insert({ 
                                   partner_id: partner.id, 
                                   source_user_id: userId, 
                                   amount: commissionAmount, 
                                   status: 'pending' 
-                              });
+                              }).select('id').single();
+                              commissionId = insertedComm?.id;
+                          }
+
+                          // --- PARTNER FIRST COMMISSION EMAIL ---
+                          if (commissionId && !isBlocked && resend && partner.email) {
+                              // Check how many commissions this partner has
+                              const { count } = await supabase
+                                .from('commissions')
+                                .select('*', { count: 'exact', head: true })
+                                .eq('partner_id', partner.id)
+                                .eq('status', 'pending');
+                              
+                              // If this is the first (or only) one pending, and maybe total count is 1
+                              // A safer check is total commissions count
+                              const { count: totalCount } = await supabase
+                                .from('commissions')
+                                .select('*', { count: 'exact', head: true })
+                                .eq('partner_id', partner.id);
+                              
+                              if (totalCount === 1) {
+                                  try {
+                                      const template = await getTemplate('part_first_commission');
+                                      let subject = template?.subject || 'Glückwunsch! Deine erste Provision 💸';
+                                      let htmlBody = template?.body || `
+                                        <h1>Stark, {firstName}!</h1>
+                                        <p>Du hast soeben deine allererste Provision verdient.</p>
+                                        <p>Jemand hat über deinen Link gebucht. Das Guthaben wurde deinem Konto gutgeschrieben.</p>
+                                        <p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Partner Dashboard</a></p>
+                                      `;
+                                      
+                                      htmlBody = htmlBody.replace(/{firstName}/g, partner.first_name || 'Partner');
+                                      htmlBody = htmlBody.replace(/{dashboardLink}/g, 'https://resortpassalarm.com/affiliate');
+                                      subject = subject.replace(/{firstName}/g, partner.first_name || 'Partner');
+
+                                      await resend.emails.send({
+                                          from: 'ResortPass Alarm <support@resortpassalarm.com>',
+                                          to: partner.email,
+                                          subject: subject,
+                                          html: htmlBody
+                                      });
+                                  } catch (mailErr) { console.error("Failed to send partner first commission email", mailErr); }
+                              }
                           }
                       }
                   }
@@ -279,7 +329,7 @@ export default async function handler(req: any, res: any) {
           const subscription = event.data.object;
           const previousAttributes = event.data.previous_attributes;
 
-          // 1. Update DB Status
+          // 1. Update DB Status (Sync Always)
           await supabase.from('subscriptions').update({ 
               cancel_at_period_end: subscription.cancel_at_period_end,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString()

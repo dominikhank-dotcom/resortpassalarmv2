@@ -330,7 +330,7 @@ const App: React.FC = () => {
     const pathname = window.location.pathname;
 
     if (hash && (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('type=signup'))) {
-        console.log("Auth redirect detected.");
+        console.log("Auth redirect detected.", pathname);
         if (hash.includes('type=signup') || hash.includes('access_token')) {
             setLoginNotification("E-Mail erfolgreich bestätigt! Du kannst dich jetzt einloggen.");
         }
@@ -355,9 +355,9 @@ const App: React.FC = () => {
 
       // If returning from Stripe, give Supabase extra time to rehydrate from localStorage
       // before giving up and showing the login screen.
+      // INCREASED RETRY LOGIC for stability
+      let maxAttempts = isStripeReturn ? 10 : 2; 
       let attempts = 0;
-      let maxAttempts = isStripeReturn ? 5 : 1; 
-      
       let sessionData = null;
 
       while (attempts < maxAttempts) {
@@ -370,7 +370,9 @@ const App: React.FC = () => {
           } catch (e) { console.error("Session check error", e); }
           
           if (isStripeReturn) {
-              await new Promise(resolve => setTimeout(resolve, 500)); // Wait 500ms
+              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between checks for Stripe return
+          } else {
+              await new Promise(resolve => setTimeout(resolve, 100)); // Short wait for normal load
           }
           attempts++;
       }
@@ -384,6 +386,7 @@ const App: React.FC = () => {
               if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
               
               // Smart Redirect on load if stuck on generic login/landing but user is auth'd
+              // But ONLY if we are not explicitly on a specific login page that was requested (unless it was a redirect)
               if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
                   if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
@@ -397,8 +400,8 @@ const App: React.FC = () => {
           }
       } else {
           // No session found after retries
-          // If we came from Stripe, we might want to ensure we stay on 'dashboard' page so LoginScreen is rendered there 
-          // (which is handled by default fallthrough in renderContent)
+          // If we came from Stripe but lost session, we might want to stay on dashboard page to allow user to re-login there
+          // But usually, standard behavior is fine.
       }
       
       // Stop loading
