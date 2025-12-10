@@ -417,7 +417,7 @@ export default async function handler(req: any, res: any) {
   try {
       await Promise.race([
           processEvent(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Webhook Logic Timeout")), 15000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Webhook Logic Timeout")), 3000)) // Reduced to 3s for safety
       ]);
   } catch (error: any) {
       console.error("WEBHOOK WARNING (Timeout or Error):", error.message);
