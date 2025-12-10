@@ -349,9 +349,6 @@ export default async function handler(req: any, res: any) {
           if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
 
           // 2. Check if this update IS a cancellation
-          // Logic: 
-          // A) Stripe says it changed (previous_attributes.cancel_at_period_end === false)
-          // B) OR Stripe says it is canceling NOW, and our DB said it wasn't before (Fallback)
           const stripeSaysChanged = previousAttributes && previousAttributes.cancel_at_period_end === false;
           const dbSaysChanged = currentDbSub && currentDbSub.cancel_at_period_end === false && subscription.cancel_at_period_end === true;
 
@@ -359,12 +356,29 @@ export default async function handler(req: any, res: any) {
               console.log(`>>> CANCELLATION DETECTED! (Source: ${stripeSaysChanged ? 'Stripe PrevAttr' : 'DB Diff'}). Sending confirmation...`);
               if (resend) {
                   try {
-                      // Fetch user info using Stripe Sub ID to be sure
-                      const { data: sub } = await supabase
+                      // Fetch user info using Stripe Sub ID
+                      let { data: sub } = await supabase
                           .from('subscriptions')
                           .select('user_id')
                           .eq('stripe_subscription_id', subscription.id)
-                          .single();
+                          .maybeSingle(); // Changed to maybeSingle to prevent error
+
+                      // --- ROBUST FALLBACK LOOKUP ---
+                      // If sub ID lookup failed (e.g. sync issue), try looking up by Stripe CUSTOMER ID
+                      if (!sub && subscription.customer) {
+                          console.log(`>>> Fallback: Looking up user via Stripe Customer ID: ${subscription.customer}`);
+                          const { data: subByCustomer } = await supabase
+                              .from('subscriptions')
+                              .select('user_id')
+                              .eq('stripe_customer_id', subscription.customer)
+                              .maybeSingle();
+                          
+                          if (subByCustomer) {
+                              sub = subByCustomer;
+                              console.log(">>> Fallback successful. User ID found.");
+                          }
+                      }
+                      // -------------------------------
 
                       if (sub && sub.user_id) {
                           const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', sub.user_id).single();
@@ -406,7 +420,7 @@ export default async function handler(req: any, res: any) {
                               console.warn(">>> Cancellation: Profile email not found.");
                           }
                       } else {
-                          console.warn(">>> Cancellation: Subscription not found in DB for sub ID:", subscription.id);
+                          console.warn(">>> Cancellation: Subscription not found in DB even after fallback. Sub ID:", subscription.id, "Cust ID:", subscription.customer);
                       }
                   } catch (e: any) {
                       console.error("Failed to send cancellation email:", e);

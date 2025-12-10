@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/Navbar';
 import { LandingPage } from './pages/LandingPage';
@@ -353,10 +354,8 @@ const App: React.FC = () => {
       const urlParams = new URLSearchParams(window.location.search);
       const isStripeReturn = urlParams.get('payment_success') || urlParams.get('portal_return');
 
-      // If returning from Stripe, give Supabase extra time to rehydrate from localStorage
-      // before giving up and showing the login screen.
-      // INCREASED RETRY LOGIC for stability
-      let maxAttempts = isStripeReturn ? 10 : 2; 
+      // INCREASED RETRY LOGIC for stability on Stripe return
+      let maxAttempts = isStripeReturn ? 15 : 3; 
       let attempts = 0;
       let sessionData = null;
 
@@ -370,7 +369,7 @@ const App: React.FC = () => {
           } catch (e) { console.error("Session check error", e); }
           
           if (isStripeReturn) {
-              await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between checks for Stripe return
+              await new Promise(resolve => setTimeout(resolve, 1500)); // Wait longer (1.5s) per try for Stripe return
           } else {
               await new Promise(resolve => setTimeout(resolve, 100)); // Short wait for normal load
           }
@@ -400,8 +399,6 @@ const App: React.FC = () => {
           }
       } else {
           // No session found after retries
-          // If we came from Stripe but lost session, we might want to stay on dashboard page to allow user to re-login there
-          // But usually, standard behavior is fine.
       }
       
       // Stop loading

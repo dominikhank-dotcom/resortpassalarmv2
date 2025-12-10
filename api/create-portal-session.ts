@@ -34,11 +34,15 @@ export default async function handler(req: any, res: any) {
         return res.status(404).json({ error: 'Kein aktives Stripe-Abo gefunden.' });
     }
 
+    // Determine Base URL (Prefer strict ENV, fallback to request origin)
+    // This is critical to prevent "Logout" issues on return if domain differs (www vs non-www)
+    const baseUrl = process.env.VITE_SITE_URL || req.headers.origin;
+
     // 2. Create Portal Session
     // Add ?portal_return=true to trigger immediate sync in UserDashboard
     const session = await stripe.billingPortal.sessions.create({
       customer: sub.stripe_customer_id,
-      return_url: `${req.headers.origin}/dashboard?portal_return=true`,
+      return_url: `${baseUrl}/dashboard?portal_return=true`,
     });
 
     res.status(200).json({ url: session.url });
