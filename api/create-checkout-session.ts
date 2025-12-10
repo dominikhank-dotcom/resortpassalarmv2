@@ -1,3 +1,4 @@
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -57,6 +58,10 @@ export default async function handler(req, res) {
     const priceValue = priceSetting && priceSetting.value ? parseFloat(priceSetting.value) : 1.99;
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
+    // Determine Base URL (Prefer strict ENV, fallback to request origin)
+    // IMPORTANT: This prevents redirect issues when users return from Stripe
+    const baseUrl = process.env.VITE_SITE_URL || req.headers.origin;
+
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
       billing_address_collection: 'required',
@@ -86,8 +91,8 @@ export default async function handler(req, res) {
         },
       ],
       mode: 'subscription',
-      success_url: `${req.headers.origin}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
-      cancel_url: `${req.headers.origin}/dashboard?payment_cancelled=true`,
+      success_url: `${baseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
+      cancel_url: `${baseUrl}/dashboard?payment_cancelled=true`,
       customer_email: email,
       // Metadata is KEY for the webhook to know who referred this user
       metadata: {
