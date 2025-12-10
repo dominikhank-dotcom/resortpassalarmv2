@@ -72,7 +72,7 @@ export default async function handler(req: any, res: any) {
           console.warn("Webhook: RESEND_API_KEY missing. Emails will not be sent.");
       }
 
-      console.log(`>>> Webhook Processing Event: ${event.type}`);
+      console.log(`>>> Webhook Processing Event: ${event.type} [ID: ${event.id}]`);
 
       // --- HANDLE NEW SUBSCRIPTION (ACTIVATION) ---
       if (event.type === 'checkout.session.completed') {
@@ -332,6 +332,14 @@ export default async function handler(req: any, res: any) {
           const subscription = event.data.object;
           const previousAttributes = event.data.previous_attributes;
 
+          // DEBUG LOG: Show exactly what changed
+          if (previousAttributes) {
+              console.log(">>> Previous Attributes:", JSON.stringify(previousAttributes));
+          }
+
+          // 0. Fetch current DB state (Fallback for robustness)
+          const { data: currentDbSub } = await supabase.from('subscriptions').select('cancel_at_period_end').eq('stripe_subscription_id', subscription.id).single();
+
           // 1. Update DB Status (Sync Always)
           const { error: dbError } = await supabase.from('subscriptions').update({ 
               cancel_at_period_end: subscription.cancel_at_period_end,
@@ -341,9 +349,14 @@ export default async function handler(req: any, res: any) {
           if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
 
           // 2. Check if this update IS a cancellation
-          // Logic: cancel_at_period_end changed from false (or undefined) to true
-          if (subscription.cancel_at_period_end === true && previousAttributes && previousAttributes.cancel_at_period_end === false) {
-              console.log(">>> CANCELLATION DETECTED! Sending confirmation...");
+          // Logic: 
+          // A) Stripe says it changed (previous_attributes.cancel_at_period_end === false)
+          // B) OR Stripe says it is canceling NOW, and our DB said it wasn't before (Fallback)
+          const stripeSaysChanged = previousAttributes && previousAttributes.cancel_at_period_end === false;
+          const dbSaysChanged = currentDbSub && currentDbSub.cancel_at_period_end === false && subscription.cancel_at_period_end === true;
+
+          if (subscription.cancel_at_period_end === true && (stripeSaysChanged || dbSaysChanged)) {
+              console.log(`>>> CANCELLATION DETECTED! (Source: ${stripeSaysChanged ? 'Stripe PrevAttr' : 'DB Diff'}). Sending confirmation...`);
               if (resend) {
                   try {
                       // Fetch user info using Stripe Sub ID to be sure
