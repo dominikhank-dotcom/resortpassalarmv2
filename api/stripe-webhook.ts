@@ -72,6 +72,8 @@ export default async function handler(req: any, res: any) {
           console.warn("Webhook: RESEND_API_KEY missing. Emails will not be sent.");
       }
 
+      console.log(`>>> Webhook Processing Event: ${event.type}`);
+
       // --- HANDLE NEW SUBSCRIPTION (ACTIVATION) ---
       if (event.type === 'checkout.session.completed') {
           const session = event.data.object;
@@ -326,19 +328,22 @@ export default async function handler(req: any, res: any) {
 
       // --- HANDLE CANCELLATION (Triggered when user clicks cancel in Stripe) ---
       if (event.type === 'customer.subscription.updated') {
+          console.log(">>> Checking for Cancellation...");
           const subscription = event.data.object;
           const previousAttributes = event.data.previous_attributes;
 
           // 1. Update DB Status (Sync Always)
-          await supabase.from('subscriptions').update({ 
+          const { error: dbError } = await supabase.from('subscriptions').update({ 
               cancel_at_period_end: subscription.cancel_at_period_end,
               current_period_end: new Date(subscription.current_period_end * 1000).toISOString()
           }).eq('stripe_subscription_id', subscription.id);
 
+          if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
+
           // 2. Check if this update IS a cancellation
           // Logic: cancel_at_period_end changed from false (or undefined) to true
           if (subscription.cancel_at_period_end === true && previousAttributes && previousAttributes.cancel_at_period_end === false) {
-              
+              console.log(">>> CANCELLATION DETECTED! Sending confirmation...");
               if (resend) {
                   try {
                       // Fetch user info using Stripe Sub ID to be sure
@@ -384,7 +389,11 @@ export default async function handler(req: any, res: any) {
                                   html: htmlBody
                               });
                               console.log(`Cancellation confirmation sent to ${profile.email}`);
+                          } else {
+                              console.warn(">>> Cancellation: Profile email not found.");
                           }
+                      } else {
+                          console.warn(">>> Cancellation: Subscription not found in DB for sub ID:", subscription.id);
                       }
                   } catch (e: any) {
                       console.error("Failed to send cancellation email:", e);
@@ -417,7 +426,7 @@ export default async function handler(req: any, res: any) {
   try {
       await Promise.race([
           processEvent(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("Webhook Logic Timeout")), 3000)) // Reduced to 3s for safety
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Webhook Logic Timeout")), 8500)) // INCREASED TO 8.5s for Email sending safety
       ]);
   } catch (error: any) {
       console.error("WEBHOOK WARNING (Timeout or Error):", error.message);
