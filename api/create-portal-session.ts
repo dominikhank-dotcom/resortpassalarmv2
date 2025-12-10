@@ -34,9 +34,16 @@ export default async function handler(req: any, res: any) {
         return res.status(404).json({ error: 'Kein aktives Stripe-Abo gefunden.' });
     }
 
-    // Determine Base URL (Prefer strict ENV, fallback to request origin)
-    // This is critical to prevent "Logout" issues on return if domain differs (www vs non-www)
-    const baseUrl = process.env.VITE_SITE_URL || req.headers.origin;
+    // Determine Base URL & Force WWW for Production
+    // This prevents "Logout" issues when returning from Stripe to non-www domain
+    let baseUrl = process.env.VITE_SITE_URL || req.headers.origin;
+    
+    // Safety check: Ensure we don't double-add or break localhost
+    if (baseUrl && !baseUrl.includes('localhost') && !baseUrl.includes('127.0.0.1')) {
+        if (!baseUrl.includes('https://www.')) {
+            baseUrl = baseUrl.replace('https://', 'https://www.');
+        }
+    }
 
     // 2. Create Portal Session
     // Add ?portal_return=true to trigger immediate sync in UserDashboard
