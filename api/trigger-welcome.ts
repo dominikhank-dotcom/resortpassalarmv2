@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
@@ -63,6 +64,12 @@ export default async function handler(req: any, res: any) {
         
         if (updateError) {
              console.error(">>> DB UPDATE ERROR:", updateError);
+             
+             // Specific Check for Schema Cache Issue
+             if (updateError.code === 'PGRST204' || updateError.message.includes('Could not find the')) {
+                 console.error(">>> CRITICAL: DB Schema Cache Stale! Please run: NOTIFY pgrst, 'reload schema'; in Supabase SQL Editor.");
+             }
+
              // STRICT MODE: If DB update fails (e.g. Schema Cache, Connection), abort email.
              // Better to miss an email than to spam the user on every login.
              console.warn(">>> ABORTING: Could not acquire lock (DB Error). Email NOT sent.");

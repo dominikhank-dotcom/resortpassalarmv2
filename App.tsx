@@ -398,7 +398,10 @@ const App: React.FC = () => {
                setRole(UserRole.GUEST);
           }
       } else {
-          // No session found after retries
+          // If returning from portal and session check failed, set a notification for manual login
+          if (isStripeReturn && urlParams.get('portal_return')) {
+              setLoginNotification("Willkommen zurück! Bitte logge dich kurz ein, um die Synchronisierung abzuschließen.");
+          }
       }
       
       // Stop loading
@@ -504,6 +507,7 @@ const App: React.FC = () => {
 
       case 'dashboard':
         if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} prices={prices} />;
+        // If guest but coming from portal, show specific sync message or loading state, but for now fall to login with notification
         return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
       
       case 'affiliate':
