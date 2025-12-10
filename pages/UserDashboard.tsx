@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, RefreshCw, CheckCircle, ExternalLink, Settings, Mail, MessageSquare, Shield, Send, Ticket, XCircle, Pencil, Save, X, AlertOctagon, CreditCard, AlertTriangle, User, History, FileText, Gift, RotateCcw } from 'lucide-react';
 import { MonitorStatus, NotificationConfig } from '../types';
@@ -57,9 +58,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
   const [alarmHistory, setAlarmHistory] = useState<LogEntry[]>([]);
   const [userProfile, setUserProfile] = useState<any>(null);
 
-  // Prevent double firing of welcome mail in React lifecycle (per mount)
-  const welcomeTriggeredRef = useRef(false);
-
   const hasActiveSubscription = subscriptionStatus !== 'NONE';
 
   const fetchProfileAndSub = async (retryCount = 0) => {
@@ -101,32 +99,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ navigate, productU
                 gold: profile.notify_gold !== false, // default true if null
                 silver: profile.notify_silver !== false
             });
-
-            // --- WELCOME MAIL TRIGGER (Robust) ---
-            // Removed frontend check for 'welcome_mail_sent' to prevent stale data issues.
-            // We blindly fire the trigger once per mount, and let the backend handle the atomic lock.
-            if (!welcomeTriggeredRef.current) {
-                welcomeTriggeredRef.current = true;
-                
-                console.log("Dashboard: Triggering Welcome Mail API for:", user.email);
-                
-                fetch('/api/trigger-welcome', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ 
-                        userId: user.id, 
-                        email: user.email,
-                        // Use profile first name which we just fetched, fallback to metadata
-                        firstName: profile.first_name || user.user_metadata?.first_name 
-                    })
-                }).then(async res => {
-                    const json = await res.json();
-                    console.log("Dashboard: Welcome API Result:", json);
-                }).catch(err => {
-                    console.error("Dashboard: Welcome API Failed:", err);
-                    // Do not reset ref, to avoid spamming on network error loop
-                });
-            }
         }
 
         const { data: logs } = await supabase.from('notification_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(10);

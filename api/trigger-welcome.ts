@@ -48,44 +48,36 @@ export default async function handler(req: any, res: any) {
     }
 
     if (!profileExists) {
-        console.warn(">>> WARNING: Profile still missing after retries. Proceeding with Auth email.");
+        console.warn(">>> WARNING: Profile still missing after retries.");
+        // If profile is missing entirely, we definitely shouldn't send, as we can't lock.
+        return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
     }
 
-    // 2. ATOMIC LOCK STRATEGY with FALLBACK
+    // 2. ATOMIC LOCK STRATEGY
+    // CRITICAL FIX: If DB schema error (PGRST204), DO NOT force send. It causes spam loops.
+    // We assume that if we can't lock, we shouldn't send.
+    
+    const { data: updatedRows, error: updateError } = await supabase
+        .from('profiles')
+        .update({ welcome_mail_sent: true })
+        .eq('id', userId)
+        .neq('welcome_mail_sent', true) // Handles FALSE and NULL
+        .select();
+    
     let shouldSendEmail = false;
 
-    if (profileExists) {
-        const { data: updatedRows, error: updateError } = await supabase
-            .from('profiles')
-            .update({ welcome_mail_sent: true })
-            .eq('id', userId)
-            .neq('welcome_mail_sent', true) // Handles FALSE and NULL
-            .select();
-        
-        if (updateError) {
-             console.error(">>> DB UPDATE ERROR:", updateError);
-             
-             // Specific Check for Schema Cache Issue
-             if (updateError.code === 'PGRST204' || updateError.message.includes('Could not find the')) {
-                 console.error(">>> CRITICAL: DB Schema Cache Stale! Ignoring DB lock and FORCING EMAIL SEND.");
-                 // FORCE SEND because we cannot check if it was sent, but better duplicate than none.
-                 shouldSendEmail = true; 
-             } else {
-                 console.warn(">>> DB Error (non-schema). Assuming safe to skip/retry later.");
-             }
-        } else {
-            if (updatedRows && updatedRows.length > 0) {
-                console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
-                shouldSendEmail = true;
-            } else {
-                console.log(">>> ATOMIC LOCK FAILED: Email already sent (row not updated). Aborting.");
-                return res.status(200).json({ success: true, message: 'Email already sent (Lock)' });
-            }
-        }
+    if (updateError) {
+         console.error(">>> DB UPDATE ERROR:", updateError);
+         console.warn(">>> ABORTING: Could not acquire lock due to DB Error. Skipping email to prevent duplicate/spam.");
+         return res.status(200).json({ success: true, message: 'DB Lock Error - Email skipped' });
     } else {
-        // Fallback if profile missing completely
-        console.warn(">>> PROFILE MISSING: Aborting to prevent potential loop/spam.");
-        return res.status(200).json({ success: true, message: 'Profile missing - Email skipped' });
+        if (updatedRows && updatedRows.length > 0) {
+            console.log(">>> ATOMIC LOCK ACQUIRED: Row updated. Sending email.");
+            shouldSendEmail = true;
+        } else {
+            console.log(">>> ATOMIC LOCK FAILED: Email already sent (row not updated). Aborting.");
+            return res.status(200).json({ success: true, message: 'Email already sent (Lock)' });
+        }
     }
 
     if (shouldSendEmail) {
@@ -99,7 +91,6 @@ export default async function handler(req: any, res: any) {
         const loginLink = `${origin}/login`;
 
         // --- LOAD TEMPLATE FROM DB ---
-        // Wrap in try/catch in case DB fail
         let templateData = null;
         try {
             const { data } = await supabase

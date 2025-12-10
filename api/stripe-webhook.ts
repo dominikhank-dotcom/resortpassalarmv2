@@ -40,8 +40,12 @@ function parseAddressLine(line1: string) {
 
 // Helper to fetch template from DB
 async function getTemplate(id: string) {
-    const { data } = await supabase.from('email_templates').select('*').eq('id', id).single();
-    return data;
+    try {
+        const { data } = await supabase.from('email_templates').select('*').eq('id', id).single();
+        return data;
+    } catch (e) {
+        return null;
+    }
 }
 
 export default async function handler(req: any, res: any) {
@@ -332,64 +336,74 @@ export default async function handler(req: any, res: any) {
           const subscription = event.data.object;
           const previousAttributes = event.data.previous_attributes;
 
-          // DEBUG LOG: Show exactly what changed
+          // DEBUG LOG
           if (previousAttributes) {
               console.log(">>> Previous Attributes:", JSON.stringify(previousAttributes));
           }
 
-          // --- SMART DB LOOKUP (Lookup first, then update) ---
+          // --- SMART DB LOOKUP ---
           let currentDbSub = null;
           
-          // 1. Try Find by Subscription ID
-          const { data: subById } = await supabase.from('subscriptions').select('*').eq('stripe_subscription_id', subscription.id).maybeSingle();
-          if (subById) {
-              currentDbSub = subById;
-          } 
-          // 2. Fallback: Find by Customer ID (in case ID changed or initial sync was partial)
-          else if (subscription.customer) {
-              const { data: subByCust } = await supabase.from('subscriptions').select('*').eq('stripe_customer_id', subscription.customer).maybeSingle();
-              if (subByCust) {
-                  console.log(`>>> Found subscription via Customer ID (${subscription.customer}) instead of Sub ID.`);
-                  currentDbSub = subByCust;
+          try {
+              // 1. Try Find by Subscription ID
+              const { data: subById } = await supabase.from('subscriptions').select('*').eq('stripe_subscription_id', subscription.id).maybeSingle();
+              if (subById) {
+                  currentDbSub = subById;
+              } 
+              // 2. Fallback: Find by Customer ID
+              else if (subscription.customer) {
+                  const { data: subByCust } = await supabase.from('subscriptions').select('*').eq('stripe_customer_id', subscription.customer).maybeSingle();
+                  if (subByCust) {
+                      console.log(`>>> Found subscription via Customer ID (${subscription.customer}) instead of Sub ID.`);
+                      currentDbSub = subByCust;
+                  }
               }
+          } catch(e) {
+              console.warn(">>> DB Lookup failed (Schema issue?), proceeding with best effort.");
           }
 
-          // 1. Update DB Status (Sync Always) - WRAPPED IN TRY/CATCH to prevent crash on Schema error
+          // 1. Update DB Status (Sync Always) - WRAPPED IN TRY/CATCH
           try {
-              // We use the ID found (or fallback to subscription.id if nothing found yet, to create/update correctly)
               const targetId = currentDbSub ? currentDbSub.stripe_subscription_id : subscription.id;
               
               const { error: dbError } = await supabase.from('subscriptions').update({ 
                   cancel_at_period_end: subscription.cancel_at_period_end,
                   current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-                  stripe_subscription_id: subscription.id // Ensure ID is synced if it changed
-              }).eq('stripe_subscription_id', targetId); // Use the known ID
+                  stripe_subscription_id: subscription.id 
+              }).eq('stripe_subscription_id', targetId);
 
               if (dbError) console.error(">>> DB Update Error in Cancellation check:", dbError);
           } catch (dbEx: any) {
               console.error(">>> DB Exception during update (likely schema cache):", dbEx.message);
-              // Do NOT throw here, proceed to check if we should send email
           }
 
           // 2. Check if this update IS a cancellation
+          // ROBUST CHECK: If Stripe explicitly says "cancel_at_period_end" CHANGED from false to true in prev_attributes
           const stripeSaysChanged = previousAttributes && previousAttributes.cancel_at_period_end === false;
-          // Robust dbSaysChanged: Only true if we actually found a record AND it was active before
+          
+          // Also check DB diff if Stripe payload is partial (fallback)
           const dbSaysChanged = currentDbSub && currentDbSub.cancel_at_period_end === false && subscription.cancel_at_period_end === true;
 
-          // FORCE EMAIL if Stripe explicitly says it changed, even if DB failed to update
+          // LOGIC: If it IS canceled now, AND (Stripe confirms change OR DB confirms change)
           if (subscription.cancel_at_period_end === true && (stripeSaysChanged || dbSaysChanged)) {
               console.log(`>>> CANCELLATION DETECTED! (Source: ${stripeSaysChanged ? 'Stripe PrevAttr' : 'DB Diff'}). Sending confirmation...`);
               if (resend) {
                   try {
-                      // Retrieve user info - we can reuse currentDbSub if available
                       let userId = currentDbSub?.user_id;
                       
                       // Double check if userId missing
                       if (!userId && subscription.customer) {
+                           // Try to fetch userId from Profile via Customer ID in Subscriptions
+                           // If this fails due to PGRST204, we might lose the user ID mapping.
+                           // As a last resort, we can try to find user by email from Stripe Customer object (requires extra call, but let's try direct first)
                            const { data: subByCust } = await supabase.from('subscriptions').select('user_id').eq('stripe_customer_id', subscription.customer).maybeSingle();
                            userId = subByCust?.user_id;
                       }
 
+                      // If still no User ID, try to get email from Stripe object directly if available? 
+                      // Event object usually doesn't have email in top level, we might need to fetch customer.
+                      // Let's assume we found userId or have to skip.
+                      
                       if (userId) {
                           const { data: profile } = await supabase.from('profiles').select('email, first_name').eq('id', userId).single();
                           
@@ -431,6 +445,7 @@ export default async function handler(req: any, res: any) {
                           }
                       } else {
                           console.warn(">>> Cancellation: User ID not found for sub ID:", subscription.id);
+                          // FALLBACK: If we really can't find the user ID, maybe log it so admin can manually check?
                       }
                   } catch (e: any) {
                       console.error("Failed to send cancellation email:", e);

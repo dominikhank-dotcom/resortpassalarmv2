@@ -377,11 +377,10 @@ const App: React.FC = () => {
       }
 
       if (sessionData && sessionData.session) {
+          const user = sessionData.session.user;
           // Fetch role AND Name
-          // CRITICAL FIX: Removed 'welcome_mail_sent' from this query.
-          // If the DB schema cache is stale, requesting a "missing" column causes the entire query to fail (data is null),
-          // which triggers the fallback logout below. We only fetch core fields here to ensure login stability.
-          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', sessionData.session.user.id).single();
+          // CRITICAL FIX: Removed 'welcome_mail_sent' from this query to prevent login crash on stale schema.
+          const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', user.id).single();
           
           if (profile) {
               if (profile.role) setRole(profile.role as UserRole);
@@ -394,13 +393,32 @@ const App: React.FC = () => {
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
                   else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
               }
+
+              // --- TRIGGER WELCOME MAIL (CLIENT SIDE LOCK) ---
+              // Only trigger for Customers
+              if (profile.role === 'CUSTOMER') {
+                  const storageKey = `welcome_triggered_${user.id}`;
+                  const hasTriggered = localStorage.getItem(storageKey);
+
+                  if (!hasTriggered) {
+                      console.log("App: Triggering Welcome Mail for", user.email);
+                      localStorage.setItem(storageKey, 'true'); // Set lock immediately
+                      
+                      fetch('/api/trigger-welcome', {
+                          method: 'POST',
+                          headers: {'Content-Type': 'application/json'},
+                          body: JSON.stringify({ 
+                              userId: user.id, 
+                              email: user.email,
+                              firstName: profile.first_name || user.user_metadata?.first_name 
+                          })
+                      }).catch(err => console.error("Welcome trigger failed", err));
+                  }
+              }
+
           } else {
                // Fallback if profile missing
-               // Only sign out if we are SURE it's not a temporary glitch.
-               // For now, we log the error but don't force sign out immediately to prevent loops on partial outages.
                console.error("Session exists but Profile missing or query failed. Check DB Schema.");
-               // await supabase.auth.signOut(); // DISABLE AGGRESSIVE SIGNOUT
-               // setRole(UserRole.GUEST);
           }
       } else {
           // If returning from portal and session check failed, set a notification for manual login
@@ -428,7 +446,6 @@ const App: React.FC = () => {
                 setCurrentPage('landing');
             }
         } else if (event === 'SIGNED_IN' && session) {
-             // Same fix here: Remove risky column
              supabase.from('profiles').select('role, first_name, last_name').eq('id', session.user.id).single()
              .then(({ data }) => {
                 if (data) {
