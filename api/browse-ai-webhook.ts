@@ -1,3 +1,4 @@
+
 import { Resend } from 'resend';
 import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
@@ -10,6 +11,8 @@ const supabase = createClient(
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  console.log(">>> WEBHOOK RECEIVED FROM BROWSE.AI");
+
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error("FATAL: SUPABASE_SERVICE_ROLE_KEY is missing!");
       return res.status(500).json({ error: "Server Configuration Error" });
@@ -17,29 +20,44 @@ export default async function handler(req, res) {
 
   try {
     const { data } = req.body;
+    
+    // Log captured lists keys to help debug incorrect list names
     const capturedLists = data?.capturedLists || {};
+    console.log(">>> Webhook Data Lists:", Object.keys(capturedLists));
+
     const now = new Date().toISOString();
     const updates = [];
     
     let goldStatus = null;
     let silverStatus = null;
 
+    // Check for Gold
     if (capturedLists.GoldStatus && capturedLists.GoldStatus.length > 0 && capturedLists.GoldStatus[0].text) {
         const text = capturedLists.GoldStatus[0].text.toLowerCase();
         const isAvailable = !text.includes("ausverkauft") && !text.includes("nicht verfügbar");
         goldStatus = isAvailable ? 'available' : 'sold_out';
         updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
+        console.log(`>>> Parsed Gold Status: ${goldStatus}`);
     }
 
+    // Check for Silver
     if (capturedLists.SilverStatus && capturedLists.SilverStatus.length > 0 && capturedLists.SilverStatus[0].text) {
         const text = capturedLists.SilverStatus[0].text.toLowerCase();
         const isAvailable = !text.includes("ausverkauft") && !text.includes("nicht verfügbar");
         silverStatus = isAvailable ? 'available' : 'sold_out';
         updates.push({ key: 'status_silver', value: silverStatus, updated_at: now });
+        console.log(`>>> Parsed Silver Status: ${silverStatus}`);
     }
 
+    // Always update last_checked if we received a valid webhook, even if no status changed
     updates.push({ key: 'last_checked', value: now, updated_at: now });
-    await supabase.from('system_settings').upsert(updates);
+    
+    const { error: dbError } = await supabase.from('system_settings').upsert(updates);
+    if (dbError) {
+        console.error(">>> DB ERROR updating settings:", dbError);
+    } else {
+        console.log(">>> DB Updated successfully (Last Checked set).");
+    }
 
     const triggerGold = goldStatus === 'available';
     const triggerSilver = silverStatus === 'available';
@@ -48,6 +66,8 @@ export default async function handler(req, res) {
        return res.status(200).json({ message: 'Status updated. No new availability.' });
     }
 
+    // --- ALARM LOGIC ---
+    
     const { data: goldUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_gold').single();
     const { data: silverUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_silver').single();
     
@@ -60,6 +80,7 @@ export default async function handler(req, res) {
         .in('status', ['active', 'trialing', 'Active', 'Trialing']);
     
     if (!subscriptions || subscriptions.length === 0) {
+        console.log(">>> Availability found but no active subs.");
         return res.status(200).json({ message: 'Items available but no active subscribers.' });
     }
 
@@ -90,8 +111,6 @@ export default async function handler(req, res) {
             const enabled = user.email_enabled !== false;
             
             // Should user receive ANY alert?
-            // If Gold triggers AND user wants Gold -> YES
-            // If Silver triggers AND user wants Silver -> YES
             const matchGold = triggerGold && (user.notify_gold !== false);
             const matchSilver = triggerSilver && (user.notify_silver !== false);
             
@@ -99,7 +118,6 @@ export default async function handler(req, res) {
         });
 
         const payloads = validProfiles.map(user => {
-            // Customize content based on match
             const matchGold = triggerGold && (user.notify_gold !== false);
             const matchSilver = triggerSilver && (user.notify_silver !== false);
             
@@ -203,6 +221,7 @@ export default async function handler(req, res) {
         }
     }
 
+    console.log(`>>> ALARM CYCLE COMPLETE. Emails sent: ${stats.sent}`);
     res.status(200).json({ success: true, message: `Alarms processed. Emails: ${stats.sent}`, stats, logs });
 
   } catch (error) {
