@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2, Ticket } from 'lucide-react';
 import { Button } from '../components/Button';
@@ -207,9 +208,10 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
 
             {/* Pass Selection */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
                 Welchen Pass suchst du? <span className="text-red-500">*</span>
               </label>
+              <p className="text-xs text-slate-500 mb-3">Das kannst du später jederzeit ändern.</p>
               <div className="grid grid-cols-2 gap-4">
                 {/* Silver - NOW LEFT */}
                 <label className={`relative flex flex-col items-center p-4 border rounded-xl cursor-pointer transition-all ${preferences.silver ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-500' : 'border-slate-200 hover:border-blue-200'}`}>

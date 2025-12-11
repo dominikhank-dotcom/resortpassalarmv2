@@ -1,3 +1,4 @@
+
 export default async function handler(req, res) {
   // Set JSON content type explicitly
   res.setHeader('Content-Type', 'application/json');
@@ -7,44 +8,53 @@ export default async function handler(req, res) {
   }
 
   const apiKey = process.env.BROWSE_AI_API_KEY;
-  const robotId = process.env.BROWSE_AI_ROBOT_ID;
+  const robotIdGold = process.env.BROWSE_AI_ROBOT_ID_GOLD;
+  const robotIdSilver = process.env.BROWSE_AI_ROBOT_ID_SILVER;
 
-  if (!apiKey || !robotId) {
+  if (!apiKey) {
     return res.status(400).json({ 
       success: false, 
-      message: 'API Key oder Robot ID fehlen in den Environment Variables.' 
+      message: 'BROWSE_AI_API_KEY fehlt in den Environment Variables.' 
+    });
+  }
+
+  if (!robotIdGold || !robotIdSilver) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Es fehlen Robot IDs. Bitte setze BROWSE_AI_ROBOT_ID_GOLD und BROWSE_AI_ROBOT_ID_SILVER in Vercel.' 
     });
   }
 
   try {
-    const response = await fetch(`https://api.browse.ai/v2/robots/${robotId}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // Check both robots in parallel
+    const [goldRes, silverRes] = await Promise.all([
+        fetch(`https://api.browse.ai/v2/robots/${robotIdGold}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+        }),
+        fetch(`https://api.browse.ai/v2/robots/${robotIdSilver}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${apiKey}` }
+        })
+    ]);
 
-    if (response.ok) {
-      const data = await response.json();
+    const goldData = await goldRes.json();
+    const silverData = await silverRes.json();
+
+    if (goldRes.ok && silverRes.ok) {
       return res.status(200).json({ 
         success: true, 
         message: 'Verbindung erfolgreich!', 
-        robotName: data.robot?.name || 'Unbekannt' 
+        robotName: `Gold: ${goldData.robot?.name || 'OK'} | Silver: ${silverData.robot?.name || 'OK'}` 
       });
     } else {
-      // Try to parse error details, fallback to status text
-      let errorMessage = response.statusText;
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-      } catch (e) {
-        // Response was not JSON
-      }
+      let errorMessage = "Fehler bei: ";
+      if (!goldRes.ok) errorMessage += `Gold (${goldData.message || goldRes.statusText}) `;
+      if (!silverRes.ok) errorMessage += `Silver (${silverData.message || silverRes.statusText})`;
       
-      return res.status(response.status).json({ 
+      return res.status(400).json({ 
         success: false, 
-        message: `Browse.ai Fehler: ${errorMessage}` 
+        message: `Browse.ai API Fehler: ${errorMessage}` 
       });
     }
 
