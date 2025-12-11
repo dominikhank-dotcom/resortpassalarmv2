@@ -31,25 +31,39 @@ export default async function handler(req, res) {
     let goldStatus = null;
     let silverStatus = null;
 
-    // Check for Gold
+    // --- CHECK GOLD ---
     if (capturedLists.GoldStatus && capturedLists.GoldStatus.length > 0 && capturedLists.GoldStatus[0].text) {
-        const text = capturedLists.GoldStatus[0].text.toLowerCase();
-        const isAvailable = !text.includes("ausverkauft") && !text.includes("nicht verfügbar");
-        goldStatus = isAvailable ? 'available' : 'sold_out';
+        const text = capturedLists.GoldStatus[0].text.toLowerCase().trim();
+        console.log(`>>> Gold Robot Text: "${text}"`);
+        
+        // Logic: If the text contains negative phrases, it is SOLD OUT.
+        // Otherwise, it is considered AVAILABLE.
+        const isSoldOut = 
+            text.includes("ausverkauft") || 
+            text.includes("nicht verfügbar") || 
+            text.includes("leider ist dieses produkt"); // Dein spezifischer Satz
+
+        goldStatus = isSoldOut ? 'sold_out' : 'available';
         updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
         console.log(`>>> Parsed Gold Status: ${goldStatus}`);
     }
 
-    // Check for Silver
+    // --- CHECK SILVER ---
     if (capturedLists.SilverStatus && capturedLists.SilverStatus.length > 0 && capturedLists.SilverStatus[0].text) {
-        const text = capturedLists.SilverStatus[0].text.toLowerCase();
-        const isAvailable = !text.includes("ausverkauft") && !text.includes("nicht verfügbar");
-        silverStatus = isAvailable ? 'available' : 'sold_out';
+        const text = capturedLists.SilverStatus[0].text.toLowerCase().trim();
+        console.log(`>>> Silver Robot Text: "${text}"`);
+
+        const isSoldOut = 
+            text.includes("ausverkauft") || 
+            text.includes("nicht verfügbar") || 
+            text.includes("leider ist dieses produkt");
+
+        silverStatus = isSoldOut ? 'sold_out' : 'available';
         updates.push({ key: 'status_silver', value: silverStatus, updated_at: now });
         console.log(`>>> Parsed Silver Status: ${silverStatus}`);
     }
 
-    // Always update last_checked if we received a valid webhook, even if no status changed
+    // Always update last_checked if we received a valid webhook
     updates.push({ key: 'last_checked', value: now, updated_at: now });
     
     const { error: dbError } = await supabase.from('system_settings').upsert(updates);
