@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2, Lightbulb } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { getSystemSettings } from '../services/backendService';
@@ -51,8 +51,8 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
     return `Vor ${diff} Minuten`;
   };
 
-  const scrollToFeatures = () => {
-    document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToHowItWorks = () => {
+    document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -79,7 +79,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
               Jetzt Überwachung Starten
               <ArrowRight size={20} />
             </Button>
-            <Button onClick={scrollToFeatures} variant="outline" size="lg" className="w-full sm:w-auto border-slate-600 text-slate-300 hover:text-white hover:border-white hover:bg-transparent">
+            <Button onClick={scrollToHowItWorks} variant="outline" size="lg" className="w-full sm:w-auto border-slate-600 text-slate-300 hover:text-white hover:border-white hover:bg-transparent">
               Wie es funktioniert
             </Button>
           </div>
@@ -117,6 +117,50 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           </div>
         </div>
       </div>
+
+      {/* Intro / Problem Story Section */}
+      <section id="how-it-works" className="py-20 bg-slate-50 border-b border-slate-200">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-2xl p-8 md:p-12 shadow-sm border border-slate-100 relative overflow-hidden">
+             {/* Background Decoration */}
+             <div className="absolute top-0 right-0 w-48 h-48 bg-[#ffcc00] rounded-full mix-blend-multiply filter blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+             
+             <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-6 relative z-10">
+               Du wartest auf eine Jahreskarte des Europa-Park?
+             </h2>
+             
+             <div className="space-y-6 text-lg text-slate-600 leading-relaxed relative z-10">
+                <p>
+                  <span className="font-bold text-slate-900">Kennst du das Problem?</span> Du möchtest unbedingt eine Europa-Park Jahreskarte, aber die sind ständig ausverkauft. Und wenn sie wieder angeboten werden, musst du schnell sein. Es werden immer nur eine begrenzte Zahl vom Europa-Park freigegeben.
+                </p>
+                <p>
+                  Du kannst nun jeden Tag selbst den Ticket-Shop besuchen und diesen wichtigen Moment doch verpassen, weil du genau dann nicht online warst.
+                </p>
+                
+                <div className="bg-blue-50 rounded-xl p-6 border-l-4 border-[#00305e] my-8">
+                  <div className="flex gap-4">
+                    <div className="shrink-0 mt-1">
+                        <Lightbulb className="text-[#00305e]" size={24} />
+                    </div>
+                    <div>
+                        <p className="text-slate-900 font-medium mb-1">
+                          <span className="font-bold text-[#00305e]">Oder du nutzt ResortPassAlarm!</span>
+                        </p>
+                        <p className="text-slate-700 text-base">
+                          Wir erledigen das für dich in kurzen Abständen, Tag und Nacht. Sobald Jahreskarten verfügbar sind, erhältst du eine E-Mail und eine SMS auf dein Handy.
+                        </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="font-bold text-slate-900 pt-2 text-center md:text-left">
+                  So steigen deine Chancen auf eine Jahreskarte erheblich! <br/>
+                  <span className="text-[#00305e] text-xl">Sei schnell und schlau! Nutze ResortPassAlarm!</span>
+                </p>
+             </div>
+          </div>
+        </div>
+      </section>
 
       {/* Premium Service & Pricing */}
       <section id="features" className="py-24 bg-white">

@@ -80,6 +80,7 @@ export default async function handler(req, res) {
 
     console.log(`>>> Incoming Robot ID: ${robotId}`);
     console.log(`>>> Run Status: ${runStatus}`);
+    
     if (runStatus === 'failed') {
         console.log(`>>> Failure Reason: [${errorCode}] ${errorMessage}`);
     }
@@ -89,22 +90,23 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Invalid Payload: robotId missing' });
     }
     
-    // CRITICAL CHANGE: Differentiate between "Site Down" (Ignore) and "Element Missing" (Alarm)
+    // INTELLIGENT ERROR HANDLING
+    // We want to ignore TECHNICAL errors (site down), but trigger alarm on CONTENT errors (element missing = text removed = available)
     const isTechnicalError = 
-        errorMessage.includes("timeout") || 
-        errorMessage.includes("navigation") || 
+        errorMessage.includes("navigation timeout") || 
         errorMessage.includes("network") ||
         errorMessage.includes("captcha") ||
         errorMessage.includes("access denied") ||
-        errorMessage.includes("http error");
+        errorMessage.includes("http error") ||
+        errorMessage.includes("dns resolution");
 
     if (runStatus !== 'successful') {
         if (isTechnicalError) {
             console.warn(">>> Robot run failed due to TECHNICAL ERROR (Timeout/Network). Ignoring to prevent false alarm.");
             return res.status(200).json({ message: 'Technical failure ignored.' });
         } else {
-            console.log(">>> Robot run failed likely due to SELECTOR/CONTENT MISSING. Proceeding to check logic (Potential Availability!).");
-            // We do NOT return here, we let the logic below handle the "Missing Content" case.
+            console.log(">>> Robot run failed likely due to SELECTOR/CONTENT MISSING. This usually means the 'Sold Out' text is gone. Proceeding as AVAILABLE.");
+            // We do NOT return here. We let the logic below handle the "Missing Content" case.
         }
     }
 
