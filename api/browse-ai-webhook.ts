@@ -8,32 +8,43 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
-// Helper to find list robustly
-function getListFromPayload(capturedLists, preferredNames = []) {
-    if (!capturedLists) return [];
-    const keys = Object.keys(capturedLists);
-    
-    // 1. Try exact preferred
+// Helper to extract text from either Lists or Texts objects
+function getRobotContent(payload, preferredNames = []) {
+    const lists = payload.capturedLists || {};
+    const texts = payload.capturedTexts || {};
+
+    const listKeys = Object.keys(lists);
+    const textKeys = Object.keys(texts);
+
+    console.log(`>>> Searching in Lists: [${listKeys.join(', ')}] AND Texts: [${textKeys.join(', ')}]`);
+
+    // 1. Check Captured TEXTS (Single Element Captures)
     for (const name of preferredNames) {
-        if (capturedLists[name]) return capturedLists[name];
+        // Exact Match
+        if (texts[name]) return { found: true, type: 'text', value: texts[name] };
+        // Case Insensitive
+        const key = textKeys.find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) return { found: true, type: 'text', value: texts[key] };
     }
 
-    // 2. Try case-insensitive preferred
+    // 2. Check Captured LISTS (List Captures)
     for (const name of preferredNames) {
-        const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
-        if (key) {
-            console.log(`>>> Found list via case-insensitive match: '${key}'`);
-            return capturedLists[key];
-        }
+        if (lists[name]) return { found: true, type: 'list', value: lists[name] };
+        const key = listKeys.find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) return { found: true, type: 'list', value: lists[key] };
     }
 
-    // 3. Fallback: Use first available list
-    if (keys.length > 0) {
-        console.log(`>>> Warning: Preferred list names (${preferredNames.join(', ')}) not found. Using first available list: '${keys[0]}'`);
-        return capturedLists[keys[0]];
+    // 3. Fallback: Take the first available data
+    if (textKeys.length > 0) {
+        console.log(`>>> Fallback: Using first text key '${textKeys[0]}'`);
+        return { found: true, type: 'text', value: texts[textKeys[0]] };
+    }
+    if (listKeys.length > 0) {
+        console.log(`>>> Fallback: Using first list key '${listKeys[0]}'`);
+        return { found: true, type: 'list', value: lists[listKeys[0]] };
     }
 
-    return [];
+    return { found: false, type: 'none', value: null };
 }
 
 export default async function handler(req, res) {
@@ -61,12 +72,9 @@ export default async function handler(req, res) {
     // --- DEBUGGING ---
     const robotId = payload?.robotId;
     const runStatus = payload?.status; // 'successful', 'failed'
-    const capturedLists = payload?.capturedLists || {};
     
-    // Log keys to confirm structure matches
     console.log(`>>> Incoming Robot ID: ${robotId}`);
     console.log(`>>> Run Status: ${runStatus}`);
-    console.log(`>>> Captured Lists Keys: ${JSON.stringify(Object.keys(capturedLists))}`);
     
     if (!robotId) {
         console.error(">>> ERROR: Robot ID is missing after unwrapping. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 300));
@@ -91,24 +99,44 @@ export default async function handler(req, res) {
     // === GOLD ROBOT LOGIC ===
     if (robotId === GOLD_ID) {
         console.log(">>> Processing GOLD Robot...");
-        const list = getListFromPayload(capturedLists, ['GoldStatus', 'List1', 'StatusGold']);
-        const textItem = list.length > 0 ? list[0].text : null;
+        const content = getRobotContent(payload, ['GoldStatus', 'List1', 'StatusGold', 'Status']);
         
-        if (textItem) {
-            const text = textItem.toLowerCase().trim();
-            console.log(`>>> Gold Text Found: "${text}"`);
-            
-            // Negative Match Check
-            if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
-                goldStatus = 'sold_out';
-            } else {
-                console.log(`>>> Gold Text does NOT contain negative keywords. Triggering Available!`);
-                goldStatus = 'available'; 
-            }
+        if (!content.found) {
+             // CASE 1: Nothing found at all (Scraping Error / Layout mismatch)
+             console.log(">>> WARNING: No lists OR texts found. Assuming SOLD OUT (Safety Fallback).");
+             goldStatus = 'sold_out'; 
         } else {
-            // LISTE LEER -> Text verschwunden -> Alarm
-            console.log(">>> Gold List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
-            goldStatus = 'available';
+            let textToAnalyze = "";
+
+            if (content.type === 'list') {
+                 if (content.value.length === 0) {
+                     // List exists but is empty -> Text removed -> Available
+                     console.log(">>> Gold List is present but EMPTY. Triggering Available!");
+                     goldStatus = 'available';
+                 } else {
+                     textToAnalyze = content.value[0].text;
+                 }
+            } else if (content.type === 'text') {
+                 textToAnalyze = content.value; // Value is directly the string
+            }
+
+            // If we have text, analyze it
+            if (goldStatus !== 'available' && textToAnalyze) {
+                const text = textToAnalyze.toLowerCase().trim();
+                console.log(`>>> Gold Text Found (${content.type}): "${text}"`);
+                
+                // Negative Match Check
+                if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
+                    goldStatus = 'sold_out';
+                } else {
+                    console.log(`>>> Gold Text does NOT contain negative keywords. Triggering Available!`);
+                    goldStatus = 'available'; 
+                }
+            } else if (goldStatus !== 'available') {
+                // Content found but text property empty?
+                console.log(">>> Gold Content found but empty string. Triggering Available.");
+                goldStatus = 'available';
+            }
         }
         
         updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
@@ -117,22 +145,38 @@ export default async function handler(req, res) {
     // === SILVER ROBOT LOGIC ===
     if (robotId === SILVER_ID) {
         console.log(">>> Processing SILVER Robot...");
-        const list = getListFromPayload(capturedLists, ['SilverStatus', 'List1', 'StatusSilver']);
-        const textItem = list.length > 0 ? list[0].text : null;
+        const content = getRobotContent(payload, ['SilverStatus', 'List1', 'StatusSilver', 'Status']);
         
-        if (textItem) {
-            const text = textItem.toLowerCase().trim();
-            console.log(`>>> Silver Text Found: "${text}"`);
-            
-            if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
-                silverStatus = 'sold_out';
-            } else {
-                console.log(`>>> Silver Text does NOT contain negative keywords. Triggering Available!`);
-                silverStatus = 'available';
-            }
+        if (!content.found) {
+             console.log(">>> WARNING: No content found for Silver. Assuming SOLD OUT.");
+             silverStatus = 'sold_out';
         } else {
-            console.log(">>> Silver List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
-            silverStatus = 'available';
+             let textToAnalyze = "";
+
+             if (content.type === 'list') {
+                  if (content.value.length === 0) {
+                      console.log(">>> Silver List is EMPTY. Triggering Alarm!");
+                      silverStatus = 'available';
+                  } else {
+                      textToAnalyze = content.value[0].text;
+                  }
+             } else if (content.type === 'text') {
+                  textToAnalyze = content.value;
+             }
+
+             if (silverStatus !== 'available' && textToAnalyze) {
+                 const text = textToAnalyze.toLowerCase().trim();
+                 console.log(`>>> Silver Text Found (${content.type}): "${text}"`);
+                 
+                 if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
+                     silverStatus = 'sold_out';
+                 } else {
+                     console.log(`>>> Silver Text does NOT contain negative keywords. Triggering Available!`);
+                     silverStatus = 'available';
+                 }
+             } else if (silverStatus !== 'available') {
+                 silverStatus = 'available';
+             }
         }
 
         updates.push({ key: 'status_silver', value: silverStatus, updated_at: now });
