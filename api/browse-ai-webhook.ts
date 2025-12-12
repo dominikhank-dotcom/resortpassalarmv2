@@ -19,21 +19,33 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { data } = req.body;
+    // FIX 1: Browse.AI sendet Daten manchmal direkt, manchmal in 'data' wrapper
+    let payload = req.body;
     
+    // Check if we need to unwrap
+    if (payload.data && !payload.robotId) {
+        console.log(">>> Payload wrapped in 'data' property. Unwrapping...");
+        payload = payload.data;
+    }
+
     // --- DEBUGGING ---
-    // Log robot ID and status to verify which robot is calling
-    const robotId = data?.robotId;
-    const runStatus = data?.status; // 'successful', 'failed'
-    const capturedLists = data?.capturedLists || {};
+    const robotId = payload?.robotId;
+    const runStatus = payload?.status; // 'successful', 'failed'
+    const capturedLists = payload?.capturedLists || {};
     
+    // Log keys to confirm structure matches
     console.log(`>>> Incoming Robot ID: ${robotId}`);
     console.log(`>>> Run Status: ${runStatus}`);
-    console.log(">>> Captured Lists Keys:", Object.keys(capturedLists));
+    
+    // If still undefined, log the raw body to see what's going on
+    if (!robotId) {
+        console.error(">>> ERROR: Robot ID is missing. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 200));
+        return res.status(400).json({ error: 'Invalid Payload: robotId missing' });
+    }
     
     // Safety check: If run failed, do not trigger alarm (could be 404/timeout)
     if (runStatus !== 'successful') {
-        console.warn(">>> Robot run failed. Ignoring.");
+        console.warn(">>> Robot run failed (BrowseAI Error). Ignoring.");
         return res.status(200).json({ message: 'Run failed, ignored.' });
     }
 
@@ -47,29 +59,31 @@ export default async function handler(req, res) {
     let goldStatus = null;
     let silverStatus = null;
 
-    // --- LOGIC: INVERTED CHECK ---
-    // 1. We look for the "Sold Out" text.
-    // 2. If text is FOUND -> Sold Out.
-    // 3. If list is EMPTY (but run successful) -> Text is GONE -> AVAILABLE!
+    // --- LOGIC: NEGATIVE MATCH ---
+    // Wir suchen nach "Ausverkauft"-Wörtern.
+    // Finden wir sie -> Ausverkauft.
+    // Finden wir sie NICHT (egal ob anderer Text oder gar kein Text) -> Verfügbar!
 
     // === GOLD ROBOT LOGIC ===
     if (robotId === GOLD_ID) {
         console.log(">>> Processing GOLD Robot...");
-        const list = capturedLists.GoldStatus || capturedLists.List1 || []; // Fallback to List1 if misnamed
+        const list = capturedLists.GoldStatus || capturedLists.List1 || []; 
         const textItem = list.length > 0 ? list[0].text : null;
         
         if (textItem) {
             const text = textItem.toLowerCase().trim();
             console.log(`>>> Gold Text Found: "${text}"`);
             
+            // Negative Match Check
             if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
                 goldStatus = 'sold_out';
             } else {
-                // Text found but says something else? Assume Available.
+                // Text ist da, aber NICHT "Ausverkauft" (z.B. "Warenkorb") -> ALARM
+                console.log(`>>> Gold Text does NOT contain negative keywords. Triggering Available!`);
                 goldStatus = 'available'; 
             }
         } else {
-            // LIST IS EMPTY -> "Sold Out" text disappeared -> AVAILABLE!
+            // LISTE LEER -> Der "Ausverkauft"-Satz ist verschwunden -> ALARM!
             console.log(">>> Gold List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
             goldStatus = 'available';
         }
@@ -90,27 +104,15 @@ export default async function handler(req, res) {
             if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
                 silverStatus = 'sold_out';
             } else {
+                console.log(`>>> Silver Text does NOT contain negative keywords. Triggering Available!`);
                 silverStatus = 'available';
             }
         } else {
-            // LIST IS EMPTY -> "Sold Out" text disappeared -> AVAILABLE!
             console.log(">>> Silver List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
             silverStatus = 'available';
         }
 
         updates.push({ key: 'status_silver', value: silverStatus, updated_at: now });
-    }
-
-    // Fallback: If unknown robot ID, try to guess based on list names (legacy support)
-    if (robotId !== GOLD_ID && robotId !== SILVER_ID) {
-        console.warn(">>> Unknown Robot ID. Trying to guess by list name...");
-        if (capturedLists.GoldStatus) {
-             // Logic repeated for safety
-             const text = capturedLists.GoldStatus[0]?.text?.toLowerCase() || "";
-             if (text.includes("leider") || text.includes("ausverkauft")) goldStatus = 'sold_out';
-             else goldStatus = 'available'; // Empty or different text
-             updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
-        }
     }
 
     // Always update last_checked
@@ -120,18 +122,19 @@ export default async function handler(req, res) {
     if (dbError) {
         console.error(">>> DB ERROR updating settings:", dbError);
     } else {
-        console.log(">>> DB Updated successfully.");
+        console.log(`>>> DB Updated. Gold: ${goldStatus}, Silver: ${silverStatus}`);
     }
 
     const triggerGold = goldStatus === 'available';
     const triggerSilver = silverStatus === 'available';
 
     if (!triggerGold && !triggerSilver) {
-       console.log(">>> No availability detected. Done.");
+       console.log(">>> No availability detected (Both Sold Out). Done.");
        return res.status(200).json({ message: 'Status updated. No new availability.' });
     }
 
-    // --- ALARM LOGIC ---
+    // --- ALARM LOGIC (EMAILS & SMS) ---
+    console.log(">>> STARTING ALARM SEQUENCE...");
     
     const { data: goldUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_gold').single();
     const { data: silverUrlSetting } = await supabase.from('system_settings').select('value').eq('key', 'url_silver').single();
