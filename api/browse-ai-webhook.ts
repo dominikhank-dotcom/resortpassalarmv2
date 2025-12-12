@@ -21,9 +21,25 @@ export default async function handler(req, res) {
   try {
     const { data } = req.body;
     
-    // Log captured lists keys to help debug incorrect list names
+    // --- DEBUGGING ---
+    // Log robot ID and status to verify which robot is calling
+    const robotId = data?.robotId;
+    const runStatus = data?.status; // 'successful', 'failed'
     const capturedLists = data?.capturedLists || {};
-    console.log(">>> Webhook Data Lists:", Object.keys(capturedLists));
+    
+    console.log(`>>> Incoming Robot ID: ${robotId}`);
+    console.log(`>>> Run Status: ${runStatus}`);
+    console.log(">>> Captured Lists Keys:", Object.keys(capturedLists));
+    
+    // Safety check: If run failed, do not trigger alarm (could be 404/timeout)
+    if (runStatus !== 'successful') {
+        console.warn(">>> Robot run failed. Ignoring.");
+        return res.status(200).json({ message: 'Run failed, ignored.' });
+    }
+
+    // Load configured IDs to know who is who
+    const GOLD_ID = process.env.BROWSE_AI_ROBOT_ID_GOLD;
+    const SILVER_ID = process.env.BROWSE_AI_ROBOT_ID_SILVER;
 
     const now = new Date().toISOString();
     const updates = [];
@@ -31,52 +47,87 @@ export default async function handler(req, res) {
     let goldStatus = null;
     let silverStatus = null;
 
-    // --- CHECK GOLD ---
-    if (capturedLists.GoldStatus && capturedLists.GoldStatus.length > 0 && capturedLists.GoldStatus[0].text) {
-        const text = capturedLists.GoldStatus[0].text.toLowerCase().trim();
-        console.log(`>>> Gold Robot Text: "${text}"`);
+    // --- LOGIC: INVERTED CHECK ---
+    // 1. We look for the "Sold Out" text.
+    // 2. If text is FOUND -> Sold Out.
+    // 3. If list is EMPTY (but run successful) -> Text is GONE -> AVAILABLE!
+
+    // === GOLD ROBOT LOGIC ===
+    if (robotId === GOLD_ID) {
+        console.log(">>> Processing GOLD Robot...");
+        const list = capturedLists.GoldStatus || capturedLists.List1 || []; // Fallback to List1 if misnamed
+        const textItem = list.length > 0 ? list[0].text : null;
         
-        // Logic: If the text contains negative phrases, it is SOLD OUT.
-        // Otherwise, it is considered AVAILABLE.
-        const isSoldOut = 
-            text.includes("ausverkauft") || 
-            text.includes("nicht verfügbar") || 
-            text.includes("leider ist dieses produkt"); // Dein spezifischer Satz
-
-        goldStatus = isSoldOut ? 'sold_out' : 'available';
+        if (textItem) {
+            const text = textItem.toLowerCase().trim();
+            console.log(`>>> Gold Text Found: "${text}"`);
+            
+            if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
+                goldStatus = 'sold_out';
+            } else {
+                // Text found but says something else? Assume Available.
+                goldStatus = 'available'; 
+            }
+        } else {
+            // LIST IS EMPTY -> "Sold Out" text disappeared -> AVAILABLE!
+            console.log(">>> Gold List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
+            goldStatus = 'available';
+        }
+        
         updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
-        console.log(`>>> Parsed Gold Status: ${goldStatus}`);
     }
 
-    // --- CHECK SILVER ---
-    if (capturedLists.SilverStatus && capturedLists.SilverStatus.length > 0 && capturedLists.SilverStatus[0].text) {
-        const text = capturedLists.SilverStatus[0].text.toLowerCase().trim();
-        console.log(`>>> Silver Robot Text: "${text}"`);
+    // === SILVER ROBOT LOGIC ===
+    if (robotId === SILVER_ID) {
+        console.log(">>> Processing SILVER Robot...");
+        const list = capturedLists.SilverStatus || capturedLists.List1 || [];
+        const textItem = list.length > 0 ? list[0].text : null;
+        
+        if (textItem) {
+            const text = textItem.toLowerCase().trim();
+            console.log(`>>> Silver Text Found: "${text}"`);
+            
+            if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
+                silverStatus = 'sold_out';
+            } else {
+                silverStatus = 'available';
+            }
+        } else {
+            // LIST IS EMPTY -> "Sold Out" text disappeared -> AVAILABLE!
+            console.log(">>> Silver List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
+            silverStatus = 'available';
+        }
 
-        const isSoldOut = 
-            text.includes("ausverkauft") || 
-            text.includes("nicht verfügbar") || 
-            text.includes("leider ist dieses produkt");
-
-        silverStatus = isSoldOut ? 'sold_out' : 'available';
         updates.push({ key: 'status_silver', value: silverStatus, updated_at: now });
-        console.log(`>>> Parsed Silver Status: ${silverStatus}`);
     }
 
-    // Always update last_checked if we received a valid webhook
+    // Fallback: If unknown robot ID, try to guess based on list names (legacy support)
+    if (robotId !== GOLD_ID && robotId !== SILVER_ID) {
+        console.warn(">>> Unknown Robot ID. Trying to guess by list name...");
+        if (capturedLists.GoldStatus) {
+             // Logic repeated for safety
+             const text = capturedLists.GoldStatus[0]?.text?.toLowerCase() || "";
+             if (text.includes("leider") || text.includes("ausverkauft")) goldStatus = 'sold_out';
+             else goldStatus = 'available'; // Empty or different text
+             updates.push({ key: 'status_gold', value: goldStatus, updated_at: now });
+        }
+    }
+
+    // Always update last_checked
     updates.push({ key: 'last_checked', value: now, updated_at: now });
     
     const { error: dbError } = await supabase.from('system_settings').upsert(updates);
     if (dbError) {
         console.error(">>> DB ERROR updating settings:", dbError);
     } else {
-        console.log(">>> DB Updated successfully (Last Checked set).");
+        console.log(">>> DB Updated successfully.");
     }
 
     const triggerGold = goldStatus === 'available';
     const triggerSilver = silverStatus === 'available';
 
     if (!triggerGold && !triggerSilver) {
+       console.log(">>> No availability detected. Done.");
        return res.status(200).json({ message: 'Status updated. No new availability.' });
     }
 
