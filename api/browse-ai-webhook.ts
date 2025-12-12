@@ -73,17 +73,39 @@ export default async function handler(req, res) {
     const robotId = payload?.robotId;
     const runStatus = payload?.status; // 'successful', 'failed'
     
+    // ERROR ANALYSIS
+    const errorObj = payload?.error;
+    const errorMessage = errorObj?.message?.toLowerCase() || "";
+    const errorCode = errorObj?.code || "";
+
     console.log(`>>> Incoming Robot ID: ${robotId}`);
     console.log(`>>> Run Status: ${runStatus}`);
+    if (runStatus === 'failed') {
+        console.log(`>>> Failure Reason: [${errorCode}] ${errorMessage}`);
+    }
     
     if (!robotId) {
         console.error(">>> ERROR: Robot ID is missing after unwrapping. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 300));
         return res.status(400).json({ error: 'Invalid Payload: robotId missing' });
     }
     
+    // CRITICAL CHANGE: Differentiate between "Site Down" (Ignore) and "Element Missing" (Alarm)
+    const isTechnicalError = 
+        errorMessage.includes("timeout") || 
+        errorMessage.includes("navigation") || 
+        errorMessage.includes("network") ||
+        errorMessage.includes("captcha") ||
+        errorMessage.includes("access denied") ||
+        errorMessage.includes("http error");
+
     if (runStatus !== 'successful') {
-        console.warn(">>> Robot run failed (BrowseAI Error). Ignoring.");
-        return res.status(200).json({ message: 'Run failed, ignored.' });
+        if (isTechnicalError) {
+            console.warn(">>> Robot run failed due to TECHNICAL ERROR (Timeout/Network). Ignoring to prevent false alarm.");
+            return res.status(200).json({ message: 'Technical failure ignored.' });
+        } else {
+            console.log(">>> Robot run failed likely due to SELECTOR/CONTENT MISSING. Proceeding to check logic (Potential Availability!).");
+            // We do NOT return here, we let the logic below handle the "Missing Content" case.
+        }
     }
 
     // Load configured IDs
@@ -102,9 +124,16 @@ export default async function handler(req, res) {
         const content = getRobotContent(payload, ['GoldStatus', 'List1', 'StatusGold', 'Status']);
         
         if (!content.found) {
-             // CASE 1: Nothing found at all (Scraping Error / Layout mismatch)
-             console.log(">>> WARNING: No lists OR texts found. Assuming SOLD OUT (Safety Fallback).");
-             goldStatus = 'sold_out'; 
+             // CASE 1: Nothing found
+             if (runStatus === 'failed' && !isTechnicalError) {
+                 // Robot failed to find the "Sold Out" element -> It's gone -> AVAILABLE!
+                 console.log(">>> Gold Robot failed to find element (Selector Error). Text removed from site. Triggering Available!");
+                 goldStatus = 'available';
+             } else {
+                 // Robot succeeded but found nothing (Empty List glitch) OR Technical Error
+                 console.log(">>> WARNING: Gold content missing (Success Empty OR Technical Fail). Assuming SOLD OUT.");
+                 goldStatus = 'sold_out'; 
+             }
         } else {
             let textToAnalyze = "";
 
@@ -148,8 +177,13 @@ export default async function handler(req, res) {
         const content = getRobotContent(payload, ['SilverStatus', 'List1', 'StatusSilver', 'Status']);
         
         if (!content.found) {
-             console.log(">>> WARNING: No content found for Silver. Assuming SOLD OUT.");
-             silverStatus = 'sold_out';
+             if (runStatus === 'failed' && !isTechnicalError) {
+                 console.log(">>> Silver Robot failed to find element. Triggering Available!");
+                 silverStatus = 'available';
+             } else {
+                 console.log(">>> WARNING: Silver content missing. Assuming SOLD OUT.");
+                 silverStatus = 'sold_out';
+             }
         } else {
              let textToAnalyze = "";
 
