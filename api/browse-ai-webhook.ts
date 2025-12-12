@@ -8,6 +8,34 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
 
+// Helper to find list robustly
+function getListFromPayload(capturedLists, preferredNames = []) {
+    if (!capturedLists) return [];
+    const keys = Object.keys(capturedLists);
+    
+    // 1. Try exact preferred
+    for (const name of preferredNames) {
+        if (capturedLists[name]) return capturedLists[name];
+    }
+
+    // 2. Try case-insensitive preferred
+    for (const name of preferredNames) {
+        const key = keys.find(k => k.toLowerCase() === name.toLowerCase());
+        if (key) {
+            console.log(`>>> Found list via case-insensitive match: '${key}'`);
+            return capturedLists[key];
+        }
+    }
+
+    // 3. Fallback: Use first available list
+    if (keys.length > 0) {
+        console.log(`>>> Warning: Preferred list names (${preferredNames.join(', ')}) not found. Using first available list: '${keys[0]}'`);
+        return capturedLists[keys[0]];
+    }
+
+    return [];
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
@@ -22,9 +50,6 @@ export default async function handler(req, res) {
     let payload = req.body;
 
     // --- PAYLOAD NORMALIZATION ---
-    // Browse.AI sendet je nach Einstellung unterschiedliche Strukturen.
-    // Wir prüfen, wo die Musik spielt (wo 'robotId' oder 'status' zu finden ist).
-
     if (payload.task && typeof payload.task === 'object') {
         console.log(">>> Payload wrapped in 'task' property. Unwrapping...");
         payload = payload.task;
@@ -41,22 +66,19 @@ export default async function handler(req, res) {
     // Log keys to confirm structure matches
     console.log(`>>> Incoming Robot ID: ${robotId}`);
     console.log(`>>> Run Status: ${runStatus}`);
+    console.log(`>>> Captured Lists Keys: ${JSON.stringify(Object.keys(capturedLists))}`);
     
-    // If still undefined, log the raw body to see what's going on
     if (!robotId) {
-        // Fallback: Manchmal ist robotId nicht im Task-Objekt, sondern wir müssen raten.
-        // Aber normalerweise ist sie Pflicht.
         console.error(">>> ERROR: Robot ID is missing after unwrapping. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 300));
         return res.status(400).json({ error: 'Invalid Payload: robotId missing' });
     }
     
-    // Safety check: If run failed, do not trigger alarm (could be 404/timeout)
     if (runStatus !== 'successful') {
         console.warn(">>> Robot run failed (BrowseAI Error). Ignoring.");
         return res.status(200).json({ message: 'Run failed, ignored.' });
     }
 
-    // Load configured IDs to know who is who
+    // Load configured IDs
     const GOLD_ID = process.env.BROWSE_AI_ROBOT_ID_GOLD;
     const SILVER_ID = process.env.BROWSE_AI_ROBOT_ID_SILVER;
 
@@ -66,15 +88,10 @@ export default async function handler(req, res) {
     let goldStatus = null;
     let silverStatus = null;
 
-    // --- LOGIC: NEGATIVE MATCH ---
-    // Wir suchen nach "Ausverkauft"-Wörtern.
-    // Finden wir sie -> Ausverkauft.
-    // Finden wir sie NICHT (egal ob anderer Text oder gar kein Text) -> Verfügbar!
-
     // === GOLD ROBOT LOGIC ===
     if (robotId === GOLD_ID) {
         console.log(">>> Processing GOLD Robot...");
-        const list = capturedLists.GoldStatus || capturedLists.List1 || []; 
+        const list = getListFromPayload(capturedLists, ['GoldStatus', 'List1', 'StatusGold']);
         const textItem = list.length > 0 ? list[0].text : null;
         
         if (textItem) {
@@ -85,12 +102,11 @@ export default async function handler(req, res) {
             if (text.includes("leider ist dieses produkt") || text.includes("ausverkauft") || text.includes("nicht verfügbar")) {
                 goldStatus = 'sold_out';
             } else {
-                // Text ist da, aber NICHT "Ausverkauft" (z.B. "Warenkorb") -> ALARM
                 console.log(`>>> Gold Text does NOT contain negative keywords. Triggering Available!`);
                 goldStatus = 'available'; 
             }
         } else {
-            // LISTE LEER -> Der "Ausverkauft"-Satz ist verschwunden -> ALARM!
+            // LISTE LEER -> Text verschwunden -> Alarm
             console.log(">>> Gold List is EMPTY. 'Sold Out' text missing. Triggering Alarm!");
             goldStatus = 'available';
         }
@@ -101,7 +117,7 @@ export default async function handler(req, res) {
     // === SILVER ROBOT LOGIC ===
     if (robotId === SILVER_ID) {
         console.log(">>> Processing SILVER Robot...");
-        const list = capturedLists.SilverStatus || capturedLists.List1 || [];
+        const list = getListFromPayload(capturedLists, ['SilverStatus', 'List1', 'StatusSilver']);
         const textItem = list.length > 0 ? list[0].text : null;
         
         if (textItem) {
@@ -136,7 +152,7 @@ export default async function handler(req, res) {
     const triggerSilver = silverStatus === 'available';
 
     if (!triggerGold && !triggerSilver) {
-       console.log(">>> No availability detected (Both Sold Out). Done.");
+       console.log(">>> No availability detected. Done.");
        return res.status(200).json({ message: 'Status updated. No new availability.' });
     }
 
