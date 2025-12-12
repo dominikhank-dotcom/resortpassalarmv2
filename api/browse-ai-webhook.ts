@@ -19,11 +19,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    // FIX 1: Browse.AI sendet Daten manchmal direkt, manchmal in 'data' wrapper
     let payload = req.body;
-    
-    // Check if we need to unwrap
-    if (payload.data && !payload.robotId) {
+
+    // --- PAYLOAD NORMALIZATION ---
+    // Browse.AI sendet je nach Einstellung unterschiedliche Strukturen.
+    // Wir prüfen, wo die Musik spielt (wo 'robotId' oder 'status' zu finden ist).
+
+    if (payload.task && typeof payload.task === 'object') {
+        console.log(">>> Payload wrapped in 'task' property. Unwrapping...");
+        payload = payload.task;
+    } else if (payload.data && typeof payload.data === 'object') {
         console.log(">>> Payload wrapped in 'data' property. Unwrapping...");
         payload = payload.data;
     }
@@ -39,7 +44,9 @@ export default async function handler(req, res) {
     
     // If still undefined, log the raw body to see what's going on
     if (!robotId) {
-        console.error(">>> ERROR: Robot ID is missing. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 200));
+        // Fallback: Manchmal ist robotId nicht im Task-Objekt, sondern wir müssen raten.
+        // Aber normalerweise ist sie Pflicht.
+        console.error(">>> ERROR: Robot ID is missing after unwrapping. Raw Body Snippet:", JSON.stringify(req.body).substring(0, 300));
         return res.status(400).json({ error: 'Invalid Payload: robotId missing' });
     }
     
