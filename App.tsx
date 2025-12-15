@@ -272,11 +272,21 @@ const App: React.FC = () => {
   // LAZY INITIALIZATION of Current Page to prevent routing glitch (redirect to landing)
   // when browser refreshes on /dashboard or /affiliate
   const [currentPage, setCurrentPage] = useState(() => {
-     const path = window.location.pathname;
+     const path = window.location.pathname.replace(/\/$/, ""); // Normalize path
+     
      if (path === '/dashboard') return 'dashboard';
      if (path === '/affiliate') return 'affiliate';
-     if (path === '/affiliate-login') return 'affiliate-login'; // Init this page if visited directly
+     if (path === '/affiliate-login') return 'affiliate-login';
      if (path === '/admin-dashboard') return 'admin-dashboard';
+     if (path === '/user-signup') return 'user-signup';
+     if (path === '/affiliate-info') return 'affiliate-info';
+     
+     // Legal Pages
+     if (path === '/imprint') return 'imprint';
+     if (path === '/privacy') return 'privacy';
+     if (path === '/terms') return 'terms';
+     if (path === '/revocation') return 'revocation';
+
      return 'landing';
   });
   
@@ -296,6 +306,26 @@ const App: React.FC = () => {
     gold: "https://tickets.mackinternational.de/de/ticket/resortpass-gold",
     silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
   });
+
+  // Handle Browser Back/Forward Buttons
+  useEffect(() => {
+      const handlePopState = () => {
+          const path = window.location.pathname.replace(/\/$/, "");
+          if (path === '/dashboard') setCurrentPage('dashboard');
+          else if (path === '/affiliate') setCurrentPage('affiliate');
+          else if (path === '/affiliate-login') setCurrentPage('affiliate-login');
+          else if (path === '/user-signup') setCurrentPage('user-signup');
+          else if (path === '/affiliate-info') setCurrentPage('affiliate-info');
+          else if (path === '/imprint') setCurrentPage('imprint');
+          else if (path === '/privacy') setCurrentPage('privacy');
+          else if (path === '/terms') setCurrentPage('terms');
+          else if (path === '/revocation') setCurrentPage('revocation');
+          else setCurrentPage('landing');
+      };
+
+      window.addEventListener('popstate', handlePopState);
+      return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Load System Settings on Mount
   useEffect(() => {
@@ -411,7 +441,7 @@ const App: React.FC = () => {
                           headers: {'Content-Type': 'application/json'},
                           body: JSON.stringify({ 
                               userId: user.id, 
-                              email: user.email,
+                              email: user.email, 
                               firstName: profile.first_name || user.user_metadata?.first_name 
                           })
                       }).catch(err => console.error("Welcome trigger failed", err));
@@ -469,6 +499,15 @@ const App: React.FC = () => {
     setCurrentPage(page);
     window.scrollTo(0, 0);
     if (page !== 'login' && page !== 'affiliate-login') setLoginNotification(null);
+    
+    // Update Browser URL for cleaner navigation and history support
+    let path = '/';
+    if (page !== 'landing') path = `/${page}`;
+    
+    // Only push if path is different to avoid duplicate history entries
+    if (window.location.pathname !== path) {
+        window.history.pushState(null, '', path);
+    }
   };
 
   const handleSetRole = (newRole: UserRole) => {
