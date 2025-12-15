@@ -209,7 +209,9 @@ const LoginScreen: React.FC<{
               >
                 {isLoading ? 'Lade...' : 'Anmelden'}
               </button>
-              <button onClick={onCancel} className="text-slate-400 text-sm hover:text-slate-600 block w-full py-2">Abbrechen</button>
+              <button onClick={onCancel} className="text-slate-400 text-sm hover:text-slate-600 block w-full py-2 hover:underline">
+                Zur Startseite
+              </button>
             </div>
             
             {onRegisterClick && (

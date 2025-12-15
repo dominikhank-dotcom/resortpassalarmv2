@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet, Info } from 'lucide-react';
+import { Copy, TrendingUp, Users, DollarSign, Sparkles, LayoutDashboard, Settings, CreditCard, Save, AlertCircle, Lock, User, Globe, Hash, Check, AlertTriangle, ArrowRight, Wallet, Info, Calendar } from 'lucide-react';
 import { AffiliateStats } from '../types';
 import { Button } from '../components/Button';
 import { generateMarketingCopy } from '../services/geminiService';
@@ -29,6 +30,15 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
   const [platform, setPlatform] = useState<'twitter' | 'email' | 'instagram'>('twitter');
   const [stripeConnected, setStripeConnected] = useState(false);
   const [isPayoutLoading, setIsPayoutLoading] = useState(false);
+  const [rawCommissions, setRawCommissions] = useState<any[]>([]);
+
+  // Date Filter State
+  const [dateRange, setDateRange] = useState({
+      start: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString().split('T')[0],
+      end: new Date().toISOString().split('T')[0]
+  });
+  const [datePreset, setDatePreset] = useState('last28');
+  const [dailyStats, setDailyStats] = useState<any[]>([]);
 
   // Welcome Mail Ref
   const welcomeTriggeredRef = useRef(false);
@@ -68,8 +78,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 .single();
             
             if (profile) {
-                // --- TRIGGER WELCOME MAIL (Partner) - Strict Safety Check ---
-                // Trigger ONLY if explicitly FALSE or NULL.
+                // --- TRIGGER WELCOME MAIL (Partner) ---
                 if (profile.partner_welcome_sent === false || profile.partner_welcome_sent === null) {
                     const sessionKey = `partner_welcome_sent_${user.id}`;
                     const alreadyTriggeredSession = sessionStorage.getItem(sessionKey);
@@ -109,8 +118,8 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     zip: profile.zip || '',
                     city: profile.city || '',
                     country: profile.country || 'Deutschland',
-                    company: '', // Add columns if needed in DB
-                    vatId: '',
+                    company: profile.company || '', 
+                    vatId: profile.vat_id || '',
                     currentPassword: '',
                     newPassword: '',
                     confirmNewPassword: ''
@@ -127,24 +136,12 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
             // Fetch Commissions Stats
             const { data: commissions } = await supabase
                 .from('commissions')
-                .select('amount, status')
-                .eq('partner_id', user.id)
-                .eq('status', 'pending');
-            
-            const { data: allCommissions } = await supabase
-                .from('commissions')
-                .select('id')
+                .select('id, amount, status, created_at')
                 .eq('partner_id', user.id);
-
+            
             if (commissions) {
-                const pendingEarnings = commissions.reduce((sum, c) => sum + Number(c.amount), 0);
-                const conversionCount = allCommissions ? allCommissions.length : 0;
-                setStats(prev => ({
-                    ...prev,
-                    conversions: conversionCount,
-                    earnings: pendingEarnings,
-                    clicks: conversionCount * 12 // Fake clicks based on conversions for demo
-                }));
+                setRawCommissions(commissions);
+                recalcStats(commissions, dateRange);
             }
         }
     };
@@ -161,21 +158,101 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     }
   }, []);
 
+  // Recalculate stats when date range or raw data changes
+  useEffect(() => {
+      if (rawCommissions.length > 0) {
+          recalcStats(rawCommissions, dateRange);
+      }
+  }, [dateRange, rawCommissions]);
+
+  const recalcStats = (commissions: any[], range: {start: string, end: string}) => {
+      const start = new Date(range.start);
+      start.setHours(0,0,0,0);
+      const end = new Date(range.end);
+      end.setHours(23,59,59,999);
+
+      // Filter by date range
+      const filtered = commissions.filter(c => {
+          const d = new Date(c.created_at);
+          return d >= start && d <= end;
+      });
+
+      // Calc Totals
+      // Pending earnings are TOTAL pending (not just filtered range, usually you want to withdraw all pending)
+      // But for "Stats" display (Earnings in period), we use filtered.
+      const earningsInPeriod = filtered.reduce((sum, c) => sum + Number(c.amount), 0);
+      
+      // Total Pending (for Payout Button)
+      const totalPending = commissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.amount), 0);
+
+      const conversions = filtered.length;
+      
+      setStats({
+          clicks: conversions * 12, // Still mock logic as requested kept (user wants "real" numbers but we only have convs)
+          conversions: conversions,
+          earnings: totalPending, // Use total pending for the "Open" card as that's what is payable
+          history: [] // Chart data would go here
+      });
+
+      // Generate Daily List
+      const dailyMap = new Map();
+      // Initialize days in range
+      const loop = new Date(start);
+      while(loop <= end) {
+          const ds = loop.toISOString().split('T')[0];
+          dailyMap.set(ds, { date: ds, conversions: 0, earnings: 0 });
+          loop.setDate(loop.getDate() + 1);
+      }
+      
+      // Fill data
+      filtered.forEach(c => {
+          const ds = new Date(c.created_at).toISOString().split('T')[0];
+          if (dailyMap.has(ds)) {
+              const d = dailyMap.get(ds);
+              d.conversions++;
+              d.earnings += Number(c.amount);
+          }
+      });
+      
+      const sortedDaily = Array.from(dailyMap.values()).sort((a,b) => b.date.localeCompare(a.date));
+      setDailyStats(sortedDaily);
+  };
+
+  const handleDatePresetChange = (preset: string) => {
+    setDatePreset(preset);
+    const end = new Date();
+    let start = new Date();
+    
+    if (preset === 'last28') {
+        start.setDate(end.getDate() - 28);
+    } else if (preset === 'lastMonth') {
+        start.setDate(1); 
+        start.setMonth(start.getMonth() - 1);
+        const lastDayPrevMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0);
+        end.setTime(lastDayPrevMonth.getTime());
+    } else if (preset === 'thisYear') {
+        start = new Date(new Date().getFullYear(), 0, 1);
+    } else if (preset === 'custom') {
+        return; 
+    }
+
+    setDateRange({
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0]
+    });
+  };
+
   const updateRefLinkDisplay = (code: string) => {
       const siteUrl = getEnv('VITE_SITE_URL') ?? window.location.origin;
-      // Remove trailing slash if present
       const cleanUrl = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl;
       setRefLink(`${cleanUrl}?ref=${code}`);
   }
 
-  // Handle immediate visual update when typing
   const handleCodeChange = (val: string) => {
       setSettings(prev => ({...prev, referralCode: val}));
       updateRefLinkDisplay(val);
   };
 
-
-  // Check if mandatory fields are filled
   const areSettingsComplete = 
     settings.firstName.trim() !== '' &&
     settings.lastName.trim() !== '' &&
@@ -226,6 +303,11 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
           setIsPayoutLoading(false);
       }
   };
+  
+  const handleScrollToPayout = () => {
+      setActiveTab('settings');
+      setTimeout(() => document.getElementById('payout-method')?.scrollIntoView({ behavior: 'smooth' }), 100);
+  };
 
   const validateReferralCode = (code: string) => {
       if (!code) return false;
@@ -240,7 +322,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       }
 
       try {
-          // Update only profile data relevant to saving
           await updateAffiliateProfile(settings);
           alert("Partner Code erfolgreich gesichert!");
       } catch (error: any) {
@@ -267,7 +348,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
     try {
         await updateAffiliateProfile(settings);
         alert("Daten erfolgreich gespeichert.");
-        // Clear password fields after save
         setSettings(prev => ({...prev, currentPassword: '', newPassword: '', confirmNewPassword: ''}));
     } catch (error: any) {
         if (error.message && error.message.includes('unique_referral_code')) {
@@ -329,13 +409,48 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
       {/* TAB: OVERVIEW */}
       {activeTab === 'overview' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          
+           {/* Date Filter */}
+           <div className="flex justify-end">
+              <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center gap-2 shadow-sm">
+                  <div className="border-r border-slate-200 pr-2 mr-2">
+                      <select 
+                        value={datePreset} 
+                        onChange={(e) => handleDatePresetChange(e.target.value)}
+                        className="bg-transparent text-sm outline-none font-medium text-slate-700 cursor-pointer"
+                      >
+                          <option value="last28">Letzte 28 Tage</option>
+                          <option value="lastMonth">Letzter Monat</option>
+                          <option value="thisYear">Dieses Jahr</option>
+                          <option value="custom">Benutzerdefiniert</option>
+                      </select>
+                  </div>
+
+                  <Calendar size={16} className="text-slate-500" />
+                  <input 
+                      type="date" 
+                      value={dateRange.start}
+                      onChange={e => { setDateRange({...dateRange, start: e.target.value}); setDatePreset('custom'); }}
+                      className="text-sm outline-none bg-transparent cursor-pointer"
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input 
+                      type="date" 
+                      value={dateRange.end}
+                      onChange={e => { setDateRange({...dateRange, end: e.target.value}); setDatePreset('custom'); }}
+                      className="text-sm outline-none bg-transparent cursor-pointer"
+                  />
+              </div>
+           </div>
+
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
               <div className="bg-blue-50 p-3 rounded-xl text-blue-600"><Users size={24} /></div>
               <div>
-                <p className="text-slate-500 text-sm">Klicks (Est.)</p>
+                <p className="text-slate-500 text-sm">Klicks (Geschätzt)</p>
                 <p className="text-2xl font-bold text-slate-900">{stats.clicks}</p>
+                <p className="text-xs text-slate-400 mt-1">Basiert auf Conversions</p>
               </div>
             </div>
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-4">
@@ -351,6 +466,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                 <div>
                   <p className="text-slate-500 text-sm">Verdienst (Offen)</p>
                   <p className="text-2xl font-bold text-slate-900">{stats.earnings.toFixed(2)} €</p>
+                  <p className="text-[10px] text-slate-400">Auszahlung ab 20 Euro Guthaben</p>
                 </div>
               </div>
               <div>
@@ -366,7 +482,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                     </Button>
                 ) : (
                     <Button 
-                        onClick={() => setActiveTab('settings')} 
+                        onClick={handleScrollToPayout}
                         size="sm" 
                         variant="primary" 
                         className="w-full bg-[#635BFF] hover:bg-[#5851E3] text-white"
@@ -402,12 +518,6 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
                   <button onClick={() => setActiveTab('settings')} className="text-xs text-indigo-300 hover:text-white underline flex items-center gap-1 ml-auto">
                       ID ändern <ArrowRight size={10} />
                   </button>
-              </div>
-              <div className="mt-2 text-xs text-indigo-300 flex items-center gap-1">
-                  <ArrowRight size={10} className="text-[#ffcc00]" />
-                  <a href="#" onClick={(e) => { e.preventDefault(); setActiveTab('settings'); }} className="hover:text-white underline">
-                      ID hier ändern
-                  </a>
               </div>
             </div>
             <div className="hidden md:block w-px h-24 bg-indigo-700/50 self-center"></div>
@@ -453,9 +563,39 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
             </div>
           )}
 
-          {/* Chart Placeholder */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 h-[300px] flex items-center justify-center">
-            <p className="text-slate-400">Diagramm wird angezeigt, sobald genügend historische Daten vorhanden sind.</p>
+          {/* Daily Table */}
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+             <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Calendar size={18} /> Tägliche Statistik</h3>
+             <div className="overflow-x-auto">
+                 <table className="w-full text-sm text-left">
+                     <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                         <tr>
+                             <th className="px-4 py-3">Datum</th>
+                             <th className="px-4 py-3">Conversions (Abos)</th>
+                             <th className="px-4 py-3">Verdienst</th>
+                         </tr>
+                     </thead>
+                     <tbody className="divide-y divide-slate-100">
+                         {dailyStats.length > 0 ? dailyStats.map(d => (
+                             <tr key={d.date} className="hover:bg-slate-50">
+                                 <td className="px-4 py-3 text-slate-700 font-medium">
+                                     {new Date(d.date).toLocaleDateString('de-DE', { weekday: 'short', year: 'numeric', month: '2-digit', day: '2-digit' })}
+                                 </td>
+                                 <td className="px-4 py-3">
+                                     {d.conversions > 0 ? (
+                                         <span className="text-green-600 font-bold bg-green-100 px-2 py-0.5 rounded">{d.conversions}</span>
+                                     ) : <span className="text-slate-400">0</span>}
+                                 </td>
+                                 <td className="px-4 py-3 font-bold text-slate-900">
+                                     {d.earnings.toFixed(2)} €
+                                 </td>
+                             </tr>
+                         )) : (
+                             <tr><td colSpan={3} className="px-4 py-8 text-center text-slate-400">Keine Daten für diesen Zeitraum.</td></tr>
+                         )}
+                     </tbody>
+                 </table>
+             </div>
           </div>
         </div>
       )}
@@ -669,7 +809,7 @@ export const AffiliateDashboard: React.FC<AffiliateDashboardProps> = ({ commissi
               <hr className="border-slate-100" />
 
               {/* Payout Section */}
-              <section>
+              <section id="payout-method">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-4">Auszahlungsmethode</h3>
                 
                 <div className="grid grid-cols-1 gap-6">

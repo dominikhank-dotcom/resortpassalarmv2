@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -76,14 +77,28 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [partnerList, setPartnerList] = useState<any[]>([]);
   const [partnerSettings, setPartnerSettings] = useState({ newRate: commissionRate });
 
+  // Pagination & Sorting State
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(25);
+
   useEffect(() => {
     loadStats();
     loadSystemSettings();
   }, [dateRange]); // Reload stats when date changes
 
   useEffect(() => {
-    if (activeTab === 'customers') loadAllUsers();
-    if (activeTab === 'partners') loadAllUsers(); // Partners are also in profiles
+    if (activeTab === 'customers') {
+        loadAllUsers();
+        // Reset to default sort for customers
+        setSortConfig({ key: 'created_at', direction: 'desc' });
+        setCurrentPage(1);
+    }
+    if (activeTab === 'partners') {
+        loadAllUsers(); 
+        setSortConfig({ key: 'created_at', direction: 'desc' });
+        setCurrentPage(1);
+    }
     if (activeTab === 'emails') loadTemplates();
   }, [activeTab]);
 
@@ -157,6 +172,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         start: start.toISOString().split('T')[0],
         end: end.toISOString().split('T')[0]
     });
+  };
+
+  const handleSort = (key: string) => {
+      let direction: 'asc' | 'desc' = 'desc'; // Default new sort to desc
+      if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
+          direction = 'asc';
+      }
+      setSortConfig({ key, direction });
   };
 
   const handleUpdateStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
@@ -257,11 +280,98 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       } catch (e: any) { alert("Fehler: " + e.message); }
   };
 
-  const filteredUsers = userList.filter(u => 
-    (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    u.id?.includes(searchTerm)) && u.role === 'CUSTOMER'
-  );
+  // Helper for Sorting and Pagination
+  const getProcessedList = (rawList: any[]) => {
+      // 1. Filter (for customers only usually, but generic enough)
+      let list = rawList;
+      if (activeTab === 'customers') {
+        list = rawList.filter(u => 
+            (u.email?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            u.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            u.id?.includes(searchTerm)) && u.role === 'CUSTOMER'
+        );
+      }
+
+      // 2. Sort
+      if (sortConfig) {
+          list = [...list].sort((a, b) => {
+              // Custom sorting logic based on keys
+              let valA = a[sortConfig.key];
+              let valB = b[sortConfig.key];
+              
+              // Handle special keys or missing values
+              if (sortConfig.key === 'status') {
+                   // Map status to number for sorting priority: active > pending > canceled > inactive
+                   const statusRank = (s: any) => {
+                       if (s.sub_status === 'active' && !s.cancel_at_period_end) return 4;
+                       if (s.sub_status === 'active' && s.cancel_at_period_end) return 3;
+                       if (s.sub_status === 'trialing') return 2;
+                       return 1; 
+                   };
+                   valA = statusRank(a);
+                   valB = statusRank(b);
+              }
+              
+              // Generic Sort
+              if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+              if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+              return 0;
+          });
+      }
+
+      // 3. Paginate
+      const startIdx = (currentPage - 1) * itemsPerPage;
+      const paginated = itemsPerPage === -1 ? list : list.slice(startIdx, startIdx + itemsPerPage);
+
+      return { paginated, total: list.length };
+  };
+
+  const renderPagination = (totalItems: number) => {
+      if (itemsPerPage === -1) return null; // "All" selected
+
+      const totalPages = Math.ceil(totalItems / itemsPerPage);
+      return (
+          <div className="flex justify-between items-center mt-4 p-2 bg-slate-50 rounded-lg">
+             <div className="flex items-center gap-2">
+                 <span className="text-sm text-slate-500">Zeige</span>
+                 <select 
+                    value={itemsPerPage} 
+                    onChange={e => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                    className="bg-white border border-slate-300 rounded px-2 py-1 text-sm outline-none"
+                 >
+                     <option value={25}>25</option>
+                     <option value={50}>50</option>
+                     <option value={100}>100</option>
+                     <option value={250}>250</option>
+                     <option value={-1}>Alle</option>
+                 </select>
+                 <span className="text-sm text-slate-500">Einträge (Gesamt: {totalItems})</span>
+             </div>
+             
+             <div className="flex gap-2">
+                 <button 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="p-1 rounded border bg-white disabled:opacity-50 hover:bg-slate-100"
+                 >
+                     <ChevronLeft size={16} />
+                 </button>
+                 <span className="text-sm flex items-center px-2">Seite {currentPage} von {totalPages}</span>
+                 <button 
+                    disabled={currentPage === totalPages || totalPages === 0}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="p-1 rounded border bg-white disabled:opacity-50 hover:bg-slate-100"
+                 >
+                     <ChevronRight size={16} />
+                 </button>
+             </div>
+          </div>
+      );
+  };
+
+  const { paginated: visibleCustomers, total: totalCustomers } = activeTab === 'customers' ? getProcessedList(userList) : { paginated: [], total: 0 };
+  const { paginated: visiblePartners, total: totalPartners } = activeTab === 'partners' ? getProcessedList(partnerList) : { paginated: [], total: 0 };
+
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -378,7 +488,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Kunden ({filteredUsers.length})</h3>
+                        <h3 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Kunden</h3>
                         <div className="relative">
                             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input 
@@ -394,14 +504,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <table className="w-full text-sm text-left">
                               <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
                                   <tr>
-                                      <th className="px-4 py-3">Kunde</th>
-                                      <th className="px-4 py-3">Status</th>
+                                      <th className="px-4 py-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('created_at')}>
+                                          Kunde <ArrowUpDown size={12} className="inline ml-1" />
+                                      </th>
+                                      <th className="px-4 py-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('status')}>
+                                          Status <ArrowUpDown size={12} className="inline ml-1" />
+                                      </th>
                                       <th className="px-4 py-3">Partner-Code</th>
                                       <th className="px-4 py-3 text-right">Aktion</th>
                                   </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
-                                  {filteredUsers.slice(0, 50).map((u: any) => (
+                                  {visibleCustomers.map((u: any) => (
                                       <tr key={u.id} className="hover:bg-slate-50">
                                           <td className="px-4 py-3">
                                               <div className="font-bold text-slate-900">{u.name}</div>
@@ -428,6 +542,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </tbody>
                           </table>
                       </div>
+                      {renderPagination(totalCustomers)}
                   </div>
               </div>
           )}
@@ -459,43 +574,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   {/* Partner List */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <h3 className="font-bold text-slate-900 mb-4">Partner Liste</h3>
-                      <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
-                              <tr>
-                                  <th className="px-4 py-3">Partner</th>
-                                  <th className="px-4 py-3">Affiliate Code</th>
-                                  <th className="px-4 py-3">Webseite</th>
-                                  <th className="px-4 py-3">Gesamtprovision</th>
-                                  <th className="px-4 py-3">Status</th>
-                              </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                              {partnerList.map((p: any) => (
-                                  <tr key={p.id}>
-                                      <td className="px-4 py-3">
-                                          <div className="font-bold text-slate-900">{p.name}</div>
-                                          <div className="text-xs text-slate-500">{p.email}</div>
-                                      </td>
-                                      <td className="px-4 py-3">
-                                          <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold border border-blue-100">
-                                            {p.ref_code || 'pending'}
-                                          </span>
-                                      </td>
-                                      <td className="px-4 py-3 text-slate-500">{p.website || '-'}</td>
-                                      <td className="px-4 py-3 font-bold text-slate-900">
-                                          {p.total_commission ? p.total_commission.toFixed(2) : '0.00'} €
-                                      </td>
-                                      <td className="px-4 py-3">
-                                          {p.referred_count > 0 ? (
-                                              <span className="text-green-600 text-xs font-bold uppercase bg-green-100 px-2 py-1 rounded">Aktiv ({p.referred_count} Refs)</span>
-                                          ) : (
-                                              <span className="text-slate-400 text-xs uppercase bg-slate-100 px-2 py-1 rounded">Keine Refs</span>
-                                          )}
-                                      </td>
-                                  </tr>
-                              ))}
-                          </tbody>
-                      </table>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                            <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                                <tr>
+                                    <th className="px-4 py-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('created_at')}>
+                                        Partner <ArrowUpDown size={12} className="inline ml-1" />
+                                    </th>
+                                    <th className="px-4 py-3">Affiliate Code</th>
+                                    <th className="px-4 py-3">Webseite</th>
+                                    <th className="px-4 py-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('total_commission')}>
+                                        Gesamtprovision <ArrowUpDown size={12} className="inline ml-1" />
+                                    </th>
+                                    <th className="px-4 py-3 cursor-pointer hover:bg-slate-100" onClick={() => handleSort('referred_count')}>
+                                        Status <ArrowUpDown size={12} className="inline ml-1" />
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {visiblePartners.map((p: any) => (
+                                    <tr key={p.id}>
+                                        <td className="px-4 py-3">
+                                            <div className="font-bold text-slate-900">{p.name}</div>
+                                            <div className="text-xs text-slate-500">{p.email}</div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className="font-mono bg-blue-50 text-blue-700 px-2 py-1 rounded font-bold border border-blue-100">
+                                              {p.ref_code || 'pending'}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-slate-500">{p.website || '-'}</td>
+                                        <td className="px-4 py-3 font-bold text-slate-900">
+                                            {p.total_commission ? p.total_commission.toFixed(2) : '0.00'} €
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            {p.referred_count > 0 ? (
+                                                <span className="text-green-600 text-xs font-bold uppercase bg-green-100 px-2 py-1 rounded">Aktiv ({p.referred_count} Refs)</span>
+                                            ) : (
+                                                <span className="text-slate-400 text-xs uppercase bg-slate-100 px-2 py-1 rounded">Keine Refs</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                      </div>
+                      {renderPagination(totalPartners)}
                   </div>
               </div>
           )}

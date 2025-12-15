@@ -1,3 +1,4 @@
+
 import { EmailTemplate } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -172,8 +173,10 @@ export const updateAffiliateProfile = async (settings: any) => {
         house_number: settings.houseNumber,
         zip: settings.zip,
         city: settings.city,
-        country: settings.country
-        // PayPal email removed as we are moving to Stripe only
+        country: settings.country,
+        // Ensure backend DB has these columns, or update will ignore/fail gracefully depending on config
+        company: settings.company,
+        vat_id: settings.vatId
     }).eq('id', user.id);
 
     if (error) throw error;

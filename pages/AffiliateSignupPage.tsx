@@ -1,7 +1,9 @@
+
 import React, { useState } from 'react';
-import { Check, Star, TrendingUp, MousePointer, Clock, ArrowRight, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Check, Star, TrendingUp, MousePointer, Clock, ArrowRight, Loader2, AlertCircle, CheckCircle, X } from 'lucide-react';
 import { Button } from '../components/Button';
 import { supabase, getEnv } from '../lib/supabase';
+import { TermsPage } from './LegalPages';
 
 interface AffiliateSignupProps {
   onLoginClick: () => void;
@@ -22,6 +24,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +104,22 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
   }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row bg-white">
+    <div className="min-h-screen flex flex-col md:flex-row bg-white relative">
+      {/* Terms Modal */}
+      {showTerms && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative">
+                  <button onClick={() => setShowTerms(false)} className="absolute top-4 right-4 bg-slate-100 p-2 rounded-full hover:bg-slate-200 z-10">
+                      <X size={20} />
+                  </button>
+                  {/* Reuse TermsPage but hide "Back" button functionality inside if possible, or just render children */}
+                  <div className="p-4">
+                      <TermsPage onBack={() => setShowTerms(false)} />
+                  </div>
+              </div>
+          </div>
+      )}
+
       {/* Left Side: Form */}
       <div className="w-full md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center">
         <div className="max-w-md mx-auto w-full">
@@ -180,7 +198,7 @@ export const AffiliateSignupPage: React.FC<AffiliateSignupProps> = ({ onLoginCli
             <div className="flex items-center gap-3 py-2">
               <input required type="checkbox" id="terms" className="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500" />
               <label htmlFor="terms" className="text-sm text-slate-600">
-                Ich stimme den <button type="button" onClick={() => onNavigate('terms')} className="text-blue-600 hover:underline">Partnerbedingungen</button> zu.
+                Ich stimme den <button type="button" onClick={() => setShowTerms(true)} className="text-blue-600 hover:underline">Partnerbedingungen</button> zu.
               </label>
             </div>
 

@@ -141,7 +141,7 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
           Account erstellen
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
-          Der erste Schritt zu deinem ResortPass.
+          Der erste Schritt zu deinem ResortPass. Es fallen hier keine Kosten an.
         </p>
       </div>
 
@@ -328,13 +328,20 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
               </div>
             </div>
 
-            <div className="mt-6 grid grid-cols-1 gap-3">
+            <div className="mt-6 grid grid-cols-1 gap-3 space-y-2">
               <Button
                 onClick={onLoginClick}
                 variant="outline"
                 className="w-full justify-center"
               >
                 Hier einloggen
+              </Button>
+               <Button
+                onClick={() => onNavigate('landing')}
+                variant="outline"
+                className="w-full justify-center text-slate-400 border-transparent hover:bg-transparent hover:text-slate-600"
+              >
+                Zur Startseite
               </Button>
             </div>
           </div>
