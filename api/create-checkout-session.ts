@@ -67,7 +67,8 @@ export default async function handler(req, res) {
       // REQUIRED: Collect address for invoices
       billing_address_collection: 'required',
       
-      // FIX: Required when using custom_text.terms_of_service_acceptance
+      // ENABLE NATIVE CONSENT CHECKBOX
+      // This creates the standard Stripe checkbox that blocks payment until checked.
       consent_collection: {
         terms_of_service: 'required',
       },
@@ -75,49 +76,13 @@ export default async function handler(req, res) {
       // DISABLE AUTOMATIC TAX to prevent 500 errors if Stripe Dashboard Tax is not configured
       // automatic_tax: { enabled: true },
       
-      // Custom Text for Legal Links (Rendered above the Pay button)
-      // Stripe supports Markdown links here: [Text](URL)
+      // CUSTOM TEXT: Waiver first, then AGB/Privacy.
+      // Order swapped as requested. Waiver text with link is top priority.
       custom_text: {
         terms_of_service_acceptance: {
-          message: `Ich habe die [Allgemeinen Geschäftsbedingungen](${cleanBaseUrl}/terms) und die [Datenschutzerklärung](${cleanBaseUrl}/privacy) gelesen und akzeptiere sie. Ich stimme ausdrücklich zu, dass ResortPassAlarm vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags beginnt. Mir ist bekannt, dass ich dadurch mein [Widerrufsrecht](${cleanBaseUrl}/revocation) verliere.`,
+          message: `Ich stimme ausdrücklich zu, dass ResortPassAlarm vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags beginnt. Mir ist bekannt, dass ich dadurch mein [Widerrufsrecht](${cleanBaseUrl}/revocation) verliere.\n\nIch akzeptiere die [AGB](${cleanBaseUrl}/terms) und [Datenschutzerklärung](${cleanBaseUrl}/privacy).`,
         },
       },
-
-      // Custom Fields to force active consent (Dropdown acting as Checkbox)
-      custom_fields: [
-        {
-          key: 'consent_agb',
-          label: {
-            type: 'custom',
-            custom: 'AGB & Datenschutz akzeptieren?',
-          },
-          type: 'dropdown',
-          dropdown: {
-            options: [
-              {
-                label: 'Ja, ich habe gelesen und akzeptiere',
-                value: 'true',
-              },
-            ],
-          },
-        },
-        {
-          key: 'consent_waiver',
-          label: {
-            type: 'custom',
-            custom: 'Verzicht auf Widerrufsrecht zustimmen?',
-          },
-          type: 'dropdown',
-          dropdown: {
-            options: [
-              {
-                label: 'Ja, ich stimme dem sofortigen Start zu',
-                value: 'true',
-              },
-            ],
-          },
-        },
-      ],
       
       // Only 'card' is enabled by default.
       payment_method_types: ['card'],
