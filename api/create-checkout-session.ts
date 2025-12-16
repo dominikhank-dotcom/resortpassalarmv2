@@ -60,7 +60,11 @@ export default async function handler(req, res) {
     
     // Determine Base URL (Prefer strict ENV, fallback to request origin)
     // IMPORTANT: This prevents redirect issues when users return from Stripe
-    const baseUrl = process.env.VITE_SITE_URL || req.headers.origin;
+    // Also needed for the Legal Links
+    const baseUrl = process.env.VITE_SITE_URL || req.headers.origin || 'https://resortpassalarm.com';
+
+    // Remove trailing slash for cleaner link construction
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
@@ -70,6 +74,50 @@ export default async function handler(req, res) {
       automatic_tax: {
         enabled: true,
       },
+      
+      // Custom Text for Legal Links (Rendered above the Pay button)
+      // Stripe supports Markdown links here: [Text](URL)
+      custom_text: {
+        terms_of_service_acceptance: {
+          message: `Ich habe die [Allgemeinen Geschäftsbedingungen](${cleanBaseUrl}/terms) und die [Datenschutzerklärung](${cleanBaseUrl}/privacy) gelesen und akzeptiere sie. Ich stimme ausdrücklich zu, dass ResortPassAlarm vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags beginnt. Mir ist bekannt, dass ich dadurch mein [Widerrufsrecht](${cleanBaseUrl}/revocation) verliere.`,
+        },
+      },
+
+      // Custom Fields to force active consent (Dropdown acting as Checkbox)
+      custom_fields: [
+        {
+          key: 'consent_agb',
+          label: {
+            type: 'custom',
+            custom: 'AGB & Datenschutz akzeptieren?',
+          },
+          type: 'dropdown',
+          dropdown: {
+            options: [
+              {
+                label: 'Ja, ich habe gelesen und akzeptiere',
+                value: 'true',
+              },
+            ],
+          },
+        },
+        {
+          key: 'consent_waiver',
+          label: {
+            type: 'custom',
+            custom: 'Verzicht auf Widerrufsrecht zustimmen?',
+          },
+          type: 'dropdown',
+          dropdown: {
+            options: [
+              {
+                label: 'Ja, ich stimme dem sofortigen Start zu',
+                value: 'true',
+              },
+            ],
+          },
+        },
+      ],
       
       // Only 'card' is enabled by default. Apple Pay / Google Pay work automatically via 'card'.
       payment_method_types: ['card'],
@@ -91,8 +139,8 @@ export default async function handler(req, res) {
         },
       ],
       mode: 'subscription',
-      success_url: `${baseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
-      cancel_url: `${baseUrl}/dashboard?payment_cancelled=true`,
+      success_url: `${cleanBaseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
+      cancel_url: `${cleanBaseUrl}/dashboard?payment_cancelled=true`,
       customer_email: email,
       // Metadata is KEY for the webhook to know who referred this user
       metadata: {
