@@ -1,15 +1,38 @@
+
 import React from 'react';
 import { ArrowLeft, Shield, Scale, FileText, Lock } from 'lucide-react';
 import { Button } from '../components/Button';
 
-// Helper to render address as SVG data URI to prevent simple text scraping
-const AddressImage = () => (
-  <div className="my-4 p-4 bg-slate-50 border border-slate-200 rounded-lg inline-block">
+// Helper to render Name as SVG data URI to prevent simple text scraping
+// Address is text as requested, but Name "Dominik Hank" is strictly an image.
+const NameAsImage = () => (
     <img 
-      src={`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="350" height="80"><text x="0" y="20" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Dominik Hank</text><text x="0" y="45" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Straßburger Weg 2, 77975 Ringsheim</text><text x="0" y="70" font-family="Arial, sans-serif" font-size="16" fill="%23334155">Support: Tel.: +49 176 64857291</text></svg>`} 
-      alt="Anschrift und Kontakt" 
-      className="block"
+      src={`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="18"><text x="0" y="14" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="%23334155">Dominik Hank</text></svg>`} 
+      alt="Inhaber" 
+      className="inline-block align-bottom"
+      style={{ height: '16px' }}
     />
+);
+
+const AddressBlock = () => (
+  <div className="my-4 p-5 bg-slate-50 border border-slate-200 rounded-lg inline-block text-slate-700 min-w-[300px]">
+    <div className="font-medium not-italic leading-relaxed mb-4 text-base">
+        <div className="font-bold text-slate-900">ResortPassAlarm</div>
+        <div>c/o Block Services</div>
+        <div>Stuttgarter Str. 106</div>
+        <div>70736 Fellbach</div>
+        <div>Deutschland</div>
+    </div>
+    
+    <div className="text-sm border-t border-slate-200 pt-3">
+        <div className="flex flex-wrap items-center gap-1 mb-2">
+            <span>ResortPassAlarm ist ein Projekt von:</span>
+            <NameAsImage />
+        </div>
+        <div className="text-slate-500">
+             Support: Tel.: +49 176 64857291
+        </div>
+    </div>
   </div>
 );
 
@@ -41,7 +64,7 @@ export const ImprintPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
     <p>
       Betreiber der Webseite und verantwortlich für den Inhalt:
     </p>
-    <AddressImage />
+    <AddressBlock />
     
     <h3>Kontakt</h3>
     <p>
@@ -71,7 +94,7 @@ export const PrivacyPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
       Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Wir behandeln Ihre personenbezogenen Daten vertraulich und entsprechend der gesetzlichen Datenschutzvorschriften sowie dieser Datenschutzerklärung.
     </p>
     <p>Verantwortliche Stelle:</p>
-    <AddressImage />
+    <AddressBlock />
 
     <h2>2. Datenerfassung auf unserer Website</h2>
     <h3>Hosting</h3>
@@ -103,7 +126,7 @@ export const TermsPage: React.FC<{ onBack: () => void }> = ({ onBack }) => (
   <LegalLayout title="Allgemeine Geschäftsbedingungen (AGB)" icon={<Scale size={32} />} onBack={onBack}>
     <h2>1. Geltungsbereich</h2>
     <p>
-      Diese AGB gelten für alle Geschäftsbeziehungen zwischen Dominik Hank (nachfolgend "Anbieter") und dem Kunden über die Nutzung des Dienstes "ResortPassAlarm".
+      Diese AGB gelten für alle Geschäftsbeziehungen zwischen dem Anbieter (siehe Impressum) und dem Kunden über die Nutzung des Dienstes "ResortPassAlarm".
     </p>
 
     <h2>2. Leistungsgegenstand</h2>
@@ -179,7 +202,7 @@ export const RevocationPage: React.FC<{ onBack: () => void }> = ({ onBack }) => 
     <h3>Muster-Widerrufsformular</h3>
     <p>(Wenn Sie den Vertrag widerrufen wollen - sofern das Recht nicht erloschen ist -, dann füllen Sie bitte dieses Formular aus und senden Sie es zurück.)</p>
     <p>An:</p>
-    <AddressImage />
+    <AddressBlock />
     <p>E-Mail: support@resortpassalarm.com</p>
     <p>
       Hiermit widerrufe(n) ich/wir (*) den von mir/uns (*) abgeschlossenen Vertrag über den Kauf der folgenden Waren (*)/die Erbringung der folgenden Dienstleistung (*)<br/><br/>

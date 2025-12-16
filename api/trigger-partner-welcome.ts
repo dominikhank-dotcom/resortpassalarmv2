@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 
@@ -44,7 +45,20 @@ export default async function handler(req: any, res: any) {
         return res.status(200).json({ success: true, message: 'Profile missing - Skipped' });
     }
 
-    // 2. ATOMIC LOCK
+    // 2. CHECK TEMPLATE ENABLED
+    const { data: templateData } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('id', 'part_register')
+        .maybeSingle();
+
+    if (templateData && templateData.is_enabled === false) {
+        console.log(">>> Partner Welcome DISABLED. Skipping.");
+        await supabase.from('profiles').update({ partner_welcome_sent: true }).eq('id', userId);
+        return res.status(200).json({ success: true, message: 'Template disabled' });
+    }
+
+    // 3. ATOMIC LOCK
     let lockAcquired = false;
 
     const { data: updatedRows, error: updateError } = await supabase
@@ -76,13 +90,6 @@ export default async function handler(req: any, res: any) {
             const origin = req.headers.origin || 'https://resortpassalarm.com';
             const dashboardLink = `${origin}/affiliate`;
             
-            // --- LOAD TEMPLATE FROM DB ---
-            const { data: templateData } = await supabase
-                .from('email_templates')
-                .select('*')
-                .eq('id', 'part_register')
-                .single();
-
             let subject = 'Willkommen im Partnerprogramm';
             let htmlBody = `<h1>Hallo ${firstName || 'Partner'},</h1>
                 <p>Wir freuen uns sehr, dich als Partner begrüßen zu dürfen.</p>

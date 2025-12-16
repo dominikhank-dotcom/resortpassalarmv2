@@ -37,6 +37,16 @@ const REQUIRED_TEMPLATES = [
         body: '<h1>Stark, {firstName}!</h1><p>Du hast soeben deine allererste Provision verdient.</p><p>Jemand hat über deinen Link gebucht. Das Guthaben wurde deinem Konto gutgeschrieben.</p><p>Mach weiter so – das ist erst der Anfang!</p><p><a href="{dashboardLink}" style="background-color: #00305e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Zum Partner Dashboard</a></p>',
         variables: ['{firstName}', '{dashboardLink}'],
         isEnabled: true
+    },
+    {
+        id: 'cust_abandoned_cart',
+        name: 'Kein Abo Warnung (24h)',
+        description: 'Erinnerung nach 24h ohne Abo-Abschluss',
+        category: 'CUSTOMER',
+        subject: 'Achtung: Dein Wächter ist noch inaktiv ⚠️',
+        body: '<h1>Hallo {firstName},</h1><p>wir haben gesehen, dass du dich registriert hast, aber <strong>noch kein Abo abgeschlossen hast.</strong></p><p>Das bedeutet: <strong>Du erhältst aktuell KEINE Alarme</strong>, wenn ResortPässe verfügbar werden!</p><h2>Warum ResortPassAlarm?</h2><ul><li>✅ 24/7 Überwachung (wir schlafen nie)</li><li>✅ Sofortige E-Mail & SMS bei Verfügbarkeit</li><li>✅ Monatlich kündbar (kein Risiko)</li></ul><p>Verpasse nicht die nächste Welle. Aktiviere deinen Schutz jetzt:</p><p><a href="{dashboardLink}" style="background-color: #ffcc00; color: #00305e; padding: 15px 25px; text-decoration: none; font-weight: bold; border-radius: 5px;">Jetzt Abo aktivieren</a></p><hr><p>Hast du Fragen oder Probleme bei der Buchung? Melde dich jederzeit bei unserem Support: <a href="mailto:support@ressortpassalarm.com">support@ressortpassalarm.com</a></p>',
+        variables: ['{firstName}', '{dashboardLink}'],
+        isEnabled: true
     }
 ];
 
@@ -121,7 +131,7 @@ export default async function handler(req: any, res: any) {
                 subject: template.subject,
                 body: template.body,
                 variables: template.variables,
-                is_enabled: template.isEnabled, // Map frontend 'isEnabled' to DB 'is_enabled'
+                is_enabled: template.isEnabled, // Explicitly save boolean
                 updated_at: new Date().toISOString()
             });
           

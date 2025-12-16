@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Power, UserMinus
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -45,7 +45,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [datePreset, setDatePreset] = useState('last28');
 
   const [stats, setStats] = useState<any>({
-    activeUsers: 0,
+    activeUncanceled: 0,
+    activeCanceling: 0,
+    newCancellations: 0,
     revenue: 0,
     profit: 0,
     newCustomers: 0,
@@ -61,7 +63,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   // Email Templates State
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
   const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate | null>(null);
-  const [testEmailAddr, setTestEmailAddr] = useState("");
+  const [isTemplatesLoading, setIsTemplatesLoading] = useState(false);
 
   // Users Management State
   const [userList, setUserList] = useState<any[]>([]);
@@ -144,17 +146,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const loadTemplates = async () => {
+      setIsTemplatesLoading(true);
       const t = await getEmailTemplates();
       if (t) setTemplates(t);
+      setIsTemplatesLoading(false);
   };
 
   const handleDatePresetChange = (preset: string) => {
     setDatePreset(preset);
     const end = new Date();
     let start = new Date();
+    const now = new Date();
     
-    if (preset === 'last28') {
+    if (preset === 'last7') {
+        start.setDate(end.getDate() - 7);
+    } else if (preset === 'last28') {
         start.setDate(end.getDate() - 28);
+    } else if (preset === 'thisMonth') {
+        // First day of current month
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
     } else if (preset === 'lastMonth') {
         // First day of previous month
         start.setDate(1); 
@@ -165,7 +175,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     } else if (preset === 'thisYear') {
         start = new Date(new Date().getFullYear(), 0, 1);
     } else if (preset === 'custom') {
-        return; // Don't change range automatically
+        return; 
     }
 
     setDateRange({
@@ -175,7 +185,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSort = (key: string) => {
-      let direction: 'asc' | 'desc' = 'desc'; // Default new sort to desc
+      let direction: 'asc' | 'desc' = 'desc'; 
       if (sortConfig && sortConfig.key === key && sortConfig.direction === 'desc') {
           direction = 'asc';
       }
@@ -193,6 +203,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
+  // ... (Existing handlers for customers, partners, etc. remain the same) ...
   const handleOpenCustomerDetail = async (userId: string) => {
       setIsDetailLoading(true);
       setSelectedCustomer(null);
@@ -258,7 +269,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSavePrices = async () => {
     try {
       await updateSystemSettings('price_new_customers', prices.new.toString());
-      // No existing customers update needed
       alert("Preise gespeichert!");
     } catch(e: any) { alert("Fehler: " + e.message); }
   };
@@ -280,9 +290,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       } catch (e: any) { alert("Fehler: " + e.message); }
   };
 
-  // Helper for Sorting and Pagination
   const getProcessedList = (rawList: any[]) => {
-      // 1. Filter (for customers only usually, but generic enough)
       let list = rawList;
       if (activeTab === 'customers') {
         list = rawList.filter(u => 
@@ -292,16 +300,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         );
       }
 
-      // 2. Sort
       if (sortConfig) {
           list = [...list].sort((a, b) => {
-              // Custom sorting logic based on keys
               let valA = a[sortConfig.key];
               let valB = b[sortConfig.key];
               
-              // Handle special keys or missing values
               if (sortConfig.key === 'status') {
-                   // Map status to number for sorting priority: active > pending > canceled > inactive
                    const statusRank = (s: any) => {
                        if (s.sub_status === 'active' && !s.cancel_at_period_end) return 4;
                        if (s.sub_status === 'active' && s.cancel_at_period_end) return 3;
@@ -312,14 +316,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    valB = statusRank(b);
               }
               
-              // Generic Sort
               if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
               if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
               return 0;
           });
       }
 
-      // 3. Paginate
       const startIdx = (currentPage - 1) * itemsPerPage;
       const paginated = itemsPerPage === -1 ? list : list.slice(startIdx, startIdx + itemsPerPage);
 
@@ -327,7 +329,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const renderPagination = (totalItems: number) => {
-      if (itemsPerPage === -1) return null; // "All" selected
+      if (itemsPerPage === -1) return null; 
 
       const totalPages = Math.ceil(totalItems / itemsPerPage);
       return (
@@ -414,7 +416,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 onChange={(e) => handleDatePresetChange(e.target.value)}
                                 className="bg-transparent text-sm outline-none font-medium text-slate-700"
                              >
+                                 <option value="last7">Letzte 7 Tage</option>
                                  <option value="last28">Letzte 28 Tage</option>
+                                 <option value="thisMonth">Dieser Monat</option>
                                  <option value="lastMonth">Letzter Monat</option>
                                  <option value="thisYear">Dieses Jahr</option>
                                  <option value="custom">Benutzerdefiniert</option>
@@ -438,29 +442,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                          <p className="text-slate-500 text-xs uppercase font-bold">Aktive Abos</p>
-                          <p className="text-2xl font-bold text-slate-900">{stats.activeUsers}</p>
+                  {/* MAIN KPI CARDS */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-green-200 bg-green-50/50">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="text-green-800 text-xs uppercase font-bold">Aktive Abos (Ungekündigt)</p>
+                                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeUncanceled}</p>
+                              </div>
+                              <CheckCircle className="text-green-600 opacity-50" size={20} />
+                          </div>
                       </div>
-                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                          <p className="text-slate-500 text-xs uppercase font-bold">Umsatz (MRR)</p>
-                          <p className="text-2xl font-bold text-green-600">{stats.revenue.toFixed(2)} €</p>
+
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-200 bg-amber-50/50">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="text-amber-800 text-xs uppercase font-bold">Gekündigte (Laufende)</p>
+                                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeCanceling}</p>
+                              </div>
+                              <UserMinus className="text-amber-600 opacity-50" size={20} />
+                          </div>
+                          <p className="text-[10px] text-amber-700 mt-1">Aktiv bis Laufzeitende</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                          <p className="text-slate-500 text-xs uppercase font-bold">Gewinn (Est.)</p>
-                          <p className="text-2xl font-bold text-blue-600">{stats.profit.toFixed(2)} €</p>
+
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-red-200 bg-red-50/50">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="text-red-800 text-xs uppercase font-bold">Neue Kündigungen</p>
+                                  <p className="text-2xl font-bold text-slate-900 mt-1">{stats.newCancellations}</p>
+                              </div>
+                              <XCircle className="text-red-600 opacity-50" size={20} />
+                          </div>
+                          <p className="text-[10px] text-red-700 mt-1">Im gewählten Zeitraum</p>
                       </div>
-                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 bg-indigo-50 border-indigo-100">
-                          <p className="text-indigo-800 text-xs uppercase font-bold">Neue Kunden</p>
-                          <p className="text-2xl font-bold text-indigo-700">+{stats.newCustomers}</p>
-                          <p className="text-[10px] text-indigo-400">im gewählten Zeitraum</p>
+
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="text-slate-500 text-xs uppercase font-bold">Umsatz (MRR)</p>
+                                  <p className="text-2xl font-bold text-green-600 mt-1">{stats.revenue.toFixed(2)} €</p>
+                              </div>
+                              <DollarSign className="text-green-600 opacity-50" size={20} />
+                          </div>
+                      </div>
+
+                      <div className="bg-white p-4 rounded-xl shadow-sm border border-indigo-100 bg-indigo-50/50">
+                          <div className="flex justify-between items-start">
+                              <div>
+                                  <p className="text-indigo-800 text-xs uppercase font-bold">Neue Kunden</p>
+                                  <p className="text-2xl font-bold text-indigo-700 mt-1">+{stats.newCustomers}</p>
+                              </div>
+                              <TrendingUp className="text-indigo-600 opacity-50" size={20} />
+                          </div>
+                          <p className="text-[10px] text-indigo-400 mt-1">im gewählten Zeitraum</p>
                       </div>
                   </div>
 
                   {/* Chart */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><TrendingUp size={18} /> Entwicklung</h3>
+                      <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><TrendingUp size={18} /> Entwicklung (Neue Abos & Revenue Impact)</h3>
                       <div className="h-[300px] w-full">
                           <ResponsiveContainer width="100%" height="100%">
                               <AreaChart data={stats.history}>
@@ -483,7 +523,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
           )}
 
-          {/* CUSTOMERS TAB */}
+          {/* ... CUSTOMERS & PARTNERS TABS remain the same ... */}
           {activeTab === 'customers' && (
               <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -630,7 +670,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
                      <div className="p-4 border-b border-slate-100 bg-slate-50 font-bold text-slate-700 flex justify-between items-center">
                         <span>Templates</span>
-                        <Button size="sm" variant="secondary" onClick={loadTemplates}><RefreshCw size={14}/></Button>
+                        <Button size="sm" variant="secondary" onClick={loadTemplates} disabled={isTemplatesLoading}>
+                            <RefreshCw size={14} className={isTemplatesLoading ? "animate-spin" : ""} />
+                        </Button>
                      </div>
                      <div className="overflow-y-auto flex-1 p-2 space-y-2">
                          {templates.map(t => (
@@ -639,7 +681,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 onClick={() => setSelectedTemplate(t)}
                                 className={`p-3 rounded-lg cursor-pointer border transition-all ${selectedTemplate?.id === t.id ? 'bg-blue-50 border-blue-200 shadow-sm' : 'border-transparent hover:bg-slate-50'}`}
                              >
-                                 <div className="font-bold text-slate-900 text-sm">{t.name}</div>
+                                 <div className="flex justify-between items-start">
+                                     <div className="font-bold text-slate-900 text-sm">{t.name}</div>
+                                     {t.isEnabled === false && <div className="bg-red-100 text-red-600 text-[10px] px-1 rounded font-bold uppercase">Disabled</div>}
+                                 </div>
                                  <div className="text-xs text-slate-500 truncate">{t.subject || 'SMS Template'}</div>
                                  <div className="mt-1 flex gap-2">
                                      <span className="text-[10px] uppercase bg-slate-100 px-1.5 py-0.5 rounded text-slate-500">{t.category}</span>
@@ -650,15 +695,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      </div>
                  </div>
 
+                 {/* ... (Existing Email Detail View remains same) ... */}
                  <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
                      {selectedTemplate ? (
                          <>
                              <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                                  <div>
-                                     <h3 className="font-bold text-slate-900">{selectedTemplate.name}</h3>
+                                     <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                                         {selectedTemplate.name}
+                                         {selectedTemplate.isEnabled !== false ? (
+                                             <span className="bg-green-100 text-green-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold">Aktiv</span>
+                                         ) : (
+                                             <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full uppercase font-bold">Inaktiv</span>
+                                         )}
+                                     </h3>
                                      <p className="text-xs text-slate-500">{selectedTemplate.description}</p>
                                  </div>
-                                 <Button size="sm" onClick={handleSaveTemplate}><Save size={14} className="mr-2"/> Speichern</Button>
+                                 <div className="flex items-center gap-2">
+                                     <div className="flex items-center gap-2 mr-4 border-r border-slate-200 pr-4">
+                                         <label className="text-xs font-bold text-slate-500 uppercase mr-2">Status:</label>
+                                         <label className="relative inline-flex items-center cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                className="sr-only peer" 
+                                                checked={selectedTemplate.isEnabled !== false} 
+                                                onChange={(e) => setSelectedTemplate({...selectedTemplate, isEnabled: e.target.checked})} 
+                                            />
+                                            <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600"></div>
+                                        </label>
+                                     </div>
+                                     <Button size="sm" onClick={handleSaveTemplate}><Save size={14} className="mr-2"/> Speichern</Button>
+                                 </div>
                              </div>
                              <div className="p-6 flex-1 overflow-y-auto space-y-4">
                                  {!selectedTemplate.id.includes('sms') && (
@@ -692,7 +759,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              </div>
           )}
 
-          {/* SETTINGS TAB (formerly System) */}
+          {/* SETTINGS TAB */}
           {activeTab === 'settings' && (
               <div className="space-y-6 animate-in fade-in">
                   
@@ -716,7 +783,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       </div>
                   </div>
 
-                  {/* System Status (Legacy System Tab Logic) */}
+                  {/* System Status */}
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity size={18} /> System Status Override</h3>
                       <div className="space-y-4">
@@ -769,9 +836,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       </div>
 
-      {/* CUSTOMER DETAIL MODAL */}
+      {/* ... CUSTOMER DETAIL MODAL ... (same as before) */}
       {selectedCustomer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+              {/* Content from previous version goes here, no changes needed for this block in this iteration */}
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
                       <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
@@ -782,7 +850,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                   
                   <div className="p-6 space-y-6">
-                      {/* Subscription Info */}
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                           <h3 className="font-bold text-slate-700 mb-2 text-sm uppercase">Abo Status</h3>
                           <div className="flex justify-between items-center">

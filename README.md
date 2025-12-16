@@ -1,3 +1,4 @@
+
 # ResortPassAlarm
 
 Ein professionelles SaaS-Tool zur Überwachung der Verfügbarkeit des Europa-Park ResortPass (Gold & Silver).
@@ -90,6 +91,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   welcome_mail_sent boolean DEFAULT false, -- Verhindert doppelte Willkommens-Mails für Kunden
   partner_welcome_sent boolean DEFAULT false, -- NEU: Partner Willkommens-Mail
   tips_mail_sent boolean DEFAULT false, -- NEU: Partner Tipps Mail (nach 10 Min)
+  abandoned_cart_mail_sent boolean DEFAULT false, -- NEU: Warenkorb-Abbrecher Mail
   notify_gold boolean DEFAULT true, -- NEU: Gold Alarm erwünscht
   notify_silver boolean DEFAULT true, -- NEU: Silver Alarm erwünscht
   last_test_config jsonb DEFAULT '{}'::jsonb, -- Speichert letzte Test-Konfig (Email/SMS)
@@ -108,6 +110,7 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS stripe_account_id text; -- 
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS welcome_mail_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS partner_welcome_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS tips_mail_sent boolean DEFAULT false;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS abandoned_cart_mail_sent boolean DEFAULT false;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_gold boolean DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS notify_silver boolean DEFAULT true;
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_test_config jsonb DEFAULT '{}'::jsonb;
@@ -130,6 +133,4 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   subscription_price decimal(10,2), -- Individual price for the user
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
-
--- Add price column if missing
-ALTER
+```

@@ -51,7 +51,25 @@ export default async function handler(req: any, res: any) {
         console.warn(">>> WARNING: Profile still missing after retries. Proceeding carefully.");
     }
 
-    // 2. ATOMIC LOCK STRATEGY
+    // 2. CHECK TEMPLATE STATUS FIRST
+    const { data: templateData } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('id', 'cust_welcome')
+        .maybeSingle();
+
+    if (templateData && templateData.is_enabled === false) {
+        console.log(">>> Welcome Email Template DISABLED. Skipping.");
+        // Still mark as sent to prevent loop? Or leave it to retry if enabled later? 
+        // Usually better to mark as sent so we don't spam 100 emails if admin enables it later.
+        // BUT for welcome emails, maybe we just mark it done.
+        
+        // Update DB lock to avoid future attempts
+        await supabase.from('profiles').update({ welcome_mail_sent: true }).eq('id', userId);
+        return res.status(200).json({ success: true, message: 'Template disabled' });
+    }
+
+    // 3. ATOMIC LOCK STRATEGY
     let shouldSendEmail = false;
 
     // Try to update DB to lock the email sending
@@ -94,17 +112,6 @@ export default async function handler(req: any, res: any) {
         const resend = new Resend(process.env.RESEND_API_KEY);
         const origin = req.headers.origin || 'https://resortpassalarm.com';
         const loginLink = `${origin}/login`;
-
-        // --- LOAD TEMPLATE FROM DB ---
-        let templateData = null;
-        try {
-            const { data } = await supabase
-                .from('email_templates')
-                .select('*')
-                .eq('id', 'cust_welcome')
-                .single();
-            templateData = data;
-        } catch(e) { console.warn("Failed to load template from DB", e); }
 
         let subject = `Willkommen bei ResortPassAlarm, ${firstName || ''}!`;
         let htmlBody = `<h1>Hallo${firstName ? ' ' + firstName : ''},</h1>

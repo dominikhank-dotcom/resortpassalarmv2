@@ -1,3 +1,4 @@
+
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -82,7 +83,8 @@ export default async function handler(req: any, res: any) {
            await supabase.from('subscriptions').update({ 
                status: 'canceled',
                cancel_at_period_end: false, // Immediate cancel means it's done
-               current_period_end: new Date().toISOString() // Ends now
+               current_period_end: new Date().toISOString(), // Ends now
+               canceled_at: new Date().toISOString() // Track time
            }).eq('user_id', userId);
 
       } else if (action === 'resume_sub') {

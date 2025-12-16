@@ -1,3 +1,4 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -12,7 +13,7 @@ export default async function handler(req: any, res: any) {
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       console.error("CRITICAL: SUPABASE_SERVICE_ROLE_KEY missing in api/admin-stats.ts");
-      return res.status(200).json({ activeUsers: 0, revenue: 0, profit: 0, newCustomers: 0, conversionRate: 0, history: [], error: 'Config Missing' });
+      return res.status(200).json({ activeUsers: 0, revenue: 0, profit: 0, newCustomers: 0, history: [], error: 'Config Missing' });
   }
 
   try {
@@ -41,15 +42,25 @@ export default async function handler(req: any, res: any) {
     // --- 2. CURRENT SNAPSHOT STATS ---
     const { data: allActiveSubs } = await supabase
       .from('subscriptions')
-      .select('subscription_price, plan_type, status, user_id, profiles:user_id(referred_by)')
+      .select('subscription_price, plan_type, status, cancel_at_period_end, user_id, profiles:user_id(referred_by)')
       .in('status', ['active', 'trialing', 'Active', 'Trialing']);
 
     let currentMRR = 0;
     let currentCommissionCost = 0;
+    let activeUncanceled = 0;
+    let activeCanceling = 0;
 
     if (allActiveSubs) {
         allActiveSubs.forEach(sub => {
             if (sub.plan_type === 'Manuell (Gratis)') return;
+            
+            // Count Status
+            if (sub.cancel_at_period_end) {
+                activeCanceling++;
+            } else {
+                activeUncanceled++;
+            }
+
             const price = sub.subscription_price !== null ? Number(sub.subscription_price) : fallbackPrice;
             currentMRR += price;
             // @ts-ignore
@@ -60,10 +71,9 @@ export default async function handler(req: any, res: any) {
         });
     }
 
-    const totalActiveUsers = allActiveSubs ? allActiveSubs.length : 0;
     const currentProfit = currentMRR - currentCommissionCost;
 
-    // --- 3. PERIOD STATS (New Customers) ---
+    // --- 3. PERIOD STATS (New Customers & Cancellations) ---
     // New Subscriptions in range
     const { count: newSubsCount, data: newSubs } = await supabase
       .from('subscriptions')
@@ -71,19 +81,19 @@ export default async function handler(req: any, res: any) {
       .gte('created_at', start.toISOString())
       .lte('created_at', end.toISOString());
 
+    // New Cancellations in range (requires canceled_at column)
+    const { count: newCancellationsCount } = await supabase
+        .from('subscriptions')
+        .select('canceled_at', { count: 'exact' })
+        .gte('canceled_at', start.toISOString())
+        .lte('canceled_at', end.toISOString());
+
     // --- 4. CHART HISTORY GENERATION ---
-    // We will generate daily buckets between start and end
     const history = [];
     let loopDate = new Date(start);
     
-    // Helper to get day string YYYY-MM-DD
     const getDayStr = (d: Date) => d.toISOString().split('T')[0];
     
-    // Pre-fetch data for chart efficiency
-    // We need sub creations per day
-    // We could also try to reconstruct MRR history but that's complex without a events table. 
-    // We will chart "New Subscriptions" and "Estimated Revenue Growth" based on new subs.
-
     while (loopDate <= end) {
         const dayStr = getDayStr(loopDate);
         // Count subs created on this day
@@ -92,14 +102,16 @@ export default async function handler(req: any, res: any) {
         history.push({
             date: dayStr,
             newSubs: subsOnDay,
-            revenue: subsOnDay * fallbackPrice // Rough estimate of NEW revenue added that day
+            revenue: subsOnDay * fallbackPrice 
         });
         
         loopDate.setDate(loopDate.getDate() + 1);
     }
 
     return res.status(200).json({
-      activeUsers: totalActiveUsers,
+      activeUncanceled: activeUncanceled,
+      activeCanceling: activeCanceling,
+      newCancellations: newCancellationsCount || 0,
       revenue: currentMRR,
       profit: currentProfit,
       newCustomers: newSubsCount || 0,
