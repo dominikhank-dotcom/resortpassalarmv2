@@ -2,8 +2,9 @@
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
+// Use latest stable API version to ensure custom_text support
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2023-10-16',
+  apiVersion: '2024-06-20',
 });
 
 // Init Supabase for Backend (using env vars directly)
@@ -59,21 +60,20 @@ export default async function handler(req, res) {
     const unitAmount = Math.round(priceValue * 100); // Stripe needs cents
     
     // Determine Base URL (Prefer strict ENV, fallback to request origin)
-    // IMPORTANT: This prevents redirect issues when users return from Stripe
-    // Also needed for the Legal Links
     const baseUrl = process.env.VITE_SITE_URL || req.headers.origin || 'https://resortpassalarm.com';
-
-    // Remove trailing slash for cleaner link construction
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
 
     const session = await stripe.checkout.sessions.create({
       // REQUIRED: Collect address for invoices
       billing_address_collection: 'required',
       
-      // ENABLE STRIPE TAX AUTOMATION
-      automatic_tax: {
-        enabled: true,
+      // FIX: Required when using custom_text.terms_of_service_acceptance
+      consent_collection: {
+        terms_of_service: 'required',
       },
+
+      // DISABLE AUTOMATIC TAX to prevent 500 errors if Stripe Dashboard Tax is not configured
+      // automatic_tax: { enabled: true },
       
       // Custom Text for Legal Links (Rendered above the Pay button)
       // Stripe supports Markdown links here: [Text](URL)
@@ -119,7 +119,7 @@ export default async function handler(req, res) {
         },
       ],
       
-      // Only 'card' is enabled by default. Apple Pay / Google Pay work automatically via 'card'.
+      // Only 'card' is enabled by default.
       payment_method_types: ['card'],
       line_items: [
         {
@@ -142,18 +142,18 @@ export default async function handler(req, res) {
       success_url: `${cleanBaseUrl}/dashboard?session_id={CHECKOUT_SESSION_ID}&payment_success=true`,
       cancel_url: `${cleanBaseUrl}/dashboard?payment_cancelled=true`,
       customer_email: email,
-      // Metadata is KEY for the webhook to know who referred this user
       metadata: {
         service: 'ResortPassAlarm',
         referralCode: safeRefCode,
         userId: userId || ''
       },
-      client_reference_id: userId // CRITICAL: Links stripe session to internal user ID
+      client_reference_id: userId
     });
 
     res.status(200).json({ url: session.url });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Stripe Error:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    // Return specific error message to frontend for better debugging
+    res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
 }
