@@ -76,13 +76,15 @@ export default async function handler(req, res) {
       // DISABLE AUTOMATIC TAX to prevent 500 errors if Stripe Dashboard Tax is not configured
       // automatic_tax: { enabled: true },
       
-      // CUSTOM TEXT: 
-      // 1. Waiver (Priority)
-      // 2. AGB/Privacy
-      // 3. Subscription Terms
+      // CUSTOM TEXT CONFIGURATION
       custom_text: {
+        // Text next to the checkbox (Legal Waiver)
         terms_of_service_acceptance: {
-          message: `Ich stimme ausdrücklich zu, dass ResortPassAlarm vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags beginnt. Mir ist bekannt, dass ich dadurch mein [Widerrufsrecht](${cleanBaseUrl}/revocation) verliere.\n\nIch akzeptiere die [AGB](${cleanBaseUrl}/terms) und [Datenschutzerklärung](${cleanBaseUrl}/privacy).\n\nMonatliches Abonnement zum o.g. Preis pro Monat. Mindestlaufzeit: 1 Monat. Automatische Verlängerung um jeweils einen Monat. Kündigung jederzeit zum Ende des jeweiligen Abrechnungszeitraums möglich. Sofortiger Zugriff auf die Software nach Zahlung.`,
+          message: `Ich stimme ausdrücklich zu, dass ResortPassAlarm vor Ablauf der Widerrufsfrist mit der Ausführung des Vertrags beginnt. Mir ist bekannt, dass ich dadurch mein [Widerrufsrecht](${cleanBaseUrl}/revocation) verliere.`,
+        },
+        // Text near the "Pay" / "Subscribe" button (Subscription Terms)
+        submit: {
+          message: `Monatliches Abonnement zum o.g. Preis pro Monat. Mindestlaufzeit: 1 Monat. Automatische Verlängerung um jeweils einen Monat. Kündigung jederzeit zum Ende des jeweiligen Abrechnungszeitraums möglich. Sofortiger Zugriff auf die Software nach Zahlung.`,
         },
       },
       
