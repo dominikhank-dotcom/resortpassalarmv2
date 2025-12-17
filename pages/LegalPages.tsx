@@ -29,9 +29,6 @@ const AddressBlock = () => (
             <span>ResortPassAlarm ist ein Projekt von:</span>
             <NameAsImage />
         </div>
-        <div className="text-slate-500">
-             Support: Tel.: +49 176 64857291
-        </div>
     </div>
   </div>
 );

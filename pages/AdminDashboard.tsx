@@ -158,7 +158,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     let start = new Date();
     const now = new Date();
     
-    if (preset === 'last7') {
+    if (preset === 'today') {
+        start = new Date();
+    } else if (preset === 'yesterday') {
+        start.setDate(start.getDate() - 1);
+        end.setDate(end.getDate() - 1);
+    } else if (preset === 'last7') {
         start.setDate(end.getDate() - 7);
     } else if (preset === 'last28') {
         start.setDate(end.getDate() - 28);
@@ -416,6 +421,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                 onChange={(e) => handleDatePresetChange(e.target.value)}
                                 className="bg-transparent text-sm outline-none font-medium text-slate-700"
                              >
+                                 <option value="today">Heute</option>
+                                 <option value="yesterday">Gestern</option>
                                  <option value="last7">Letzte 7 Tage</option>
                                  <option value="last28">Letzte 28 Tage</option>
                                  <option value="thisMonth">Dieser Monat</option>
