@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2, Bell, Shield, Smartphone, MousePointer, Star } from 'lucide-react';
+import { Clock, Check, HelpCircle, ArrowRight, Loader2, Lightbulb } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { getSystemSettings } from '../services/backendService';
@@ -46,7 +46,6 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
     const diff = Math.floor((new Date().getTime() - new Date(isoString).getTime()) / 60000);
     if (diff < 1) return "Gerade eben";
     if (diff === 1) return "Vor 1 Minute";
-    if (diff > 60) return "Vor > 1 Stunde";
     return `Vor ${diff} Minuten`;
   };
 
@@ -55,251 +54,267 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Hero Section */}
-      <section className="relative overflow-hidden pt-12 pb-20 lg:pt-24 lg:pb-32 bg-[#00305e]">
-         {/* Background Effects */}
-         <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0">
-             <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob"></div>
-             <div className="absolute top-40 -left-40 w-96 h-96 bg-blue-400 rounded-full mix-blend-screen filter blur-3xl opacity-10 animate-blob animation-delay-2000"></div>
-         </div>
-
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full text-[#ffcc00] text-sm font-bold mb-8 border border-white/10">
-            <Zap size={16} fill="currentColor" /> 24/7 Live-Überwachung aktiv
-          </div>
-          
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight mb-8">
+    <div className="flex flex-col min-h-screen bg-[#f8fafc]">
+      {/* Page 1: Hero Section */}
+      <section className="bg-[#001529] pt-20 pb-24 px-4">
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
             Verpasse nie wieder den <br />
             <span className="text-[#ffcc00]">ResortPass</span>
           </h1>
-          <p className="text-lg md:text-xl text-blue-100 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Der Europa-Park ResortPass ist ständig ausverkauft. Unser Tool prüft die Verfügbarkeit in kurzen Abständen und benachrichtigt dich sofort per E-Mail und SMS.
+          <p className="text-lg md:text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
+            Der Europa-Park ResortPass ist ständig ausverkauft. Unser Tool prüft die Verfügbarkeit in kurzen Abständen und benachrichtigt dich sofort.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button onClick={onSignup} size="lg" className="w-full sm:w-auto bg-[#ffcc00] text-[#00305e] hover:bg-yellow-400 border-0 font-bold shadow-xl">
-              Überwachung jetzt starten
-              <ArrowRight size={20} />
-            </Button>
-            <Button onClick={scrollToHowItWorks} variant="outline" size="lg" className="w-full sm:w-auto border-white/30 text-white hover:bg-white/10">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+            <button 
+              onClick={onSignup}
+              className="w-full sm:w-auto bg-[#5046e5] hover:bg-[#4338ca] text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg"
+            >
+              Jetzt Überwachung Starten <ArrowRight size={20} />
+            </button>
+            <button 
+              onClick={scrollToHowItWorks}
+              className="w-full sm:w-auto border-2 border-slate-700 hover:border-slate-500 text-slate-300 px-8 py-4 rounded-xl font-bold text-lg transition-all"
+            >
               Wie es funktioniert
-            </Button>
-          </div>
-          
-          {/* Trust Elements */}
-          <div className="mt-12 flex flex-wrap justify-center items-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all">
-             <div className="flex items-center gap-2 text-white font-semibold"><Shield size={20}/> Sicherer Checkout</div>
-             <div className="flex items-center gap-2 text-white font-semibold"><Clock size={20}/> Keine Wartezeit</div>
-             <div className="flex items-center gap-2 text-white font-semibold"><Smartphone size={20}/> SMS-Alarm inklusive</div>
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Status Ticker */}
-      <div className="bg-slate-950 border-y border-slate-800 py-3 overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between text-sm gap-2">
-          {loadingStatus ? (
-             <div className="flex items-center gap-2 text-slate-500">
-                <Loader2 size={14} className="animate-spin" /> Lade Live-Status...
-             </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 font-mono items-center w-full sm:w-auto">
-                <div className="flex items-center gap-2 text-slate-300">
-                <span className={`h-2 w-2 rounded-full ${status.gold === 'available' ? 'bg-green-500' : 'bg-red-500'} ${status.lastChecked ? 'animate-pulse' : ''}`}></span>
-                ResortPass Gold: <span className={`${status.gold === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>{status.gold === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}</span>
-                </div>
-                <div className="flex items-center gap-2 text-slate-300">
-                <span className={`h-2 w-2 rounded-full ${status.silver === 'available' ? 'bg-green-500' : 'bg-red-500'} ${status.lastChecked ? 'animate-pulse' : ''}`}></span>
-                ResortPass Silver: <span className={`${status.silver === 'available' ? 'text-green-400' : 'text-red-400'} font-bold uppercase`}>{status.silver === 'available' ? 'VERFÜGBAR' : 'Ausverkauft'}</span>
-                </div>
+      {/* Page 1: Status Ticker */}
+      <div className="bg-[#000d1a] py-6 border-b border-slate-800">
+        <div className="max-w-4xl mx-auto px-4 flex flex-col items-center">
+          <div className="flex flex-wrap justify-center gap-6 md:gap-12 mb-3">
+            <div className="flex items-center gap-2 text-white font-medium">
+              <span className={`w-2 h-2 rounded-full ${status.gold === 'available' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
+              <span>ResortPass Gold:</span>
+              <span className={status.gold === 'available' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
+                {status.gold === 'available' ? 'VERFÜGBAR' : 'AUSVERKAUFT'}
+              </span>
             </div>
-          )}
-          <div className="text-slate-500 text-xs flex items-center gap-1 mt-2 sm:mt-0"><Clock size={12} /> Zuletzt geprüft: {loadingStatus ? '...' : getTimeAgo(status.lastChecked)}</div>
+            <div className="flex items-center gap-2 text-white font-medium">
+              <span className={`w-2 h-2 rounded-full ${status.silver === 'available' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
+              <span>ResortPass Silver:</span>
+              <span className={status.silver === 'available' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
+                {status.silver === 'available' ? 'VERFÜGBAR' : 'AUSVERKAUFT'}
+              </span>
+            </div>
+          </div>
+          <div className="text-slate-500 text-xs flex items-center gap-1">
+            <Clock size={12} /> Zuletzt geprüft: {loadingStatus ? '...' : getTimeAgo(status.lastChecked)}
+          </div>
         </div>
       </div>
 
-      {/* Intro Section */}
-      <section id="how-it-works" className="py-24 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col lg:flex-row items-center gap-16">
-            <div className="lg:w-1/2">
-                <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6 leading-tight">
-                  Das Problem mit den <br />
-                  <span className="text-blue-600">ResortPass "Wellen"</span>
-                </h2>
-                <div className="space-y-6 text-lg text-slate-600 leading-relaxed">
-                  <p>
-                    Der Europa-Park schaltet neue Jahreskarten oft unangekündigt in kleinen Kontingenten ("Wellen") frei. Diese sind meist nach 10-15 Minuten bereits wieder vergriffen.
-                  </p>
-                  <p className="font-bold text-[#00305e]">
-                    Du kannst nicht den ganzen Tag die Seite aktualisieren. Aber unser Tool kann es!
-                  </p>
-                  <div className="bg-blue-50 p-6 rounded-2xl border-l-4 border-[#00305e]">
-                    <p className="text-[#00305e] font-medium italic">
-                      "Wir überwachen die offiziellen Ticket-Seiten für Gold & Silver im Minutentakt. Sobald der Status auf 'Verfügbar' springt, schlägt dein Handy Alarm."
-                    </p>
+      {/* Page 1/2: Problem & Intro */}
+      <section id="how-it-works" className="py-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-3xl p-8 md:p-12 shadow-sm border border-slate-100">
+            <h2 className="text-2xl md:text-3xl font-bold text-slate-900 mb-8">
+              Du wartest auf eine Jahreskarte des Europa-Park?
+            </h2>
+            
+            <div className="space-y-6 text-slate-600 text-lg leading-relaxed">
+              <p>
+                <span className="font-bold text-slate-900">Kennst du das Problem?</span> Du möchtest unbedingt eine Europa-Park Jahreskarte, aber die sind ständig ausverkauft. Und wenn sie wieder angeboten werden, musst du schnell sein. Es werden immer nur eine begrenzte Zahl vom Europa-Park freigegeben.
+              </p>
+              <p>
+                Du kannst nun jeden Tag selbst den Ticket-Shop besuchen und diesen wichtigen Moment doch verpassen, weil du genau dann nicht online warst.
+              </p>
+            </div>
+
+            {/* Blue Solution Box (Page 2) */}
+            <div className="mt-12 bg-blue-50/50 rounded-2xl p-8 md:p-10 border border-blue-100 relative">
+              <div className="flex gap-6">
+                <div className="hidden md:block">
+                  <div className="bg-white p-3 rounded-xl shadow-sm text-[#001529]">
+                    <Lightbulb size={32} />
                   </div>
                 </div>
-            </div>
-            <div className="lg:w-1/2 relative">
-                <div className="absolute inset-0 bg-[#ffcc00]/10 rounded-3xl -rotate-3"></div>
-                <div className="relative bg-[#00305e] rounded-3xl p-8 shadow-2xl text-white">
-                    <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                      <Bell className="text-[#ffcc00]" /> So funktioniert dein Alarm
-                    </h3>
-                    <div className="space-y-8">
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold shrink-0">1</div>
-                            <div>
-                                <p className="font-bold mb-1">Registrierung</p>
-                                <p className="text-blue-200 text-sm text-balance">Erstelle dein Konto und gib an, ob du per E-Mail, SMS oder beides benachrichtigt werden willst.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center font-bold shrink-0">2</div>
-                            <div>
-                                <p className="font-bold mb-1">Überwachung</p>
-                                <p className="text-blue-200 text-sm text-balance">Unser System prüft rund um die Uhr die Verfügbarkeit direkt im Europa-Park Ticketshop.</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-4">
-                            <div className="w-10 h-10 rounded-full bg-[#ffcc00] text-[#00305e] flex items-center justify-center font-bold shrink-0">3</div>
-                            <div>
-                                <p className="font-bold mb-1 text-[#ffcc00]">Sofort-Alarm</p>
-                                <p className="text-blue-200 text-sm text-balance">Sobald Karten verfügbar sind, erhältst du binnen Sekunden eine SMS und E-Mail mit dem Direktlink zum Kauf.</p>
-                            </div>
-                        </div>
-                    </div>
+                <div>
+                  <h3 className="text-xl md:text-2xl font-bold text-[#001529] mb-4">
+                    Oder du nutzt ResortPassAlarm!
+                  </h3>
+                  <p className="text-slate-700 leading-relaxed mb-6">
+                    Wir erledigen das für dich in kurzen Abständen, Tag und Nacht. Sobald Jahreskarten verfügbar sind, erhältst du eine E-Mail und eine SMS auf dein Handy.
+                  </p>
+                  <p className="text-[#001529] font-bold italic text-lg text-center md:text-left mt-10">
+                    So steigen deine Chancen auf eine Jahreskarte erheblich! <br className="hidden md:block" />
+                    Sei schnell und schlau! Nutze ResortPassAlarm!
+                  </p>
                 </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Grid */}
-      <section className="py-24 bg-slate-50 border-y border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900">Warum ResortPassAlarm?</h2>
-            <p className="text-slate-500 mt-4 max-w-2xl mx-auto">Alles was du brauchst, um dir deine Jahreskarte zu sichern.</p>
-          </div>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-6">
-                <Clock size={24} />
-              </div>
-              <h3 className="text-xl font-bold mb-3">24/7 Überwachung</h3>
-              <p className="text-slate-600">Wir prüfen die Seite auch nachts, am Wochenende und an Feiertagen. Wir schlafen nie.</p>
-            </div>
-            
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-xl flex items-center justify-center mb-6">
-                <Zap size={24} />
-              </div>
-              <h3 className="text-xl font-bold mb-3">Maximale Speed</h3>
-              <p className="text-slate-600">Unsere Server sind optimiert, um Änderungen sofort zu erkennen und den Alarm ohne Verzögerung zu senden.</p>
-            </div>
-            
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
-              <div className="w-12 h-12 bg-green-100 text-green-600 rounded-xl flex items-center justify-center mb-6">
-                <Smartphone size={24} />
-              </div>
-              <h3 className="text-xl font-bold mb-3">SMS-Alert inklusive</h3>
-              <p className="text-slate-600">E-Mails gehen oft im Postfach unter. Mit unserem SMS-Alarm verpasst du die 10-Minuten-Fenster garantiert nicht.</p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Page 2/3: Pricing / Premium Service */}
+      <section className="py-20 px-4 bg-white border-t border-slate-100">
+        <div className="max-w-4xl mx-auto text-center">
+          <span className="text-[#5046e5] font-bold text-sm tracking-widest uppercase mb-4 block">PREMIUM SERVICE</span>
+          <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Deine Chance auf eine Jahreskarte</h2>
+          <p className="text-slate-500 text-lg mb-16 max-w-2xl mx-auto">
+            Egal ob du den ResortPass Gold (inkl. Parken & Wasserwelt) oder den ResortPass Silver suchst – wir sagen dir Bescheid.
+          </p>
 
-      {/* Pricing Section */}
-      <section id="features" className="py-24 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <span className="text-blue-600 font-bold tracking-wider uppercase text-sm">Premium Service</span>
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mt-2">Sichere dir deinen ResortPass</h2>
-          </div>
-          <div className="max-w-4xl mx-auto bg-slate-50 rounded-3xl border border-slate-200 overflow-hidden shadow-lg flex flex-col md:flex-row">
-            <div className="p-8 md:p-12 md:w-1/2 flex flex-col justify-center">
-              <h3 className="text-2xl font-bold text-slate-900 mb-4">ResortPass Alarm</h3>
-              <p className="text-slate-600 mb-8">Voller Zugriff auf alle Alarm-Funktionen für Gold & Silver.</p>
-              <div className="mt-auto">
-                 <div className="flex items-baseline gap-1 mb-1">
-                    <span className="text-4xl font-bold text-[#00305e]">{price.toFixed(2).replace('.', ',')} €</span>
-                    <span className="text-slate-500">/ Monat</span>
-                 </div>
-                 <p className="text-xs text-slate-400">Jederzeit mit einem Klick im Dashboard kündbar.</p>
+          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden text-left max-w-2xl mx-auto">
+            <div className="p-8 md:p-12">
+              <h3 className="text-2xl font-bold text-slate-900 mb-6">ResortPass Alarm</h3>
+              <p className="text-slate-600 mb-10 leading-relaxed">
+                Verliere keine Zeit mit ständigem Nachsehen auf der Ticket-Seite. Unser System erledigt das für dich und verschafft dir den entscheidenden Vorteil. Rund um die Uhr, 24h am Tag!
+              </p>
+              
+              <div className="mb-10">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-extrabold text-slate-900">{price.toFixed(2).replace('.', ',')} €</span>
+                  <span className="text-slate-500 text-xl">/ Monat</span>
+                </div>
+                <p className="text-slate-400 text-sm mt-2 italic">Inkl. MwSt. Monatlich kündbar.</p>
               </div>
-            </div>
-            <div className="bg-white p-8 md:p-12 md:w-1/2 border-t md:border-t-0 md:border-l border-slate-200">
-              <ul className="space-y-4">
+
+              <div className="space-y-4 mb-12">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">ALLES INKLUSIVE</p>
                 {[
-                  'Überwachung: ResortPass Gold', 
-                  'Überwachung: ResortPass Silver', 
-                  'Prüfung in extrem kurzen Abständen', 
-                  'Sofortiger E-Mail Alarm', 
-                  'Sofortiger SMS Alarm (inklusive)', 
-                  'Direktlink zum Mack-Ticketshop'
+                  'Überwachung: Gold & Silver',
+                  'Prüfung in kurzen Abständen',
+                  'Sofortige E-Mail Alert',
+                  'Sofortige SMS Alert',
+                  'Direktlink zum Warenkorb',
+                  'Jederzeit kündbar'
                 ].map((item, i) => (
-                  <li key={i} className="flex items-center gap-3 text-slate-700 text-sm">
-                    <div className="bg-green-100 p-1 rounded-full shrink-0">
-                      <Check size={14} className="text-green-600" />
+                  <div key={i} className="flex items-center gap-3">
+                    <div className="bg-green-100 rounded-full p-0.5">
+                      <Check size={16} className="text-green-600" />
                     </div>
-                    <span className="font-medium">{item}</span>
-                  </li>
+                    <span className="text-slate-700 font-medium">{item}</span>
+                  </div>
                 ))}
-              </ul>
-              <div className="mt-10">
-                <Button onClick={onSignup} className="w-full bg-[#00305e] hover:bg-[#002040] text-white shadow-lg py-4">
-                  Jetzt Alarm aktivieren
-                </Button>
               </div>
+
+              <button 
+                onClick={onSignup}
+                className="w-full bg-[#5046e5] hover:bg-[#4338ca] text-white py-5 rounded-2xl font-bold text-xl transition-all shadow-lg active:scale-[0.98]"
+              >
+                Jetzt buchen
+              </button>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ Section */}
-      <section className="py-24 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-slate-900">Häufige Fragen</h2>
-            <p className="text-slate-500 mt-4">Wir klären deine Zweifel.</p>
+      {/* Page 3/4: Only Small Waves */}
+      <section className="bg-[#001529] py-24 px-4 relative overflow-hidden">
+        {/* Background grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '30px 30px' }}></div>
+        
+        <div className="max-w-4xl mx-auto relative z-10">
+          <h2 className="text-[#ffcc00] text-3xl md:text-4xl font-bold text-center mb-16">
+            Nur kleine Wellen
+          </h2>
+
+          <div className="grid md:grid-cols-2 gap-12 text-white">
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold flex items-center gap-3">
+                <span className="text-[#ffcc00]">⚡</span> Warum du schnell sein musst
+              </h3>
+              <p className="text-slate-300 leading-relaxed text-lg">
+                Der Europa-Park gibt ResortPässe oft unangekündigt und nur in sehr kleinen Kontingenten frei. Oft sind diese "Wellen" nach wenigen Minuten wieder vorbei.
+              </p>
+            </div>
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold flex items-center gap-3">
+                <span className="text-[#ffcc00]">🕒</span> Die 10-Minuten-Regel
+              </h3>
+              <p className="text-slate-300 leading-relaxed text-lg">
+                Wer nicht innerhalb von 10 Minuten nach Freischaltung bucht, geht meistens leer aus. Unser Tool verschafft dir den entscheidenden Zeitvorteil durch sofortige Benachrichtigung.
+              </p>
+            </div>
           </div>
-          <div className="space-y-4">
+
+          <div className="mt-16 text-center">
+            <button 
+              onClick={onSignup}
+              className="bg-[#5046e5] hover:bg-[#4338ca] text-white px-10 py-5 rounded-2xl font-bold text-xl transition-all shadow-xl"
+            >
+              Überwachung starten
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* Page 4/5: FAQ */}
+      <section className="py-24 px-4 bg-[#f8fafc]">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Häufige Fragen</h2>
+            <p className="text-slate-500 text-lg">Alles, was du über den ResortPassAlarm wissen musst.</p>
+          </div>
+
+          <div className="space-y-6">
             {[
               { 
-                q: "Verkauft ihr selbst ResortPässe?", 
-                a: "Nein. Wir sind ein unabhängiger Monitoring-Service. Wir informieren dich lediglich über die Verfügbarkeit im offiziellen Europa-Park Shop, damit du dort schnell zuschlagen kannst." 
+                q: "Was bringt mir ResortPassAlarm?", 
+                a: "Du sparst dir das ständige, nervige Neuladen der Ticket-Seite. Unser System prüft rund um die Uhr in kurzen Abständen die Verfügbarkeit und benachrichtigt dich sofort, wenn Gold oder Silver Pässe freigeschaltet werden." 
               },
               { 
-                q: "Wie sicher ist es, dass ich einen Pass bekomme?", 
-                a: "Unser Tool erhöht deine Chancen massiv, da du sofort informiert wirst. Da die Kontingente aber begrenzt sind, musst du nach Erhalt des Alarms trotzdem schnell sein. Eine Kaufgarantie können wir nicht geben." 
-              },
-              { 
-                q: "Warum kostet der Service monatlich Geld?", 
-                a: "Die ständige Überwachung erfordert leistungsstarke Server und spezialisierte Software-Roboter, die rund um die Uhr laufen. Zudem fallen Kosten für den sofortigen SMS-Versand an." 
+                q: "Was kostet der Service?", 
+                a: `Der Service kostet nur ${price.toFixed(2).replace('.', ',')} € pro Monat. Das deckt unsere Serverkosten für die ständige Überwachung und die SMS-Kosten ab. Ein kleiner Preis für die Chance auf eine Jahreskarte.` 
               },
               { 
                 q: "Kann ich jederzeit kündigen?", 
-                a: "Ja, absolut. Du kannst dein Abo jederzeit zum Ende des laufenden Monats direkt in deinem Dashboard mit einem Klick beenden. Es gibt keine versteckten Vertragslaufzeiten." 
+                a: "Ja, absolut. Du kannst dein Abo jederzeit mit einem einzigen Klick in deinem Dashboard beenden. Es gibt keine langen Vertragslaufzeiten." 
+              },
+              { 
+                q: "Ist das eine Abofalle?", 
+                a: "Nein! Wir setzen auf volle Transparenz. Die Zahlungsabwicklung erfolgt sicher über Stripe. Du hast volle Kontrolle über dein Abo und keine versteckten Kosten." 
+              },
+              { 
+                q: "Wie bekomme ich den Alarm?", 
+                a: "Sobald Tickets verfügbar sind, erhältst du sofort eine E-Mail. Optional (und kostenlos inklusive) senden wir dir auch eine SMS auf dein Handy, damit du es unterwegs nicht verpasst." 
+              },
+              { 
+                q: "Gibt es eine Jahreskarten-Garantie?", 
+                a: "Wir garantieren, dass wir dich benachrichtigen. Da die Kontingente oft sehr klein sind, musst du nach dem Alarm trotzdem schnell sein. Wir verschaffen dir aber den entscheidenden Zeitvorteil gegenüber allen anderen." 
               }
             ].map((faq, i) => (
-              <div key={i} className="bg-white rounded-xl p-6 border border-slate-200 shadow-sm">
-                <h3 className="font-bold text-lg text-slate-900 mb-2 flex items-start gap-3">
-                  <HelpCircle className="text-blue-600 shrink-0 mt-1" size={20} />
+              <div key={i} className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200">
+                <h4 className="text-lg font-bold text-slate-900 mb-4 flex items-start gap-3">
+                  <HelpCircle className="text-[#5046e5] shrink-0 mt-1" size={20} />
                   {faq.q}
-                </h3>
-                <p className="text-slate-600 pl-8 leading-relaxed text-sm">{faq.a}</p>
+                </h4>
+                <p className="text-slate-600 leading-relaxed pl-8">
+                  {faq.a}
+                </p>
               </div>
             ))}
           </div>
-          
-          <div className="mt-16 text-center">
-             <div className="inline-flex items-center gap-2 text-slate-400 text-sm">
-                <Star size={16} fill="currentColor" className="text-yellow-400" />
-                Noch Fragen? Schreibe uns an <a href="mailto:support@resortpassalarm.com" className="underline hover:text-[#00305e]">support@resortpassalarm.com</a>
-             </div>
+        </div>
+      </section>
+
+      {/* Page 6: Become a Partner */}
+      <section className="bg-[#002a52] py-24 px-4 text-center">
+        <div className="max-w-4xl mx-auto">
+          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+            Betreibst du eine Fanseite? <br className="hidden md:block" /> Werde Partner.
+          </h2>
+          <p className="text-slate-300 text-lg mb-12 max-w-2xl mx-auto leading-relaxed">
+            Hilf anderen Europa-Park Fans an ihre Tickets zu kommen und verdiene dabei. Unser Partnerprogramm ist fair, transparent und lukrativ.
+          </p>
+          <div className="flex flex-col items-center gap-4">
+            <button 
+              onClick={() => navigate('affiliate-signup')}
+              className="bg-[#5046e5] hover:bg-[#4338ca] text-white px-10 py-5 rounded-2xl font-bold text-xl transition-all shadow-xl"
+            >
+              Zum Partnerprogramm
+            </button>
+            <button 
+              onClick={() => navigate('affiliate-info')}
+              className="text-[#ffcc00] hover:text-yellow-400 font-bold text-sm mt-4 flex items-center gap-2"
+            >
+              Mehr Infos und Rechenbeispiele ansehen <ArrowRight size={16} />
+            </button>
           </div>
         </div>
       </section>
