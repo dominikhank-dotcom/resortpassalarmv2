@@ -1,20 +1,17 @@
+
 import { GoogleGenAI } from "@google/genai";
 
-export default async function handler(req, res) {
+export default async function handler(req: any, res: any) {
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Server Konfiguration fehlt (API_KEY)' });
-  }
-
   try {
     const { stats, type } = req.body; // type can be 'admin_insights' or 'marketing_copy'
-    const ai = new GoogleGenAI({ apiKey });
+    /* Initialize with direct process.env.API_KEY as per guidelines */
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
     let prompt = "";
     // Use a more capable model for complex tasks like creative writing or analysis
@@ -54,7 +51,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ text: response.text });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini Generation Error:", error);
     return res.status(500).json({ error: error.message });
   }
