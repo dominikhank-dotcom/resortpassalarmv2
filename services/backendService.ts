@@ -19,6 +19,20 @@ const handleResponse = async (response: Response) => {
   }
 };
 
+export const deleteAccount = async (userId: string) => {
+  try {
+    const response = await fetch('/api/delete-account', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId })
+    });
+    return await handleResponse(response);
+  } catch (error: any) {
+    console.error("Delete Account Error:", error);
+    throw error;
+  }
+};
+
 export const sendTestAlarm = async (userId: string, email: string, phone: string, sendEmail: boolean, sendSms: boolean) => {
   try {
     const response = await fetch('/api/send-test-alarm', {
