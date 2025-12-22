@@ -1,9 +1,9 @@
 
 import React from 'react';
-import { ArrowLeft, Calendar, User, Clock, Share2, Tag, ChevronRight, Check } from 'lucide-react';
+// Add missing imports for ArrowRight and Star from lucide-react
+import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
-import { BlogCTA } from '../components/BlogCTA';
 import { BLOG_POSTS } from './BlogOverviewPage';
 
 interface BlogPostPageProps {
@@ -25,446 +25,270 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
 
   const handleSignup = () => navigate('user-signup');
 
-  // Simple Name-as-Image helper
-  const NameAsImage = () => (
-      <img 
-        src={`data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="18"><text x="0" y="14" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="%23334155">Dominik Hank</text></svg>`} 
-        alt="Dominik Hank" 
-        className="inline-block align-bottom h-[14px]"
-      />
+  // Integrated CTA for the blog
+  const BlogInjectedCTA = ({ variant = 'default' }: { variant?: 'default' | 'small' }) => (
+    <div className={`my-10 bg-[#001529] rounded-2xl p-8 text-white shadow-xl relative overflow-hidden not-prose border-l-4 border-[#ffcc00]`}>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-3xl opacity-10 -translate-y-1/2 translate-x-1/2"></div>
+        <div className="relative z-10">
+            <h4 className="text-[#ffcc00] font-bold text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
+                <Zap size={16} fill="currentColor" /> Tipp vom Experten
+            </h4>
+            <h3 className="text-xl md:text-2xl font-bold mb-4">Keine Lust auf ständiges Nachsehen?</h3>
+            <p className="text-slate-300 mb-6 leading-relaxed">
+                Der ResortPass ist oft binnen Minuten ausverkauft. Unser Alarm-Tool überwacht die Server rund um die Uhr und benachrichtigt dich sofort per E-Mail & SMS, wenn neue Kontingente frei werden.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 items-center">
+                <Button onClick={() => navigate('landing')} className="bg-[#5046e5] hover:bg-indigo-700 text-white border-0 px-6 py-3 font-bold w-full sm:w-auto">
+                    Jetzt Alarm aktivieren <ArrowRight size={18} />
+                </Button>
+                <div className="text-xs text-slate-400 flex items-center gap-1 italic">
+                    <ShieldCheck size={14} className="text-green-500" /> Über 5.000 erfolgreiche Alarme
+                </div>
+            </div>
+        </div>
+    </div>
   );
 
   const renderContent = () => {
     switch (slug) {
-      case 'resortpass-erfahrungen-1-jahr':
+      case 'resortpass-guide-2026':
         return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Erfahrungsberichte ranken, weil Menschen echte Antworten wollen. Dieser Artikel ist bewusst praxisorientiert: Was hat sich gelohnt, was nervt – und für wen welcher Pass passt.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Was viele nach 3 Monaten merken (und vorher unterschätzen)</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Man fährt häufiger „kurz und spontan“ – wenn man es zeitlich hinbekommt.</li>
-                <li>Der Pass spart nicht nur Geld, sondern auch Entscheidungsmüdigkeit („Lohnt sich ein Tagesticket heute?“).</li>
-                <li>Reservierung/Planung ist ein echter Faktor – besonders bei beliebten Tagen.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Pro & Contra (ehrlich)</h2>
-              <div className="overflow-x-auto my-6">
-                <table className="w-full border-collapse border border-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr><th className="border border-slate-200 p-4 text-left font-bold">Pro</th><th className="border border-slate-200 p-4 text-left font-bold">Contra</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td className="border border-slate-200 p-4 text-sm">Mehr Besuche ohne jedes Mal Ticketkauf</td><td className="border border-slate-200 p-4 text-sm">Verfügbarkeit/Verkauf kann zeitweise geschlossen sein</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm">Gold: maximale Flexibilität + 2× Rulantica</td><td className="border border-slate-200 p-4 text-sm">Silver: Kalender‑Einschränkungen</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm">Partner‑Parks als Bonus</td><td className="border border-slate-200 p-4 text-sm">Zusatzkosten (Anreise/Essen) bleiben</td></tr>
-                  </tbody>
-                </table>
+          <div className="space-y-8">
+            <div className="bg-blue-50 border-l-4 border-[#00305e] p-6 rounded-r-xl">
+              <h3 className="text-[#00305e] font-bold text-lg mb-2">📋 Zusammenfassung</h3>
+              <p className="text-slate-700 leading-relaxed m-0">Der Europa-Park ResortPass ist die Jahreskarte für Deutschlands größten Freizeitpark. Mit der Karte kannst du ein ganzes Jahr lang den Europa-Park besuchen – entweder mit dem <strong>ResortPass Silver</strong> an über 230 Tagen oder mit dem <strong>ResortPass Gold</strong> an allen Öffnungstagen. Zusätzlich erhältst du Zugang zu Partnerparks in ganz Europa, Premium-Inhalte auf VEEJOY und weitere exklusive Vorteile. In diesem Guide erfährst du alles, was du als Einsteiger über den ResortPass 2026 wissen musst!</p>
+            </div>
+
+            <p>Du liebst den Europa-Park und überlegst, ob sich eine Jahreskarte für dich lohnt? Dann bist du hier genau richtig! Der ResortPass ist die offizielle Jahreskarte des Europa-Park und bietet dir unglaublich viele Möglichkeiten, Deutschlands besten Freizeitpark so oft zu besuchen, wie du möchtest. In diesem ultimativen Guide erklären wir dir Schritt für Schritt alles Wichtige zum Europa-Park ResortPass 2026.</p>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Was ist der Europa-Park ResortPass?</h2>
+            <p>Der <strong>Europa-Park ResortPass</strong> ist die moderne Jahreskarte des Europa-Park Erlebnis-Resorts. Er ermöglicht dir ein ganzes Jahr lang den Zugang zum Europa-Park – je nach gewählter Variante an bestimmten oder allen Öffnungstagen.</p>
+            
+            <div className="bg-yellow-50 border-2 border-yellow-200 p-6 rounded-2xl flex gap-4 items-start">
+              <div className="bg-yellow-400 p-2 rounded-lg text-white shrink-0"><Zap size={20} /></div>
+              <div>
+                <strong className="block text-slate-900 mb-1">💡 Gut zu wissen:</strong>
+                <p className="text-slate-700 text-sm m-0">Der ResortPass ist eine digitale Jahreskarte, die in der Europa-Park App oder im MackOne Account hinterlegt wird. Du brauchst keine physische Karte – alles läuft über einen QR-Code auf deinem Smartphone!</p>
               </div>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">So schreibst du deinen eigenen Erfahrungsbericht (SEO‑Struktur)</h2>
-              <ol className="space-y-2 list-decimal pl-6 mb-6">
-                <li>Wie oft bist du gefahren? (Monate/Anlässe)</li>
-                <li>Welche Tage hast du genutzt? (Ferien vs. Nebensaison)</li>
-                <li>Was waren deine Top‑Momente? (Shows/Events/Attraktionen)</li>
-                <li>Was würdest du beim nächsten Mal anders machen?</li>
-              </ol>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Ideen für echte Mehrwerte im Text</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Mini‑Rechner: „Kosten pro Besuch“ (Passpreis ÷ Besuche)</li>
-                <li>Beste Besuchszeiten (deine Statistik)</li>
-                <li>Rulantica‑Kombi (falls Gold)</li>
-              </ul>
-            </section>
-          </>
+            </div>
+
+            <BlogInjectedCTA />
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Die zwei Varianten: Silver vs. Gold</h2>
+            <p>Der Europa-Park bietet dir zwei verschiedene ResortPass-Varianten an: <strong>Silver</strong> und <strong>Gold</strong>. Beide haben ihre eigenen Vorteile und richten sich an unterschiedliche Besuchertypen.</p>
+
+            <h3 className="text-xl font-bold text-indigo-700">ResortPass Silver – Der perfekte Einstieg</h3>
+            <p>Der ResortPass Silver ist ideal für dich, wenn du den Europa-Park regelmäßig besuchen möchtest, aber nicht unbedingt an jedem Tag im Jahr kommen musst. Mit dieser Variante kannst du den Park an <strong>über 230 vorab definierten Öffnungstagen</strong> besuchen.</p>
+            <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-r-xl italic text-slate-700">
+                <strong>Insider-Tipp:</strong> Auch wenn du den Silver Pass hast, kannst du die Sperrtage umgehen! Wenn du eine Übernachtung in einem der Europa-Park Hotels buchst, hast du an allen Tagen deines Aufenthalts freien Zugang!
+            </div>
+
+            <h3 className="text-xl font-bold text-indigo-700">ResortPass Gold – Volle Flexibilität</h3>
+            <p>Der ResortPass Gold ist die Premium-Variante ohne Einschränkungen. Mit ihm kannst du den Europa-Park an <strong>allen Öffnungstagen</strong> besuchen – ohne Sperrtage, ohne Ausnahmen.</p>
+            <ul className="list-disc pl-6 space-y-2">
+                <li><strong>Zwei Tagestickets für Rulantica inklusive.</strong></li>
+                <li><strong>Physische Karte ohne Aufpreis per Post.</strong></li>
+            </ul>
+
+            <div className="bg-red-50 border-2 border-red-100 p-8 rounded-3xl text-center my-10">
+                <h3 className="text-[#00305e] text-2xl font-bold mb-4">💰 ResortPass Preise 2026 (voraussichtlich)</h3>
+                <div className="grid grid-cols-2 gap-4 text-left max-w-md mx-auto">
+                    <div className="font-bold text-slate-900 border-b pb-2">Kategorie</div>
+                    <div className="font-bold text-slate-900 border-b pb-2 text-right">Preis</div>
+                    <div className="text-slate-600">Silver Erwachsen</div><div className="font-bold text-right">295 €</div>
+                    <div className="text-slate-600">Silver Kind (4-11)</div><div className="font-bold text-right">255 €</div>
+                    <div className="text-slate-600 pt-2 border-t">Gold Erwachsen</div><div className="font-bold text-right pt-2">475 €</div>
+                    <div className="text-slate-600 border-b pb-2">Gold Kind (4-11)</div><div className="font-bold text-right border-b pb-2">415 €</div>
+                </div>
+                <p className="text-xs text-slate-400 mt-4 italic">Stand: Dezember 2025. Preise können sich ändern.</p>
+            </div>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Wie funktioniert die Reservierung?</h2>
+            <p>Du musst deine Besuche vorher <strong>reservieren</strong>. Das geht einfach über den MackOne Account oder die App. Du kannst bis zu <strong>fünf Besuchstage gleichzeitig reservieren</strong>. Sobald ein Tag vorbei ist, kannst du den nächsten buchen.</p>
+
+            <BlogInjectedCTA />
+
+            <div className="bg-white border border-slate-200 rounded-3xl p-8 shadow-sm">
+                <h3 className="text-2xl font-bold text-slate-900 mb-6">❓ Häufig gestellte Fragen</h3>
+                <div className="space-y-6">
+                    <div>
+                        <h4 className="font-bold text-indigo-600 mb-2">Wie lange ist der Pass gültig?</h4>
+                        <p className="text-slate-600 m-0">Exakt 12 Monate ab dem von dir gewählten Startdatum.</p>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-indigo-600 mb-2">Brauche ich die physische Karte?</h4>
+                        <p className="text-slate-600 m-0">Nein, die App reicht völlig aus. Die Plastikkarte ist optional (5€ bei Silver, inkl. bei Gold).</p>
+                    </div>
+                </div>
+            </div>
+          </div>
         );
-      case 'resortpass-faq-haeufige-fragen':
+      case 'silver-vs-gold-vergleich':
         return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Hier findest du Antworten auf die Fragen, die bei Google & in Foren am häufigsten auftauchen – kurz, verständlich und mit Fokus auf Praxis.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Reservierung & Zutritt</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Muss ich reservieren?</b> Je nach Vorgaben kann eine Reservierung über das ResortPass‑Portal erforderlich sein.</li>
-                <li><b>Ist Zutritt garantiert?</b> Innerhalb der Regeln des jeweiligen Modells (z. B. Silver‑Gültigkeitstage) ist der Eintritt grundsätzlich vorgesehen – Details stehen in den offiziellen Bedingungen.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Partner‑Freizeitparks</h2>
-              <p className="mb-6">Laut offiziellen FAQ gibt es <b>keinen Unterschied</b> zwischen Silver und Gold bei den Partner‑Parks: Beide Modelle erlauben den einmaligen kostenfreien bzw. ermäßigten Besuch während der Laufzeit.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Rulantica (nur Gold)</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>2 Tagestickets</b> sind enthalten.</li>
-                <li>Die <b>Termine sind frei wählbar</b> (nach Verfügbarkeit), müssen aber vorab reserviert werden.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Print‑Karte / Ausweis</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">Gut zu wissen</strong>
-                <div className="text-sm">Eine gedruckte Karte ist nicht überall automatisch erhältlich. In den offiziellen FAQ gibt es Hinweise, dass eine Print‑Karte gegen Gebühr an einer Info‑Stelle im Park ausgestellt werden kann.</div>
-              </div>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Warum ResortPassAlarm?</h2>
-              <p className="mb-6">Viele Nutzer scheitern nicht an der Entscheidung Silver vs. Gold – sondern daran, dass der Pass gerade nicht verkauft wird. Ein Alarm spart Zeit und Nerven.</p>
-            </section>
-          </>
-        );
-      case 'resortpass-gold-vorteile-rulantica':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Gold ist die Premium‑Variante: volle Flexibilität im Europa‑Park und zwei Rulantica‑Tagestickets. Hier sind die echten Vorteile – und wie du sie clever nutzt.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Die Kernvorteile</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Uneingeschränkter Zutritt</b> zum Europa‑Park an allen Öffnungstagen.</li>
-                <li><b>2 Tagestickets für Rulantica</b> während der Laufzeit (Termine frei wählbar nach Verfügbarkeit).</li>
-                <li><b>Partner‑Freizeitparks</b> einmalig kostenfrei/ermäßigt.</li>
-                <li>Weitere Benefits wie Aktionen bei Events und Vergünstigungen (z. B. Abendkino, je nach Angebot).</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Rulantica mit Gold: so funktioniert’s praktisch</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">Reservierung nicht vergessen</strong>
-                <div className="text-sm">Für Rulantica‑Besuche ist eine vorherige Reservierung der Termine erforderlich und läuft über das ResortPass‑Portal im Ticketshop (laut offizieller Beschreibung).</div>
-              </div>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Plane Rulantica am besten an einem Tag, an dem du <b>nicht</b> den ganzen Tag im Park sein willst.</li>
-                <li>Bei Kurzurlauben: 1 Tag Europa‑Park + 1 Tag Rulantica ist oft die perfekte Kombi.</li>
-              </ul>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Für wen Gold besonders stark ist</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Spontane Besucher (auch „mal eben“ nach Feierabend/wochenends)</li>
-                <li>Fans von saisonalen Events & Ferienzeiten</li>
-                <li>Alle, die Europa‑Park und Wasserwelt als „Gesamt‑Resort“ erleben wollen</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Gold ist oft kontingentiert</h2>
-              <p className="mb-6">Weil Gold ein exklusiveres Gesamtpaket ist, ist er häufig nur <b>begrenzt verfügbar</b>. Wenn du ihn möchtest, lohnt sich ein Alarm, sobald der Verkauf wieder startet.</p>
-            </section>
-          </>
-        );
-      case 'resortpass-kaufen-verfuegbarkeit-tipps':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Wenn der ResortPass gefragt ist, ist er oft schnell vergriffen oder zeitweise nicht verfügbar. Mit der richtigen Vorbereitung bist du beim nächsten Verkaufsfenster deutlich schneller – hier ist die Checkliste.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Warum ist der ResortPass manchmal nicht verfügbar?</h2>
-              <p className="mb-6">ResortPässe können kontingentiert sein. Das bedeutet: Der Verkauf wird zeitweise gestoppt, wenn das Kontingent erreicht ist – und später wieder geöffnet. Das betrifft häufig sowohl Silver als auch Gold.</p>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Die 7‑Punkte‑Checkliste für den Kauf</h2>
-              <ol className="space-y-2 list-decimal pl-6 mb-6">
-                <li><b>Account im Ticketshop</b> anlegen und eingeloggt bleiben.</li>
-                <li>Personendaten bereithalten (Name, Geburtsdatum etc.).</li>
-                <li>Zahlungsart vorbereiten (z. B. Kreditkarte/PayPal – je nach Shop‑Option).</li>
-                <li>Auf Mobil & Desktop testen (Backup‑Gerät).</li>
-                <li>Browser‑Autofill aktivieren.</li>
-                <li>Wenn möglich: stabile Verbindung (WLAN/LAN).</li>
-                <li><b>Alarm setzen</b>, damit du den Verkaufsstart nicht verpasst.</li>
-              </ol>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Silver oder Gold – was ist schneller weg?</h2>
-              <p className="mb-6">Das kann je nach Saison variieren. Gold ist wegen der Flexibilität und der Rulantica‑Leistung häufig besonders nachgefragt. Entscheidend ist: Sobald der Verkauf offen ist, zählt Geschwindigkeit.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Nach dem Kauf: Was du sofort prüfen solltest</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Deine Daten im Ticketshop (Tippfehler kosten später Nerven).</li>
-                <li>Wie Reservierung/Portalzugang funktioniert.</li>
-                <li>Welche Tage bei Silver gültig sind (Kalender speichern).</li>
-              </ul>
-            </section>
-          </>
-        );
-      case 'resortpass-lohnt-sich-rechner':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Die häufigste Google‑Frage: „Ab wie vielen Besuchen lohnt sich die Jahreskarte?“ Hier bekommst du nachvollziehbare Beispiele – ohne Marketing‑Buzz, dafür mit realistischen Szenarien.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Aktuelle Richtpreise (Stand: 22. Dezember 2025)</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">ResortPass‑Preise (offizielle Übersicht – kann sich ändern)</strong>
-                <ul className="space-y-1 text-sm list-disc pl-6">
-                  <li><b>ResortPass Silver:</b> Kinder (4–11) 255 €, Erwachsene (ab 12) 295 €, Senioren (ab 60) 255 €</li>
-                  <li><b>ResortPass Gold:</b> Kinder (4–11) 415 €, Erwachsene (ab 12) 475 €, Senioren (ab 60) 415 €</li>
+          <div className="space-y-8">
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-6 rounded-r-xl mb-8">
+                <h2 className="text-xl font-bold text-slate-900 mb-4 m-0">📋 Auf einen Blick</h2>
+                <ul className="list-none p-0 space-y-2 m-0 text-slate-700">
+                    <li className="flex items-center gap-2"><Check size={16} className="text-green-600" /> <strong>ResortPass Silver:</strong> 295 €, über 230 Besuchstage, ideal für Sparfüchse.</li>
+                    <li className="flex items-center gap-2"><Check size={16} className="text-green-600" /> <strong>ResortPass Gold:</strong> 475 €, alle Öffnungstage + 2x Rulantica.</li>
+                    <li className="flex items-center gap-2"><Check size={16} className="text-green-600" /> <strong>Preisdifferenz:</strong> 180 € – aber lohnt sich das Upgrade?</li>
                 </ul>
-                <div className="text-xs text-slate-400 mt-4 italic">Tipp: Prüfe immer den aktuellen Stand im offiziellen Ticketshop, weil Preise/Verfügbarkeit variieren können.</div>
-              </div>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">So rechnest du schnell selbst</h2>
-              <p className="mb-4"><b>Break‑even‑Idee:</b> ResortPass‑Preis ÷ durchschnittlicher Ticketpreis pro Besuch ≈ Besuche, ab denen es sich lohnt.</p>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Wenn du sonst oft an teuren Tagen gehst, kippt die Rechnung schneller Richtung <b>Gold</b>.</li>
-                <li>Wenn du gezielt günstigere Tage nutzt, kann <b>Silver</b> extrem stark sein.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Beispiel 1: Paar, 3 Besuche pro Jahr</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Wenn alle 3 Besuche auf <b>Silver‑Tagen</b> liegen, kann Silver schnell günstiger als 3 Einzel‑Tickets sein.</li>
-                <li>Wenn mindestens 1 Besuch in Ferien/Peak fällt, wird <b>Gold</b> wegen der Flexibilität interessanter.</li>
-              </ul>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Beispiel 2: Familie, 4–5 Besuche + 1× Rulantica</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Mit Rulantica‑Interesse ist Gold spannend, weil <b>2 Rulantica‑Tagestickets</b> enthalten sind.</li>
-                <li>Wenn Rulantica kein Thema ist und ihr planbar fahrt, ist Silver oft der Preis‑Leistungs‑Champion.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Versteckte Kosten, die du einplanen solltest</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Anreise & Parken</b> (je nach Option ggf. Zusatzpässe/Tagestickets)</li>
-                <li><b>Essen & Merchandise</b> (Budget festlegen)</li>
-                <li><b>Übernachtung</b> bei Resort‑Trips</li>
-              </ul>
-            </section>
-          </>
-        );
-      case 'resortpass-preise-bedingungen-rabatte':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Wer „Europa‑Park Jahreskarte Preis“ googelt, meint meistens den ResortPass. Hier findest du die Preisstruktur, die wichtigsten Bedingungen – und die Dinge, die in der Kalkulation oft vergessen werden.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">ResortPass Preise (offizielle Übersicht)</h2>
-              <div className="overflow-x-auto my-6">
-                <table className="w-full border-collapse border border-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr><th className="border border-slate-200 p-4 text-left font-bold">Modell</th><th className="border border-slate-200 p-4 text-left font-bold">Kinder (4–11)</th><th className="border border-slate-200 p-4 text-left font-bold">Erwachsene (ab 12)</th><th className="border border-slate-200 p-4 text-left font-bold">Senioren (ab 60)</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">ResortPass Silver</td><td className="border border-slate-200 p-4 text-sm">255 €</td><td className="border border-slate-200 p-4 text-sm">295 €</td><td className="border border-slate-200 p-4 text-sm">255 €</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">ResortPass Gold</td><td className="border border-slate-200 p-4 text-sm">415 €</td><td className="border border-slate-200 p-4 text-sm">475 €</td><td className="border border-slate-200 p-4 text-sm">415 €</td></tr>
-                  </tbody>
+            </div>
+
+            <p>Du willst dir endlich einen Europa-Park ResortPass zulegen, aber die Frage lässt dich nicht los: <strong>Silver oder Gold?</strong> In diesem Artikel zeigen wir dir ganz genau, wo die Unterschiede liegen und für wen sich welche Variante wirklich lohnt.</p>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Der direkte Vergleich</h2>
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse bg-white rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+                    <thead>
+                        <tr className="bg-[#00305e] text-white">
+                            <th className="p-4 text-left">Feature</th>
+                            <th className="p-4 text-center">Silver</th>
+                            <th className="p-4 text-center">Gold</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        <tr><td className="p-4 font-bold">Preis (Erwachsen)</td><td className="p-4 text-center">295 €</td><td className="p-4 text-center">475 €</td></tr>
+                        <tr><td className="p-4 font-bold">Besuchstage</td><td className="p-4 text-center">Über 230</td><td className="p-4 text-center">Alle Tage</td></tr>
+                        <tr><td className="p-4 font-bold">Sperrtage</td><td className="p-4 text-center text-red-500">Ja (~135)</td><td className="p-4 text-center text-green-600">Keine</td></tr>
+                        <tr><td className="p-4 font-bold">Rulantica</td><td className="p-4 text-center">—</td><td className="p-4 text-center text-green-600">2 Tagestickets</td></tr>
+                        <tr><td className="p-4 font-bold">Partnerparks</td><td className="p-4 text-center">Inkl.</td><td className="p-4 text-center">Inkl.</td></tr>
+                    </tbody>
                 </table>
-              </div>
-              <p className="text-xs text-slate-400 mb-6">Stand: 22. Dezember 2025. Verbindlich sind die Angaben im offiziellen Ticketshop/auf den Ticketseiten.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Was ist enthalten – und was nicht?</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Europa‑Park Zutritt:</b> Silver (über 230 definierte Tage), Gold (alle Öffnungstage).</li>
-                <li><b>Rulantica:</b> Nur bei Gold: zwei Tagestickets.</li>
-                <li><b>Partner‑Parks:</b> Beide Modelle: einmalig kostenfrei/ermäßigt.</li>
-              </ul>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Typische Zusatzkosten</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Parken/Anreise</li>
-                <li>Essen & Getränke</li>
-                <li>Übernachtungen im Resort (Hotels/Camping/Silver Lake City)</li>
-                <li>Extras (Events, spezielle Tickets, Souvenirs)</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Preis‑Tipp: So vergleichst du fair</h2>
-              <p className="mb-6">Vergleiche nicht nur den ResortPass‑Preis mit einem einzelnen Tagesticket. Entscheidend ist, <b>an welchen Tagen</b> du sonst fahren würdest (günstige vs. teure Tage) – und ob du Rulantica ohnehin eingeplant hast.</p>
-            </section>
-          </>
+            </div>
+
+            <BlogInjectedCTA />
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Was bedeuten die Sperrtage beim Silver Pass?</h2>
+            <p>Der größte Unterschied sind die <strong>Sperrtage</strong>. Silver ist an besonders beliebten Tagen wie Feiertagen, Brückentagen und in den Ferien oft gesperrt. <strong>Aber:</strong> Bei Hotelübernachtungen gelten diese Sperrtage nicht!</p>
+
+            <div className="grid md:grid-cols-2 gap-6 my-10">
+                <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+                    <h4 className="text-green-600 font-bold text-lg mb-4 flex items-center gap-2"><Check /> Vorteile Silver</h4>
+                    <ul className="list-disc pl-5 space-y-2 text-slate-600 text-sm">
+                        <li>Deutlich günstiger (180 € Ersparnis)</li>
+                        <li>Rechnet sich bereits ab 5 Besuchen</li>
+                        <li>Perfekt für Budget-Bewusste</li>
+                    </ul>
+                </div>
+                <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-sm">
+                    <h4 className="text-indigo-600 font-bold text-lg mb-4 flex items-center gap-2"><Star /> Vorteile Gold</h4>
+                    <ul className="list-disc pl-5 space-y-2 text-slate-600 text-sm">
+                        <li>Volle Flexibilität ohne Sperrtage</li>
+                        <li>2 Rulantica Tickets (Wert ca. 100 €)</li>
+                        <li>Ideal für Familien in Ferienzeiten</li>
+                    </ul>
+                </div>
+            </div>
+
+            <BlogInjectedCTA />
+
+            <div className="bg-blue-50 border-2 border-indigo-200 p-8 rounded-3xl">
+                <h3 className="text-[#00305e] text-2xl font-bold mb-4">🎯 Unser Fazit</h3>
+                <p className="text-slate-700 leading-relaxed mb-6">Für die meisten Besucher ist <strong>Silver die klügere Wahl</strong>: günstiger, rechnet sich schneller und die Sperrtage sind in der Praxis oft verschmerzbar.</p>
+                <p className="text-slate-700 leading-relaxed font-bold">Starte mit Silver! Du kannst bei der nächsten Verlängerung immer noch auf Gold upgraden.</p>
+            </div>
+          </div>
         );
-      case 'resortpass-silver-oeffnungstage-sperrtage':
+      case 'resortpass-preise-2026':
         return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Mit Silver kannst du den Europa‑Park als Tagesgast an über 230 vorab definierten Öffnungstagen besuchen. Die Kunst ist, diese Tage smart zu nutzen – hier zeige ich dir, wie du den Kalender richtig liest und optimal planst.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Warum gibt es Sperrtage?</h2>
-              <p className="mb-6">Silver ist bewusst günstiger und dafür an besonders nachfragestarken Tagen (z. B. viele Ferien/Feiertage) eingeschränkt. Das hilft dem Park, Besucherströme zu steuern – und dir, an ruhigeren Tagen günstiger und entspannter zu besuchen.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">So planst du mit dem Silver‑Kalender</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Wähle 2–3 Wunschmonate</b> und prüfe dort die gültigen Silver‑Tage.</li>
-                <li>Nutze <b>Brückentage</b> und „Randtage“ außerhalb der Ferien.</li>
-                <li>Plane pro Trip einen <b>Backup‑Tag</b> ein, falls du krank wirst oder sich Pläne ändern.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Wichtiger Punkt: „Über 230 Tage“ heißt nicht „jeder Tag“</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">Typische Fehlannahme</strong>
-                <div className="text-sm">Viele denken, Silver sei „fast immer“ gültig. Tatsächlich gilt: Du hast sehr viele Besuchstage – aber eben nicht alle. Deshalb lohnt sich ein kurzer Kalender‑Check, bevor du buchst oder Urlaub einreichst.</div>
-              </div>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Reservierung & Zutritt</h2>
-              <p className="mb-6">Je nach Regelwerk kann für den Besuch eine <b>Reservierung über das ResortPass‑Portal</b> erforderlich sein. Wer auf Nummer sicher gehen will, reserviert frühzeitig – besonders an beliebten Silver‑Tagen.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Pro‑Tipp: Silver + Kurzurlaub</h2>
-              <p className="mb-6">Wenn du eh im Europa‑Park Hotel übernachtest, kannst du deinen Aufenthalt so legen, dass die Parktage in die Silver‑Gültigkeit fallen. Das spart oft deutlich im Vergleich zu einzelnen Tagestickets.</p>
-            </section>
-          </>
+          <div className="space-y-8">
+            <div className="bg-[#5046e5] text-white p-10 rounded-3xl shadow-xl flex flex-col items-center text-center">
+                <span className="bg-white/20 px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest mb-4">Preis-Check 2026</span>
+                <h2 className="text-3xl font-bold mb-6 text-white m-0">Was kostet der Pass wirklich?</h2>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 w-full mt-4">
+                    <div className="bg-white/10 p-4 rounded-xl">
+                        <p className="text-xs opacity-70 uppercase font-bold mb-1">Silver Erw.</p>
+                        <p className="text-2xl font-bold">295 €</p>
+                    </div>
+                    <div className="bg-white/10 p-4 rounded-xl">
+                        <p className="text-xs opacity-70 uppercase font-bold mb-1">Gold Erw.</p>
+                        <p className="text-2xl font-bold">475 €</p>
+                    </div>
+                    <div className="bg-white/10 p-4 rounded-xl">
+                        <p className="text-xs opacity-70 uppercase font-bold mb-1">Silver Kind</p>
+                        <p className="text-2xl font-bold">255 €</p>
+                    </div>
+                    <div className="bg-white/10 p-4 rounded-xl">
+                        <p className="text-xs opacity-70 uppercase font-bold mb-1">Gold Kind</p>
+                        <p className="text-2xl font-bold">415 €</p>
+                    </div>
+                </div>
+            </div>
+
+            <p>Du planst, dir 2026 einen ResortPass zuzulegen? In diesem Artikel erfährst du <strong>alle Preise für 2026</strong> – übersichtlich, transparent und ohne versteckte Kosten.</p>
+
+            <BlogInjectedCTA />
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Optionale Zusatzkosten</h2>
+            <div className="bg-indigo-50 border-2 border-indigo-100 p-8 rounded-3xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-indigo-200"><Clock size={120} opacity={0.1} /></div>
+                <h3 className="text-indigo-900 font-bold text-xl mb-4">🚗 ParkingPass 2026</h3>
+                <p className="text-4xl font-extrabold text-[#00305e] mb-4">39 €</p>
+                <p className="text-indigo-800 text-sm max-w-md m-0">Ermöglicht dir 1 Jahr lang kostenloses Parken. Rechnet sich bereits ab dem <strong>4. Besuch</strong>, da Parken sonst 10 € pro Tag kostet.</p>
+            </div>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Preisentwicklung & Fazit</h2>
+            <div className="bg-green-50 border-l-4 border-green-500 p-6 rounded-r-xl">
+                <p className="text-slate-700 m-0"><strong>Gute Nachrichten:</strong> Die Preise für 2026 bleiben nach dem Preissprung in 2025 stabil! Das ist eine tolle Nachricht für alle Europa-Park Fans.</p>
+            </div>
+
+            <BlogInjectedCTA />
+          </div>
         );
-      case 'resortpass-silver-vs-gold-unterschiede':
+      case 'resortpass-amortisation-rechner':
         return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Silver ist der günstige Einstieg mit fest definierten Besuchstagen. Gold ist die flexible Premium‑Variante mit Zugang an allen Öffnungstagen und zwei Rulantica‑Tagestickets. Hier kommt der Vergleich, der bei der Entscheidung wirklich hilft.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Die Unterschiede auf einen Blick</h2>
-              <div className="overflow-x-auto my-6">
-                <table className="w-full border-collapse border border-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr><th className="border border-slate-200 p-4 text-left font-bold">Kriterium</th><th className="border border-slate-200 p-4 text-left font-bold">Silver</th><th className="border border-slate-200 p-4 text-left font-bold">Gold</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Zutritt als Tagesgast</td><td className="border border-slate-200 p-4 text-sm">über 230 definierte Öffnungstage</td><td className="border border-slate-200 p-4 text-sm">alle Öffnungstage</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Spontan‑Trips</td><td className="border border-slate-200 p-4 text-sm">eingeschränkt (Kalender beachten)</td><td className="border border-slate-200 p-4 text-sm">sehr gut (max. flexibel)</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Rulantica</td><td className="border border-slate-200 p-4 text-sm">nicht enthalten</td><td className="border border-slate-200 p-4 text-sm">2 Tagestickets inklusive</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Partner‑Parks</td><td className="border border-slate-200 p-4 text-sm">inklusive</td><td className="border border-slate-200 p-4 text-sm">inklusive</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Zielgruppe</td><td className="border border-slate-200 p-4 text-sm">Planer, Off‑Season‑Fans</td><td className="border border-slate-200 p-4 text-sm">Spontane, Peak‑Season, Resort‑Kombi</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Für wen lohnt sich ResortPass Silver?</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Du fährst <b>mehrmals</b>, aber hauptsächlich in ruhigeren Monaten.</li>
-                <li>Du kannst deine Besuche nach dem <b>Silver‑Kalender</b> planen.</li>
-                <li>Du brauchst Rulantica nicht zwingend in der Jahreskarte.</li>
-              </ul>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Für wen lohnt sich ResortPass Gold?</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Du willst <b>maximale Flexibilität</b> (auch Ferien/Feiertage).</li>
-                <li>Du willst Europa‑Park & Rulantica kombinieren (2 Rulantica‑Tagestickets sind enthalten).</li>
-                <li>Du machst häufiger <b>spontane Tagestrips</b> oder Kurzurlaube im Resort.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Entscheidungshilfe in 3 Fragen</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">Quick‑Check</strong>
-                <ol className="space-y-2 list-decimal pl-6 text-sm">
-                  <li>Willst du in Ferien/Top‑Tagen fahren? → eher <b>Gold</b>.</li>
-                  <li>Planst du 3+ Besuche, hauptsächlich außerhalb der Peaks? → oft <b>Silver</b>.</li>
-                  <li>Willst du Rulantica fix dabei haben? → <b>Gold</b>.</li>
-                </ol>
-              </div>
-            </section>
-          </>
-        );
-      case 'resortpass-tipps-tricks-vielbesucher':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Du hast (oder willst) einen ResortPass? Dann hol mit diesen Tipps mehr aus jedem Besuch raus – weniger Wartezeit, bessere Planung, mehr Erlebnisse pro Tag.</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Planung & Timing</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li><b>Früh starten</b>: Die erste Stunde ist oft die ruhigste.</li>
-                <li><b>Randzeiten nutzen</b>: Mittag/Spätnachmittag sind ideal für Shows oder Essen.</li>
-                <li><b>Event‑Tage bewusst wählen</b>: Manche Tage sind voller, aber auch spektakulärer.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Wartezeiten smart reduzieren</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Beginne mit Top‑Attraktionen in entgegengesetzter Laufrichtung.</li>
-                <li>Nutze ruhigere Bereiche als „Puffer“, wenn ein Bereich überfüllt ist.</li>
-                <li>Plane 1–2 „Fixpunkte“ (Must‑dos) und bleib ansonsten flexibel.</li>
-              </ul>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Silver‑Spezial: Maximiere deine gültigen Tage</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Lege Urlaub auf Silver‑Tage (Kalender checken).</li>
-                <li>Fahre bewusst an Wochentagen außerhalb der Ferien.</li>
-                <li>Wenn möglich: mehrere Kurzbesuche statt einen Marathon‑Tag.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Gold‑Spezial: Rulantica clever einbauen</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Setze einen Rulantica‑Tag als „Erholungstag“ zwischen zwei Parktagen.</li>
-                <li>Reserviere früh, wenn du an Wochenenden willst.</li>
-              </ul>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Budget‑Tricks</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Setze ein fixes Essensbudget pro Besuch.</li>
-                <li>Souvenir‑Regel: nur 1 „Lieblingsstück“ pro Saison.</li>
-              </ul>
-            </section>
-          </>
-        );
-      case 'resortpass-was-ist-das':
-        return (
-          <>
-            <p className="lead text-xl text-slate-600 mb-8">Der ResortPass ist die „Jahreskarte“ des Europa‑Park Erlebnis‑Resorts. Hier bekommst du einen schnellen, ehrlichen Überblick über Modelle, Vorteile und typische Stolperfallen (Reservierung, Gültigkeitstage, Verfügbarkeit).</p>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Das Wichtigste in 60 Sekunden</h2>
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 mb-6">
-                <strong className="block mb-2">Kurzfassung</strong>
-                <ul className="space-y-2 list-disc pl-6 text-sm">
-                  <li><b>Silver:</b> Zutritt als Tagesgast an <b>über 230 vorab definierten Öffnungstagen</b>.</li>
-                  <li><b>Gold:</b> <b>uneingeschränkter Zutritt</b> zum Europa‑Park an allen Öffnungstagen + <b>2 Tagestickets für Rulantica</b>.</li>
-                  <li>Beide Modelle: <b>Partner‑Freizeitparks</b> (einmalig kostenfrei/ermäßigt), Aktionen bei Events und weitere Benefits.</li>
-                  <li>Für Europa‑Park und (bei Gold auch Rulantica) kann eine <b>Reservierung über das ResortPass‑Portal</b> erforderlich sein.</li>
-                </ul>
-              </div>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">ResortPass Silver und Gold: die Grundidee</h2>
-              <p className="mb-6">Der ResortPass richtet sich an Menschen, die den Europa‑Park öfter besuchen wollen als 1–2 Mal pro Jahr. Statt jedes Mal ein Tagesticket zu kaufen, erhältst du für <b>ein Jahr Laufzeit</b> einen wiederkehrenden Zutritt – beim Silver mit fixen Besuchstagen, beim Gold mit voller Flexibilität.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Welche Vorteile sind typischerweise enthalten?</h2>
-              <div className="overflow-x-auto my-6">
-                <table className="w-full border-collapse border border-slate-200">
-                  <thead className="bg-slate-50">
-                    <tr><th className="border border-slate-200 p-4 text-left font-bold">Leistung</th><th className="border border-slate-200 p-4 text-left font-bold">Silver</th><th className="border border-slate-200 p-4 text-left font-bold">Gold</th></tr>
-                  </thead>
-                  <tbody>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Europa‑Park als Tagesgast</td><td className="border border-slate-200 p-4 text-sm">über 230 definierte Tage</td><td className="border border-slate-200 p-4 text-sm">alle Öffnungstage</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Europa‑Park als Übernachtungsgast</td><td className="border border-slate-200 p-4 text-sm">Zutritt möglich</td><td className="border border-slate-200 p-4 text-sm">Zutritt möglich</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Rulantica</td><td className="border border-slate-200 p-4 text-sm">nicht enthalten</td><td className="border border-slate-200 p-4 text-sm">2 Tagestickets</td></tr>
-                    <tr><td className="border border-slate-200 p-4 text-sm font-bold">Partner‑Parks</td><td className="border border-slate-200 p-4 text-sm">inkl.</td><td className="border border-slate-200 p-4 text-sm">inkl.</td></tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-slate-400 mb-6">Quelle: offizielle ResortPass‑Übersichten & Ticketshop‑Beschreibungen.</p>
-            </section>
-            <BlogCTA onSignup={handleSignup} />
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Warum „ResortPassAlarm“ sinnvoll ist</h2>
-              <p className="mb-6">ResortPässe sind häufig <b>kontingentiert</b> und zeitweise nicht verfügbar. Wenn du flexibel sein willst, hilft ein Alarm‑Service: Du wirst informiert, sobald ein Verkauf wieder möglich ist – ohne täglich selbst zu prüfen.</p>
-            </section>
-            <section>
-              <h2 className="text-2xl font-bold text-[#00305e] mt-8 mb-4">Praxis‑Tipp: Vor dem Kauf klären</h2>
-              <ul className="space-y-2 list-disc pl-6 mb-6">
-                <li>Wie oft willst du realistisch fahren – und in welchen Monaten?</li>
-                <li>Brauchst du Rulantica (dann ist Gold oft die „ein Ticket für alles“-Option)?</li>
-                <li>Reist du eher spontan (Gold) oder planbar (Silver)?</li>
-              </ul>
-            </section>
-          </>
+          <div className="space-y-8">
+            <div className="bg-slate-900 text-white rounded-3xl p-10 shadow-2xl">
+                <div className="flex flex-wrap justify-between gap-6">
+                    <div className="flex-1 min-w-[200px]">
+                        <h2 className="text-2xl font-bold mb-4 m-0 text-white">Wann rechnet sich der Pass?</h2>
+                        <p className="text-slate-400 mb-0">Rechne es hier direkt durch. Wir nutzen einen durchschnittlichen Ticketpreis von 68 € pro Tag.</p>
+                    </div>
+                    <div className="flex gap-4 items-center">
+                        <div className="text-center bg-indigo-600 p-4 rounded-2xl w-32">
+                            <p className="text-[10px] uppercase font-bold mb-1 opacity-70">Silver</p>
+                            <p className="text-xl font-bold">5x</p>
+                        </div>
+                        <div className="text-center bg-amber-600 p-4 rounded-2xl w-32">
+                            <p className="text-[10px] uppercase font-bold mb-1 opacity-70">Gold</p>
+                            <p className="text-xl font-bold">6-7x</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <p>295 € oder sogar 475 € sind eine Investition. Hier rechnen wir gemeinsam durch, ab wann sich der Pass wirklich für dich amortisiert.</p>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Die Grundrechnung</h2>
+            <div className="grid md:grid-cols-2 gap-8 my-10">
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm text-center">
+                    <h3 className="text-[#00305e] font-bold text-xl mb-4">💰 Silver Amortisation</h3>
+                    <div className="text-4xl font-black text-indigo-600 mb-2">5 Besuche</div>
+                    <p className="text-slate-500 text-sm m-0">295 € ÷ 68 € = 4,3 Tage</p>
+                </div>
+                <div className="bg-white border border-slate-200 p-8 rounded-3xl shadow-sm text-center">
+                    <h3 className="text-[#00305e] font-bold text-xl mb-4">💰 Gold Amortisation</h3>
+                    <div className="text-4xl font-black text-amber-600 mb-2">6 Besuche</div>
+                    <p className="text-slate-500 text-sm m-0">Mit Einberechnung der Rulantica Tickets!</p>
+                </div>
+            </div>
+
+            <BlogInjectedCTA />
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Versteckte Vorteile</h2>
+            <p>Die reine Ticket-Rechnung ist nicht alles. Vergiss nicht die <strong>Partnerpark-Besuche</strong>. Je einmal kostenlos nach Efteling, Liseberg oder Port Aventura spart dir locker noch einmal 150-200 € pro Jahr!</p>
+
+            <h2 className="text-2xl font-bold text-[#00305e] pt-4">Unsere Kaufempfehlung</h2>
+            <div className="bg-indigo-900 text-white p-10 rounded-3xl shadow-xl text-center">
+                <div className="inline-block bg-[#ffcc00] text-[#00305e] p-3 rounded-2xl mb-6">
+                    <Info size={32} />
+                </div>
+                <h3 className="text-2xl font-bold mb-4 m-0 text-white">Der Pass lohnt sich für fast jeden Stammgast!</h3>
+                <p className="text-indigo-200 mb-8 max-w-2xl mx-auto">Wenn du 5 oder mehr Besuche pro Jahr planst, ist Silver eine kluge Investition. Für Familien in Ferienzeiten ist Gold die bessere Wahl.</p>
+                <BlogInjectedCTA />
+            </div>
+          </div>
         );
       default:
         return null;
@@ -479,12 +303,12 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
           <div className="mb-12">
             <button 
               onClick={() => navigate('blog')}
-              className="flex items-center text-slate-500 hover:text-[#00305e] font-medium transition-colors mb-6"
+              className="flex items-center text-slate-500 hover:text-indigo-600 font-medium transition-colors mb-6"
             >
               <ArrowLeft size={16} className="mr-2" /> Zurück zum Blog
             </button>
             <div className="flex items-center gap-2 mb-4">
-              <span className="bg-blue-100 text-[#00305e] text-xs font-bold uppercase px-3 py-1 rounded-full">
+              <span className="bg-indigo-100 text-indigo-600 text-xs font-bold uppercase px-3 py-1 rounded-full">
                 {postInfo.category}
               </span>
               <span className="text-slate-400 text-sm flex items-center gap-1">
@@ -499,26 +323,31 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                  {postInfo.icon}
                </div>
                <div>
-                  <p className="text-sm font-bold text-slate-900"><NameAsImage /></p>
-                  <p className="text-xs text-slate-400">ResortPass Experte</p>
+                  <p className="text-sm font-bold text-slate-900">ResortPass-Experten</p>
+                  <p className="text-xs text-slate-400">Aktualisiert für die Saison 2026</p>
                </div>
                <div className="ml-auto flex gap-2">
-                 <button className="p-2 text-slate-400 hover:text-blue-500 transition"><Share2 size={20} /></button>
+                 <button className="p-2 text-slate-400 hover:text-indigo-500 transition"><Share2 size={20} /></button>
                </div>
             </div>
           </div>
 
           {/* Content */}
-          <div className="prose prose-slate prose-lg max-w-none prose-headings:text-[#00305e] prose-headings:font-bold prose-a:text-blue-600 prose-strong:text-slate-900">
+          <div className="prose prose-slate prose-lg max-w-none prose-headings:text-[#00305e] prose-headings:font-bold prose-a:text-indigo-600 prose-strong:text-slate-900 leading-relaxed">
             {renderContent()}
           </div>
 
           {/* Footer Info */}
-          <div className="mt-12 p-8 bg-white rounded-2xl border border-slate-200 shadow-sm">
-            <strong className="block mb-2 text-slate-900">Transparenz‑Hinweis</strong>
-            <p className="text-sm text-slate-500 m-0 leading-relaxed">
-              Dieser Artikel fasst öffentlich verfügbare Informationen zusammen (z. B. offizielle ResortPass‑Seiten & FAQ). Für verbindliche Details gelten die Angaben des Europa‑Park/Mack International Ticketshops. ResortPassAlarm ist ein unabhängiger Service.
-            </p>
+          <div className="mt-16 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-start gap-4">
+                <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={24} />
+                <div>
+                    <strong className="block mb-2 text-slate-900">Transparenz‑Hinweis</strong>
+                    <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                    Dieser Artikel fasst öffentlich verfügbare Informationen zusammen. Für verbindliche Details gelten ausschließlich die Angaben des Europa‑Park / Mack International Ticketshops. ResortPassAlarm ist ein unabhängiger Service.
+                    </p>
+                </div>
+            </div>
           </div>
 
           {/* More Posts */}
@@ -528,15 +357,15 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                 {BLOG_POSTS.filter(p => p.slug !== slug).slice(0, 2).map(p => (
                   <div 
                     key={p.slug} 
-                    className="flex gap-4 cursor-pointer group bg-white p-4 rounded-xl border border-slate-100 hover:shadow-md transition-all"
+                    className="flex gap-4 cursor-pointer group bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-all"
                     onClick={() => { navigate(`blog-post:${p.slug}`); window.scrollTo(0,0); }}
                   >
-                    <div className="w-16 h-16 rounded-lg bg-slate-100 flex items-center justify-center shrink-0 text-[#00305e]">
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-[#00305e]">
                       {p.icon}
                     </div>
                     <div>
-                      <h4 className="font-bold text-slate-900 leading-snug group-hover:text-[#00305e] transition-colors line-clamp-2">{p.title}</h4>
-                      <p className="text-xs text-slate-400 mt-2 flex items-center gap-1 font-bold uppercase tracking-wider">Lesen <ChevronRight size={12}/></p>
+                      <h4 className="font-bold text-slate-900 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-2">{p.title}</h4>
+                      <p className="text-xs text-slate-400 mt-2 flex items-center gap-1 font-bold uppercase tracking-wider">Guide lesen <ChevronRight size={12}/></p>
                     </div>
                   </div>
                 ))}
