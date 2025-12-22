@@ -13,6 +13,7 @@ import { UserRole } from './types';
 import { supabase, getEnv } from './lib/supabase';
 import { CheckCircle, Loader2 } from 'lucide-react';
 import { getSystemSettings } from './services/backendService';
+import { CookieBanner } from './components/CookieBanner';
 
 // Simple mock Login screen with Forgot Password flow
 const LoginScreen: React.FC<{ 
@@ -605,6 +606,7 @@ const App: React.FC = () => {
       <main>
         {renderContent()}
       </main>
+      <CookieBanner navigate={navigate} />
     </div>
   );
 };

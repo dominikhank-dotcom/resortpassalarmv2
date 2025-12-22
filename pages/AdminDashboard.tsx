@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
@@ -154,15 +153,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleDatePresetChange = (preset: string) => {
     setDatePreset(preset);
-    const end = new Date();
+    // Fixed: Declared 'end' with 'let' to allow reassignment in different preset branches.
+    let end = new Date();
     let start = new Date();
     const now = new Date();
     
     if (preset === 'today') {
         start = new Date();
+        end = new Date();
     } else if (preset === 'yesterday') {
-        start.setDate(start.getDate() - 1);
-        end.setDate(end.getDate() - 1);
+        const d = new Date();
+        d.setDate(d.getDate() - 1);
+        start = new Date(d);
+        end = new Date(d);
     } else if (preset === 'last7') {
         start.setDate(end.getDate() - 7);
     } else if (preset === 'last28') {
@@ -208,7 +211,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       }
   };
 
-  // ... (Existing handlers for customers, partners, etc. remain the same) ...
   const handleOpenCustomerDetail = async (userId: string) => {
       setIsDetailLoading(true);
       setSelectedCustomer(null);
@@ -530,7 +532,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
           )}
 
-          {/* ... CUSTOMERS & PARTNERS TABS remain the same ... */}
+          {/* ... CUSTOMERS & PARTNERS TABS ... */}
           {activeTab === 'customers' && (
               <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -702,7 +704,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      </div>
                  </div>
 
-                 {/* ... (Existing Email Detail View remains same) ... */}
                  <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col overflow-hidden">
                      {selectedTemplate ? (
                          <>
@@ -843,10 +844,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       </div>
 
-      {/* ... CUSTOMER DETAIL MODAL ... (same as before) */}
+      {/* CUSTOMER DETAIL MODAL */}
       {selectedCustomer && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-              {/* Content from previous version goes here, no changes needed for this block in this iteration */}
               <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <div className="p-6 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
                       <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">

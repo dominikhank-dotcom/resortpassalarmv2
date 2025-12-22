@@ -25,9 +25,12 @@ const AddressBlock = () => (
     </div>
     
     <div className="text-sm border-t border-slate-200 pt-3">
-        <div className="flex flex-wrap items-center gap-1 mb-2">
+        <div className="flex flex-wrap items-center gap-1">
             <span>ResortPassAlarm ist ein Projekt von:</span>
             <NameAsImage />
+        </div>
+        <div className="mt-2 text-slate-500 font-medium">
+            USt-ID: DE224296401
         </div>
     </div>
   </div>
