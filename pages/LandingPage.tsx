@@ -87,14 +87,14 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
         <div className="max-w-4xl mx-auto px-4 flex flex-col items-center">
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 mb-3">
             <div className="flex items-center gap-2 text-white font-medium">
-              <span className={`w-2 h-2 rounded-full ${status.gold === 'available' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
+              <span className={`w-2 h-2 rounded-full ${status.gold === 'available' ? 'bg-green-50 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
               <span>ResortPass Gold:</span>
               <span className={status.gold === 'available' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
                 {status.gold === 'available' ? 'VERFÜGBAR' : 'AUSVERKAUFT'}
               </span>
             </div>
             <div className="flex items-center gap-2 text-white font-medium">
-              <span className={`w-2 h-2 rounded-full ${status.silver === 'available' ? 'bg-green-500 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
+              <span className={`w-2 h-2 rounded-full ${status.silver === 'available' ? 'bg-green-50 shadow-[0_0_8px_#22c55e]' : 'bg-red-500'}`}></span>
               <span>ResortPass Silver:</span>
               <span className={status.silver === 'available' ? 'text-green-500 font-bold' : 'text-red-500 font-bold'}>
                 {status.silver === 'available' ? 'VERFÜGBAR' : 'AUSVERKAUFT'}
@@ -152,45 +152,52 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
 
       {/* Page 2/3: Pricing / Premium Service */}
       <section className="py-20 px-4 bg-white border-t border-slate-100">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-5xl mx-auto text-center">
           <span className="text-[#5046e5] font-bold text-sm tracking-widest uppercase mb-4 block">PREMIUM SERVICE</span>
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Deine Chance auf eine Jahreskarte</h2>
           <p className="text-slate-500 text-lg mb-16 max-w-2xl mx-auto">
             Egal ob du den ResortPass Gold (inkl. Parken & Wasserwelt) oder den ResortPass Silver suchst – wir sagen dir Bescheid.
           </p>
 
-          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden text-left max-w-2xl mx-auto">
+          <div className="bg-white rounded-[2.5rem] shadow-2xl border border-slate-100 overflow-hidden text-left max-w-4xl mx-auto">
             <div className="p-8 md:p-12">
               <h3 className="text-2xl font-bold text-slate-900 mb-6">ResortPass Alarm</h3>
-              <p className="text-slate-600 mb-10 leading-relaxed">
-                Verliere keine Zeit mit ständigem Nachsehen auf der Ticket-Seite. Unser System erledigt das für dich und verschafft dir den entscheidenden Vorteil. Rund um die Uhr, 24h am Tag!
-              </p>
               
-              <div className="mb-10">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-5xl font-extrabold text-slate-900">{price.toFixed(2).replace('.', ',')} €</span>
-                  <span className="text-slate-500 text-xl">/ Monat</span>
-                </div>
-                <p className="text-slate-400 text-sm mt-2 italic">Inkl. MwSt. Monatlich kündbar.</p>
-              </div>
-
-              <div className="space-y-4 mb-12">
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">ALLES INKLUSIVE</p>
-                {[
-                  'Überwachung: Gold & Silver',
-                  'Prüfung in kurzen Abständen',
-                  'Sofortige E-Mail Alert',
-                  'Sofortige SMS Alert',
-                  'Direktlink zum Warenkorb',
-                  'Jederzeit kündbar'
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <div className="bg-green-100 rounded-full p-0.5">
-                      <Check size={16} className="text-green-600" />
+              <div className="flex flex-col md:flex-row gap-10 md:gap-16">
+                <div className="flex-1">
+                  <p className="text-slate-600 mb-10 leading-relaxed">
+                    Verliere keine Zeit mit ständigem Nachsehen auf der Ticket-Seite. Unser System erledigt das für dich und verschafft dir den entscheidenden Vorteil. Rund um die Uhr, 24h am Tag!
+                  </p>
+                  
+                  <div className="mb-10">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-5xl font-extrabold text-slate-900">{price.toFixed(2).replace('.', ',')} €</span>
+                      <span className="text-slate-500 text-xl">/ Monat</span>
                     </div>
-                    <span className="text-slate-700 font-medium">{item}</span>
+                    <p className="text-slate-400 text-sm mt-2 italic">Inkl. MwSt. Monatlich kündbar.</p>
                   </div>
-                ))}
+                </div>
+
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">ALLES INKLUSIVE</p>
+                  <div className="space-y-4 mb-10">
+                    {[
+                      'Überwachung: Gold & Silver',
+                      'Prüfung in kurzen Abständen',
+                      'Sofortige E-Mail Alert',
+                      'Sofortige SMS Alert',
+                      'Direktlink zum Warenkorb',
+                      'Jederzeit kündbar'
+                    ].map((item, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <div className="bg-green-100 rounded-full p-0.5">
+                          <Check size={16} className="text-green-600" />
+                        </div>
+                        <span className="text-slate-700 font-medium">{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button 
@@ -211,7 +218,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
         
         <div className="max-w-4xl mx-auto relative z-10">
           <h2 className="text-[#ffcc00] text-3xl md:text-4xl font-bold text-center mb-16">
-            Nur kleine Wellen
+            Nur begrenzt verfügbar
           </h2>
 
           <div className="grid md:grid-cols-2 gap-12 text-white">
@@ -220,7 +227,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
                 <span className="text-[#ffcc00]">⚡</span> Warum du schnell sein musst
               </h3>
               <p className="text-slate-300 leading-relaxed text-lg">
-                Der Europa-Park gibt ResortPässe oft unangekündigt und nur in sehr kleinen Kontingenten frei. Oft sind diese "Wellen" nach wenigen Minuten wieder vorbei.
+                Der Europa-Park gibt ResortPässe oft in nur kleinen Kontingenten frei. Oft sind die Jahreskarten dann nach kurzer Zeit wieder ausverkauft.
               </p>
             </div>
             <div className="space-y-6">
@@ -228,7 +235,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
                 <span className="text-[#ffcc00]">🕒</span> Die 10-Minuten-Regel
               </h3>
               <p className="text-slate-300 leading-relaxed text-lg">
-                Wer nicht innerhalb von 10 Minuten nach Freischaltung bucht, geht meistens leer aus. Unser Tool verschafft dir den entscheidenden Zeitvorteil durch sofortige Benachrichtigung.
+                Beste Chancen haben alle, die in den ersten 10 Minuten eine Jahreskarte ergattern können! Unser Tool verschafft dir den entscheidenden Zeitvorteil durch sofortige Benachrichtigung.
               </p>
             </div>
           </div>
@@ -246,13 +253,13 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
 
       {/* Page 4/5: FAQ */}
       <section className="py-24 px-4 bg-[#f8fafc]">
-        <div className="max-w-3xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Häufige Fragen</h2>
             <p className="text-slate-500 text-lg">Alles, was du über den ResortPassAlarm wissen musst.</p>
           </div>
 
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
               { 
                 q: "Was bringt mir ResortPassAlarm?", 
