@@ -7,80 +7,80 @@ import { Footer } from '../components/Footer';
 export const BLOG_POSTS = [
   {
     slug: 'resortpass-erfahrungen-1-jahr',
-    title: 'ResortPass Erfahrungen: Mein Fazit nach 1 Jahr',
-    excerpt: 'Wie fühlt sich der ResortPass im Alltag an? Ein ehrlicher Erfahrungsbericht mit Pro/Contra‑Liste, Kosten‑Check und Tipps.',
+    title: 'ResortPass Erfahrungen: mein Fazit nach 1 Jahr',
+    excerpt: 'Wie fühlt sich der ResortPass im Alltag an? Erfahrungsbericht‑Vorlage mit ehrlicher Pro/Contra‑Liste, Kosten‑Check und Tipps.',
     date: '22. Dezember 2025',
     category: 'Erfahrungsberichte',
     icon: <Star size={24} />
   },
   {
     slug: 'resortpass-faq-haeufige-fragen',
-    title: 'ResortPass FAQ: Reservierung, Upgrade, Partner‑Parks',
-    excerpt: 'Die wichtigsten Fragen zum Europa‑Park ResortPass kompakt beantwortet: Partner‑Parks, Rulantica (Gold), Karte/Print und mehr.',
+    title: 'ResortPass FAQ: Reservierung, Upgrade, Karte, Partner‑Parks',
+    excerpt: 'Die wichtigsten Fragen zum Europa‑Park ResortPass: Reservierung, Partner‑Parks, Rulantica (Gold), Karte/Print, Bedingungen und typische Probleme.',
     date: '22. Dezember 2025',
     category: 'Wissen',
     icon: <HelpCircle size={24} />
   },
   {
     slug: 'resortpass-gold-vorteile-rulantica',
-    title: 'ResortPass Gold Vorteile: Rulantica, Flexibilität & Extras',
-    excerpt: 'Alle Vorteile des ResortPass Gold: Zutritt an allen Öffnungstagen, 2× Rulantica, Partner‑Parks und exklusive Aktionen.',
+    title: 'ResortPass Gold Vorteile: Rulantica‑Tickets, Flexibilität & Extras',
+    excerpt: 'Alle Vorteile des Europa‑Park ResortPass Gold: Zutritt an allen Öffnungstagen, 2× Rulantica, Partner‑Parks, Aktionen – plus Tipps zur Nutzung.',
     date: '22. Dezember 2025',
     category: 'Vorteile',
     icon: <Star size={24} className="text-yellow-500" />
   },
   {
     slug: 'resortpass-kaufen-verfuegbarkeit-tipps',
-    title: 'ResortPass kaufen: So erhöhst du deine Chance',
-    excerpt: 'Tipps zu Verfügbarkeit, Kontingenten und Verkaufsstart. Wie du dich vorbereitest, um beim nächsten Fenster schnell genug zu sein.',
+    title: 'ResortPass kaufen: Verfügbarkeit, Verkaufsstart, Tipps',
+    excerpt: 'Wie und wann kann man ResortPass Silver/Gold kaufen? Tipps zu Verfügbarkeit, Kontingenten, Verkaufsstart und Account‑Vorbereitung.',
     date: '22. Dezember 2025',
     category: 'Ratgeber',
     icon: <Target size={24} />
   },
   {
     slug: 'resortpass-lohnt-sich-rechner',
-    title: 'Lohnt sich der ResortPass? Rechner & Beispiele',
-    excerpt: 'Ab wann lohnt sich die Jahreskarte? Rechenbeispiele für Familien, Paare und Solo‑Besucher im Vergleich Silver vs. Gold.',
+    title: 'Lohnt sich der Europa‑Park ResortPass? Rechner & Beispiele',
+    excerpt: 'Ab wann lohnt sich der ResortPass? Rechenbeispiele für Familien, Paare und Solo‑Besucher: Silver vs. Gold, Break‑Even und Spartipps.',
     date: '22. Dezember 2025',
     category: 'Finanzen',
     icon: <Calculator size={24} />
   },
   {
     slug: 'resortpass-preise-bedingungen-rabatte',
-    title: 'ResortPass Preise & Bedingungen (Stand 2025)',
-    excerpt: 'Aktuelle ResortPass‑Preise für alle Altersgruppen, wichtige Bedingungen und typische Zusatzkosten kompakt zusammengefasst.',
+    title: 'ResortPass Preise: Silver & Gold, Altersgruppen, Bedingungen',
+    excerpt: 'Aktuelle ResortPass‑Preise für Kinder/Erwachsene/Senioren, wichtige Bedingungen und typische Zusatzkosten – kompakt für deine Entscheidung.',
     date: '22. Dezember 2025',
     category: 'Wissen',
     icon: <FileText size={24} />
   },
   {
     slug: 'resortpass-silver-oeffnungstage-sperrtage',
-    title: 'ResortPass Silver: Öffnungstage & Sperrtage erklärt',
-    excerpt: 'Welche Tage sind mit Silver gültig? So liest du den Kalender, planst Ferien und vermeidest typische Fehlannahmen.',
+    title: 'ResortPass Silver: Öffnungstage & Sperrtage verstehen',
+    excerpt: 'Welche Tage sind mit ResortPass Silver gültig? So liest du den Kalender, planst Ferien/Brückentage und vermeidest typische Fehlannahmen.',
     date: '22. Dezember 2025',
     category: 'Planung',
     icon: <Settings size={24} />
   },
   {
     slug: 'resortpass-silver-vs-gold-unterschiede',
-    title: 'ResortPass Silver vs. Gold: Welcher passt zu dir?',
-    excerpt: 'Der große Vergleich der Europa‑Park ResortPass‑Modelle: Zutrittstage, Rulantica‑Tickets, Benefits und unsere Empfehlung.',
+    title: 'ResortPass Silver vs. Gold: Unterschiede, Vorteile, Empfehlung',
+    excerpt: 'Silver oder Gold? Vergleich der Europa‑Park ResortPass‑Modelle: Zutrittstage, Rulantica‑Tickets, Benefits, Reservierung & Zielgruppen.',
     date: '22. Dezember 2025',
     category: 'Vergleich',
     icon: <Layers size={24} />
   },
   {
     slug: 'resortpass-tipps-tricks-vielbesucher',
-    title: '15 Tipps & Tricks für ResortPass‑Besitzer',
-    excerpt: 'Hol mehr aus deinem ResortPass raus: Strategien gegen Wartezeiten, App‑Tricks, Budget‑Tipps und optimale Besuchszeiten.',
+    title: 'Europa‑Park Jahreskarte: 15 Tipps für ResortPass‑Besitzer',
+    excerpt: 'Die besten Tipps für ResortPass‑Besitzer: Besuchszeiten, Wartezeit‑Strategien, App‑Nutzung, Event‑Tage, Essen und Rulantica‑Kombi.',
     date: '22. Dezember 2025',
     category: 'Ratgeber',
     icon: <Info size={24} />
   },
   {
     slug: 'resortpass-was-ist-das',
-    title: 'Europa‑Park ResortPass: Der ultimative Guide',
-    excerpt: 'Was ist der ResortPass? Erklärung zu Silver & Gold, Laufzeit, Zutrittstage, Reservierung und den wichtigsten Regeln.',
+    title: 'Europa‑Park ResortPass erklärt: Silver, Gold, Vorteile & Regeln',
+    excerpt: 'Was ist der Europa‑Park ResortPass? Erklärung zu Silver & Gold, Laufzeit, Zutrittstage, Reservierung und wichtigsten Vorteilen.',
     date: '22. Dezember 2025',
     category: 'Wissen',
     icon: <BookOpen size={24} />
