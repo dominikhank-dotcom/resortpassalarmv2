@@ -270,99 +270,69 @@ const LoginScreen: React.FC<{
 
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
-  const [userName, setUserName] = useState<string>(''); // Added state for User Name
+  const [userName, setUserName] = useState<string>(''); 
   
-  // LAZY INITIALIZATION of Current Page
-  const [currentPage, setCurrentPage] = useState(() => {
-     const path = window.location.pathname.replace(/\/$/, ""); 
-     
-     if (path === '/dashboard') return 'dashboard';
-     if (path === '/affiliate') return 'affiliate';
-     if (path === '/affiliate-login') return 'affiliate-login';
-     if (path === '/admin-dashboard') return 'admin-dashboard';
-     if (path === '/user-signup') return 'user-signup';
-     if (path === '/affiliate-info') return 'affiliate-info';
-     if (path === '/blog') return 'blog';
-     if (path.startsWith('/blog/')) return `blog-post:${path.split('/blog/')[1]}`;
-     
-     // Legal Pages
-     if (path === '/imprint') return 'imprint';
-     if (path === '/privacy') return 'privacy';
-     if (path === '/terms') return 'terms';
-     if (path === '/revocation') return 'revocation';
+  // PAGE RESOLVER HELPER
+  const resolvePageFromPath = (path: string) => {
+    const cleanPath = path.replace(/\/$/, ""); 
+    if (cleanPath === '/dashboard') return 'dashboard';
+    if (cleanPath === '/affiliate') return 'affiliate';
+    if (cleanPath === '/affiliate-login') return 'affiliate-login';
+    if (cleanPath === '/admin-dashboard') return 'admin-dashboard';
+    if (cleanPath === '/user-signup') return 'user-signup';
+    if (cleanPath === '/affiliate-info') return 'affiliate-info';
+    if (cleanPath === '/blog') return 'blog';
+    if (cleanPath.startsWith('/blog/')) return `blog-post:${cleanPath.split('/blog/')[1]}`;
+    if (cleanPath === '/imprint') return 'imprint';
+    if (cleanPath === '/privacy') return 'privacy';
+    if (cleanPath === '/terms') return 'terms';
+    if (cleanPath === '/revocation') return 'revocation';
+    return 'landing';
+  };
 
-     return 'landing';
-  });
+  const [currentPage, setCurrentPage] = useState(() => resolvePageFromPath(window.location.pathname));
   
   const [loginNotification, setLoginNotification] = useState<string | null>(null);
-  const [isAppInitializing, setIsAppInitializing] = useState(true); // Global Loading State
+  const [isAppInitializing, setIsAppInitializing] = useState(true); 
   
-  // Use ref to access current page inside closures/effects if needed
   const currentPageRef = useRef(currentPage);
   useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
   
-  // Global Commission & Price State
   const [globalCommissionRate, setGlobalCommissionRate] = useState(50);
   const [prices, setPrices] = useState({ new: 1.99, existing: 1.99 });
-
-  // Global Product URLs State
   const [productUrls, setProductUrls] = useState({
     gold: "https://tickets.mackinternational.de/de/ticket/resortpass-gold",
     silver: "https://tickets.mackinternational.de/de/ticket/resortpass-silver"
   });
 
-  // Handle Browser Back/Forward Buttons
   useEffect(() => {
       const handlePopState = () => {
-          const path = window.location.pathname.replace(/\/$/, "");
-          if (path === '/dashboard') setCurrentPage('dashboard');
-          else if (path === '/affiliate') setCurrentPage('affiliate');
-          else if (path === '/affiliate-login') setCurrentPage('affiliate-login');
-          else if (path === '/user-signup') setCurrentPage('user-signup');
-          else if (path === '/affiliate-info') setCurrentPage('affiliate-info');
-          else if (path === '/blog') setCurrentPage('blog');
-          else if (path.startsWith('/blog/')) setCurrentPage(`blog-post:${path.split('/blog/')[1]}`);
-          else if (path === '/imprint') setCurrentPage('imprint');
-          else if (path === '/privacy') setCurrentPage('privacy');
-          else if (path === '/terms') setCurrentPage('terms');
-          else if (path === '/revocation') setCurrentPage('revocation');
-          else setCurrentPage('landing');
+          setCurrentPage(resolvePageFromPath(window.location.pathname));
       };
-
       window.addEventListener('popstate', handlePopState);
       return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
-  // Load System Settings on Mount
   useEffect(() => {
     const loadSettings = async () => {
        const settings = await getSystemSettings();
        if (settings) {
-          if (settings.global_commission_rate) {
-             setGlobalCommissionRate(Number(settings.global_commission_rate));
-          }
-          if (settings.price_new_customers) {
-             setPrices(p => ({...p, new: Number(settings.price_new_customers)}));
-          }
-          if (settings.price_existing_customers) {
-             setPrices(p => ({...p, existing: Number(settings.price_existing_customers)}));
-          }
+          if (settings.global_commission_rate) setGlobalCommissionRate(Number(settings.global_commission_rate));
+          if (settings.price_new_customers) setPrices(p => ({...p, new: Number(settings.price_new_customers)}));
+          if (settings.price_existing_customers) setPrices(p => ({...p, existing: Number(settings.price_existing_customers)}));
        }
     };
     loadSettings();
   }, []);
 
-  // Track Referral Link
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const refCode = params.get('ref');
     if (refCode) {
-      console.log("Partner Tracking active:", refCode);
       localStorage.setItem('resortpass_referral', refCode);
     }
   }, []);
 
-  // INITIAL AUTH & ROUTING CHECK
   useEffect(() => {
     const hash = window.location.hash;
     const pathname = window.location.pathname;
@@ -371,15 +341,8 @@ const App: React.FC = () => {
         if (hash.includes('type=signup') || hash.includes('access_token')) {
             setLoginNotification("E-Mail erfolgreich bestätigt! Du kannst dich jetzt einloggen.");
         }
-        if (pathname === '/affiliate-login') {
-            setCurrentPage('affiliate-login');
-        } else {
-            setCurrentPage('login');
-        }
-    } else if (pathname === '/login') {
-        setCurrentPage('login');
-    } else if (pathname === '/affiliate-login') {
-        setCurrentPage('affiliate-login');
+        if (pathname === '/affiliate-login') setCurrentPage('affiliate-login');
+        else setCurrentPage('login');
     }
 
     const checkSession = async () => {
@@ -398,12 +361,8 @@ const App: React.FC = () => {
                 break;
             }
           } catch (e) { console.error("Session check error", e); }
-          
-          if (isStripeReturn) {
-              await new Promise(resolve => setTimeout(resolve, 1500)); 
-          } else {
-              await new Promise(resolve => setTimeout(resolve, 100)); 
-          }
+          if (isStripeReturn) await new Promise(resolve => setTimeout(resolve, 1500)); 
+          else await new Promise(resolve => setTimeout(resolve, 100)); 
           attempts++;
       }
 
@@ -415,34 +374,13 @@ const App: React.FC = () => {
               if (profile.role) setRole(profile.role as UserRole);
               if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
               
-              if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
+              const isDefaultPage = ['landing', 'login', 'affiliate-login', 'admin-login'].includes(currentPage);
+              if (isDefaultPage) {
                   if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
                   else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
               }
-
-              if (profile.role === 'CUSTOMER') {
-                  const storageKey = `welcome_triggered_${user.id}`;
-                  const hasTriggered = localStorage.getItem(storageKey);
-
-                  if (!hasTriggered) {
-                      localStorage.setItem(storageKey, 'true'); 
-                      fetch('/api/trigger-welcome', {
-                          method: 'POST',
-                          headers: {'Content-Type': 'application/json'},
-                          body: JSON.stringify({ 
-                              userId: user.id, 
-                              email: user.email, 
-                              firstName: profile.first_name || user.user_metadata?.first_name 
-                          })
-                      }).catch(err => console.error("Welcome trigger failed", err));
-                  }
-              }
           } 
-      } else {
-          if (isStripeReturn && urlParams.get('portal_return')) {
-              setLoginNotification("Willkommen zurück! Bitte logge dich kurz ein, um die Synchronisierung abzuschließen.");
-          }
       }
       setIsAppInitializing(false);
     };
@@ -465,9 +403,12 @@ const App: React.FC = () => {
                 if (data) {
                     if (data.role) setRole(data.role as UserRole);
                     if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
-                    if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
-                    else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
-                    else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+                    const isDefaultPage = ['landing', 'login', 'affiliate-login', 'admin-login'].includes(currentPageRef.current);
+                    if (isDefaultPage) {
+                      if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
+                      else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
+                      else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
+                    }
                 }
              });
         }
@@ -507,16 +448,7 @@ const App: React.FC = () => {
 
     switch (currentPage) {
       case 'affiliate-info':
-        return (
-          <AffiliateInfoPage 
-            onSignup={() => navigate('affiliate-signup')} 
-            onBack={() => navigate('landing')} 
-            onLogin={() => navigate('affiliate-login')}
-            commissionRate={globalCommissionRate} 
-            price={prices.new}
-            navigate={navigate}
-          />
-        );
+        return <AffiliateInfoPage onSignup={() => navigate('affiliate-signup')} onBack={() => navigate('landing')} onLogin={() => navigate('affiliate-login')} commissionRate={globalCommissionRate} price={prices.new} navigate={navigate} />;
       case 'affiliate-signup':
         return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => {}} onNavigate={navigate} commissionRate={globalCommissionRate} />;
       case 'affiliate-login':

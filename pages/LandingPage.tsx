@@ -1,10 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2, Lightbulb, BookOpen, ChevronRight } from 'lucide-react';
+import { Clock, Zap, Check, HelpCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { getSystemSettings } from '../services/backendService';
-import { BLOG_POSTS } from './BlogOverviewPage';
 
 interface LandingProps {
   onSignup: () => void;
@@ -148,42 +147,6 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
               </ul>
               <div className="mt-8"><Button onClick={onSignup} className="w-full bg-[#00305e] hover:bg-[#002040] text-white">Jetzt buchen</Button></div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Blog Section (NEW) */}
-      <section className="py-24 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-12 gap-4">
-            <div>
-              <span className="text-blue-600 font-bold tracking-wider uppercase text-sm">Magazin & Ratgeber</span>
-              <h2 className="text-3xl font-bold text-slate-900 mt-2">Wissenswertes zum ResortPass</h2>
-            </div>
-            <button onClick={() => navigate('blog')} className="text-[#00305e] font-bold flex items-center gap-1 hover:underline">
-              Alle Artikel ansehen <ArrowRight size={18} />
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {BLOG_POSTS.slice(0, 3).map((post) => (
-              <div 
-                key={post.slug} 
-                className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col"
-                onClick={() => navigate(`blog-post:${post.slug}`)}
-              >
-                <div className="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-[#00305e] mb-6">
-                  {post.icon}
-                </div>
-                <h3 className="text-lg font-bold text-slate-900 mb-3 leading-snug">{post.title}</h3>
-                <p className="text-slate-500 text-sm mb-6 line-clamp-3 leading-relaxed flex-1">
-                  {post.excerpt}
-                </p>
-                <div className="flex items-center text-[#00305e] font-bold text-sm">
-                  Weiterlesen <ChevronRight size={16} className="ml-0.5" />
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       </section>

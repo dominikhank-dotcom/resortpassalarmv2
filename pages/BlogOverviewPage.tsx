@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Calendar, ChevronRight, Clock, ArrowLeft, BookOpen, FileText, Info, HelpCircle, Star, Target, Calculator, Settings, Layers, MessageSquare } from 'lucide-react';
+import { Calendar, ChevronRight, ArrowLeft, BookOpen, FileText, Info, HelpCircle, Star, Target, Calculator, Settings, Layers } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 
@@ -110,7 +110,6 @@ export const BlogOverviewPage: React.FC<{ navigate: (page: string) => void }> = 
                 onClick={() => navigate(`blog-post:${post.slug}`)}
               >
                 <div className="h-40 bg-[#00305e] flex items-center justify-center relative overflow-hidden">
-                   {/* Decorative circle */}
                    <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500 rounded-full blur-2xl opacity-20 -translate-y-1/2 translate-x-1/2"></div>
                    <div className="text-[#ffcc00] transform group-hover:scale-110 transition-transform duration-500">
                      {post.icon}
