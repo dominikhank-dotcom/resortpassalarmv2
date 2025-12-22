@@ -6,6 +6,7 @@ import { UserDashboard } from './pages/UserDashboard';
 import { AffiliateDashboard } from './pages/AffiliateDashboard';
 import { AffiliateInfoPage } from './pages/AffiliateInfoPage';
 import { AffiliateSignupPage } from './pages/AffiliateSignupPage';
+import { AffiliateLoginPage } from './pages/AffiliateLoginPage';
 import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
