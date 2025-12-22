@@ -9,6 +9,8 @@ import { AffiliateSignupPage } from './pages/AffiliateSignupPage';
 import { UserSignupPage } from './pages/UserSignupPage';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { ImprintPage, PrivacyPage, TermsPage, RevocationPage } from './pages/LegalPages';
+import { BlogOverviewPage } from './pages/BlogOverviewPage';
+import { BlogPostPage } from './pages/BlogPostPage';
 import { UserRole } from './types';
 import { supabase, getEnv } from './lib/supabase';
 import { CheckCircle, Loader2 } from 'lucide-react';
@@ -270,10 +272,9 @@ const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [userName, setUserName] = useState<string>(''); // Added state for User Name
   
-  // LAZY INITIALIZATION of Current Page to prevent routing glitch (redirect to landing)
-  // when browser refreshes on /dashboard or /affiliate
+  // LAZY INITIALIZATION of Current Page
   const [currentPage, setCurrentPage] = useState(() => {
-     const path = window.location.pathname.replace(/\/$/, ""); // Normalize path
+     const path = window.location.pathname.replace(/\/$/, ""); 
      
      if (path === '/dashboard') return 'dashboard';
      if (path === '/affiliate') return 'affiliate';
@@ -281,6 +282,8 @@ const App: React.FC = () => {
      if (path === '/admin-dashboard') return 'admin-dashboard';
      if (path === '/user-signup') return 'user-signup';
      if (path === '/affiliate-info') return 'affiliate-info';
+     if (path === '/blog') return 'blog';
+     if (path.startsWith('/blog/')) return `blog-post:${path.split('/blog/')[1]}`;
      
      // Legal Pages
      if (path === '/imprint') return 'imprint';
@@ -317,6 +320,8 @@ const App: React.FC = () => {
           else if (path === '/affiliate-login') setCurrentPage('affiliate-login');
           else if (path === '/user-signup') setCurrentPage('user-signup');
           else if (path === '/affiliate-info') setCurrentPage('affiliate-info');
+          else if (path === '/blog') setCurrentPage('blog');
+          else if (path.startsWith('/blog/')) setCurrentPage(`blog-post:${path.split('/blog/')[1]}`);
           else if (path === '/imprint') setCurrentPage('imprint');
           else if (path === '/privacy') setCurrentPage('privacy');
           else if (path === '/terms') setCurrentPage('terms');
@@ -359,17 +364,13 @@ const App: React.FC = () => {
 
   // INITIAL AUTH & ROUTING CHECK
   useEffect(() => {
-    // 1. Check for Hash (Email Confirmation / Password Reset)
     const hash = window.location.hash;
     const pathname = window.location.pathname;
 
     if (hash && (hash.includes('access_token') || hash.includes('type=recovery') || hash.includes('type=signup'))) {
-        console.log("Auth redirect detected.", pathname);
         if (hash.includes('type=signup') || hash.includes('access_token')) {
             setLoginNotification("E-Mail erfolgreich bestätigt! Du kannst dich jetzt einloggen.");
         }
-        
-        // Smart Redirect based on return URL path
         if (pathname === '/affiliate-login') {
             setCurrentPage('affiliate-login');
         } else {
@@ -381,13 +382,10 @@ const App: React.FC = () => {
         setCurrentPage('affiliate-login');
     }
 
-    // 2. Check Session
     const checkSession = async () => {
-      // Check if we are returning from Stripe (params present)
       const urlParams = new URLSearchParams(window.location.search);
       const isStripeReturn = urlParams.get('payment_success') || urlParams.get('portal_return');
 
-      // INCREASED RETRY LOGIC for stability on Stripe return
       let maxAttempts = isStripeReturn ? 15 : 3; 
       let attempts = 0;
       let sessionData = null;
@@ -402,41 +400,33 @@ const App: React.FC = () => {
           } catch (e) { console.error("Session check error", e); }
           
           if (isStripeReturn) {
-              await new Promise(resolve => setTimeout(resolve, 1500)); // Wait longer (1.5s) per try for Stripe return
+              await new Promise(resolve => setTimeout(resolve, 1500)); 
           } else {
-              await new Promise(resolve => setTimeout(resolve, 100)); // Short wait for normal load
+              await new Promise(resolve => setTimeout(resolve, 100)); 
           }
           attempts++;
       }
 
       if (sessionData && sessionData.session) {
           const user = sessionData.session.user;
-          // Fetch role AND Name
-          // CRITICAL FIX: Removed 'welcome_mail_sent' from this query to prevent login crash on stale schema.
           const { data: profile } = await supabase.from('profiles').select('role, first_name, last_name').eq('id', user.id).single();
           
           if (profile) {
               if (profile.role) setRole(profile.role as UserRole);
               if (profile.first_name && profile.last_name) setUserName(`${profile.first_name} ${profile.last_name}`);
               
-              // Smart Redirect on load if stuck on generic login/landing but user is auth'd
-              // But ONLY if we are not explicitly on a specific login page that was requested (unless it was a redirect)
               if (currentPage === 'landing' || currentPage === 'login' || currentPage === 'affiliate-login' || currentPage === 'admin-login') {
                   if (profile.role === 'ADMIN') setCurrentPage('admin-dashboard');
                   else if (profile.role === 'AFFILIATE') setCurrentPage('affiliate');
                   else if (profile.role === 'CUSTOMER') setCurrentPage('dashboard');
               }
 
-              // --- TRIGGER WELCOME MAIL (CLIENT SIDE LOCK) ---
-              // Only trigger for Customers
               if (profile.role === 'CUSTOMER') {
                   const storageKey = `welcome_triggered_${user.id}`;
                   const hasTriggered = localStorage.getItem(storageKey);
 
                   if (!hasTriggered) {
-                      console.log("App: Triggering Welcome Mail for", user.email);
-                      localStorage.setItem(storageKey, 'true'); // Set lock immediately
-                      
+                      localStorage.setItem(storageKey, 'true'); 
                       fetch('/api/trigger-welcome', {
                           method: 'POST',
                           headers: {'Content-Type': 'application/json'},
@@ -448,19 +438,12 @@ const App: React.FC = () => {
                       }).catch(err => console.error("Welcome trigger failed", err));
                   }
               }
-
-          } else {
-               // Fallback if profile missing
-               console.error("Session exists but Profile missing or query failed. Check DB Schema.");
-          }
+          } 
       } else {
-          // If returning from portal and session check failed, set a notification for manual login
           if (isStripeReturn && urlParams.get('portal_return')) {
               setLoginNotification("Willkommen zurück! Bitte logge dich kurz ein, um die Synchronisierung abzuschließen.");
           }
       }
-      
-      // Stop loading
       setIsAppInitializing(false);
     };
     
@@ -470,11 +453,9 @@ const App: React.FC = () => {
         if (event === 'SIGNED_OUT') {
             setRole(UserRole.GUEST);
             setUserName('');
-            
             const page = currentPageRef.current;
             const protectedPages = ['dashboard', 'affiliate', 'admin-dashboard'];
             const loginPages = ['login', 'affiliate-login', 'admin-login'];
-            
             if (!protectedPages.includes(page) && !loginPages.includes(page)) {
                 setCurrentPage('landing');
             }
@@ -484,7 +465,6 @@ const App: React.FC = () => {
                 if (data) {
                     if (data.role) setRole(data.role as UserRole);
                     if (data.first_name && data.last_name) setUserName(`${data.first_name} ${data.last_name}`);
-                    
                     if (data.role === 'ADMIN') setCurrentPage('admin-dashboard');
                     else if (data.role === 'AFFILIATE') setCurrentPage('affiliate');
                     else if (data.role === 'CUSTOMER') setCurrentPage('dashboard');
@@ -492,7 +472,6 @@ const App: React.FC = () => {
              });
         }
     });
-
     return () => subscription.unsubscribe();
   }, []);
 
@@ -501,11 +480,11 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
     if (page !== 'login' && page !== 'affiliate-login') setLoginNotification(null);
     
-    // Update Browser URL for cleaner navigation and history support
     let path = '/';
-    if (page !== 'landing') path = `/${page}`;
+    if (page === 'landing') path = '/';
+    else if (page.startsWith('blog-post:')) path = `/blog/${page.split(':')[1]}`;
+    else path = `/${page}`;
     
-    // Only push if path is different to avoid duplicate history entries
     if (window.location.pathname !== path) {
         window.history.pushState(null, '', path);
     }
@@ -523,6 +502,9 @@ const App: React.FC = () => {
   };
 
   const renderContent = () => {
+    if (currentPage === 'blog') return <BlogOverviewPage navigate={navigate} />;
+    if (currentPage.startsWith('blog-post:')) return <BlogPostPage slug={currentPage.split(':')[1]} navigate={navigate} />;
+
     switch (currentPage) {
       case 'affiliate-info':
         return (
@@ -536,53 +518,30 @@ const App: React.FC = () => {
           />
         );
       case 'affiliate-signup':
-        return <AffiliateSignupPage 
-            onLoginClick={() => navigate('affiliate-login')} 
-            onRegister={() => { /* Wait for auth listener */ }} 
-            onNavigate={navigate} 
-            commissionRate={globalCommissionRate}
-        />;
+        return <AffiliateSignupPage onLoginClick={() => navigate('affiliate-login')} onRegister={() => {}} onNavigate={navigate} commissionRate={globalCommissionRate} />;
       case 'affiliate-login':
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       case 'user-signup':
-        return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => { /* Wait for auth listener */ }} onNavigate={navigate} />;
+        return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => {}} onNavigate={navigate} />;
       case 'admin-login':
         return <LoginScreen role={UserRole.ADMIN} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} notification={loginNotification} />;
       case 'admin-dashboard':
          return role === UserRole.ADMIN 
-          ? <AdminDashboard 
-              commissionRate={globalCommissionRate} 
-              onUpdateCommission={setGlobalCommissionRate}
-              prices={prices}
-              onUpdatePrices={setPrices}
-              productUrls={productUrls}
-              onUpdateProductUrls={setProductUrls}
-            /> 
+          ? <AdminDashboard commissionRate={globalCommissionRate} onUpdateCommission={setGlobalCommissionRate} prices={prices} onUpdatePrices={setPrices} productUrls={productUrls} onUpdateProductUrls={setProductUrls} /> 
           : <LoginScreen role={UserRole.ADMIN} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} notification={loginNotification} />;
-      
-      // Legal Pages
-      case 'imprint':
-        return <ImprintPage onBack={() => navigate('landing')} />;
-      case 'privacy':
-        return <PrivacyPage onBack={() => navigate('landing')} />;
-      case 'terms':
-        return <TermsPage onBack={() => navigate('landing')} />;
-      case 'revocation':
-        return <RevocationPage onBack={() => navigate('landing')} />;
-
+      case 'imprint': return <ImprintPage onBack={() => navigate('landing')} />;
+      case 'privacy': return <PrivacyPage onBack={() => navigate('landing')} />;
+      case 'terms': return <TermsPage onBack={() => navigate('landing')} />;
+      case 'revocation': return <RevocationPage onBack={() => navigate('landing')} />;
       case 'dashboard':
         if (role === UserRole.CUSTOMER) return <UserDashboard navigate={navigate} productUrls={productUrls} prices={prices} />;
-        // If guest but coming from portal, show specific sync message or loading state, but for now fall to login with notification
         return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
-      
       case 'affiliate':
         if (role === UserRole.AFFILIATE) return <AffiliateDashboard commissionRate={globalCommissionRate} price={prices.new} />;
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
-      
       case 'login':
          return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
-
-      default: // 'landing'
+      default: 
         return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} />;
     }
   };
