@@ -1,10 +1,18 @@
 
 import React from 'react';
-import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText } from 'lucide-react';
+import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText, ShoppingBag } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 
 export const BLOG_POSTS = [
+  {
+    slug: 'resortpass-kaufen-tipps',
+    title: 'ResortPass kaufen: So sicherst du dir deine Jahreskarte (inkl. Tipps bei Ausverkauf)',
+    excerpt: 'Du willst eine Europa-Park Jahreskarte kaufen, aber alles ist weg? Erfahre hier die besten Strategien, um doch noch an einen ResortPass zu kommen.',
+    date: '22. Mai 2024',
+    category: 'Tipps',
+    icon: <ShoppingBag size={24} />
+  },
   {
     slug: 'resortpass-guide-2026',
     title: 'Europa-Park ResortPass erklärt: Der ultimative Guide für Einsteiger 2026',

@@ -1,7 +1,7 @@
 
 import React from 'react';
 // Added CheckCircle and Ticket to the imports to fix "Cannot find name" errors
-import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket, ShoppingBag, UserCheck, Timer, MousePointer2 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { BLOG_POSTS } from './BlogOverviewPage';
@@ -62,6 +62,148 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
 
   const renderContent = () => {
     switch (slug) {
+      case 'resortpass-kaufen-tipps':
+        return (
+          <div className="space-y-10">
+            <div className="bg-amber-50 border-l-8 border-amber-400 p-8 rounded-r-3xl shadow-sm">
+                <h2 className="text-2xl font-bold text-[#00305e] mb-6 m-0 flex items-center gap-3"><Info className="text-amber-500"/> 📋 Das Wichtigste auf einen Blick</h2>
+                <ul className="list-none p-0 space-y-4 m-0 text-lg">
+                    <li className="flex items-start gap-3"><Check size={24} className="text-green-600 shrink-0 mt-1" /> <strong>Limitiertes Kontingent:</strong> Der Europa-Park gibt Pässe oft in "Wellen" frei.</li>
+                    <li className="flex items-start gap-3"><Check size={24} className="text-green-600 shrink-0 mt-1" /> <strong>Vorbereitung:</strong> MackOne Account vorab erstellen und Daten hinterlegen.</li>
+                    <li className="flex items-start gap-3"><Check size={24} className="text-green-600 shrink-0 mt-1" /> <strong>Schnelligkeit:</strong> Bei Verfügbarkeit zählen oft Sekunden statt Minuten.</li>
+                    <li className="flex items-start gap-3"><Check size={24} className="text-green-600 shrink-0 mt-1" /> <strong>Wächter-Lösung:</strong> Automatisierte Alarme sind der sicherste Weg zum Pass.</li>
+                </ul>
+            </div>
+
+            <p className="text-xl leading-relaxed">
+                Der Europa-Park ResortPass ist weit mehr als eine einfache Eintrittskarte. Er ist die Eintrittskarte in eine Welt voller Magie, Achterbahnen und unvergesslicher Momente. Doch für viele Fans beginnt das Abenteuer schon weit vor dem Parkeingang: beim Versuch, überhaupt einen der begehrten Pässe zu ergattern. Da der ResortPass Gold und Silver regelmäßig als „ausverkauft“ markiert ist, gleicht der Kaufprozess oft einer digitalen Schatzsuche. In diesem Guide erfährst du, wie du deine Chancen maximierst und was du tun kannst, wenn der Shop mal wieder keine Kontingente anzeigt.
+            </p>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">1. Warum ist der ResortPass so schwer zu bekommen?</h2>
+            <p>
+                Seit der Einführung des ResortPass-Systems hat der Europa-Park eine klare Strategie: Qualität vor Quantität. Um die Besucherströme besser steuern zu können und das Erlebnis im Park auf einem hohen Niveau zu halten, wird die Gesamtzahl der ausgegebenen Jahreskarten streng limitiert. Anders als früher bei der klassischen Clubkarte, die fast jederzeit verfügbar war, entscheidet der Park heute tagesaktuell oder saisonal über neue Kontingente.
+            </p>
+            <p>
+                Besonders der <strong>ResortPass Gold</strong> ist aufgrund seiner unbegrenzten Gültigkeit (ohne Sperrtage) und der inkludierten Rulantica-Tickets extrem gefragt. Sobald eine neue "Welle" an Pässen freigeschaltet wird, spricht sich das in Fan-Foren und Social-Media-Gruppen in Windeseile herum. Die Folge: Innerhalb weniger Minuten kann das Kontingent bereits wieder erschöpft sein.
+            </p>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">2. Die perfekte Vorbereitung: Dein MackOne Account</h2>
+            <p>
+                Wenn der Moment der Verfügbarkeit kommt, hast du keine Zeit mehr für Bürokratie. Dein größter Feind ist der Zeitverlust durch Dateneingabe.
+            </p>
+            <div className="grid md:grid-cols-2 gap-6 my-8">
+                <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100">
+                    <UserCheck className="text-indigo-600 mb-4" size={32} />
+                    <h4 className="font-bold text-lg mb-2">Account vorab erstellen</h4>
+                    <p className="text-sm text-slate-500">Erstelle dir bereits heute einen MackOne Account auf der offiziellen Webseite. Bestätige deine E-Mail Adresse und logge dich einmal ein, um sicherzustellen, dass alles funktioniert.</p>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100">
+                    <MousePointer2 className="text-indigo-600 mb-4" size={32} />
+                    <h4 className="font-bold text-lg mb-2">Daten hinterlegen</h4>
+                    <p className="text-sm text-slate-500">Hinterlege im Profil deine vollständige Anschrift. Beim Kaufprozess werden diese Daten automatisch gezogen, was dir wertvolle Sekunden spart.</p>
+                </div>
+            </div>
+
+            <BlogInjectedCTA variant={1} />
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">3. Die "Wellen-Taktik": Wann werden Pässe frei?</h2>
+            <p>
+                Es gibt keinen offiziellen Fahrplan für die Freischaltung neuer Pässe. Dennoch zeigen Erfahrungen der letzten Monate bestimmte Muster. Oft werden Kontingente am <strong>Vormittag zwischen 9:00 und 11:00 Uhr</strong> oder am frühen Nachmittag freigeschaltet. Auch zum Saisonstart oder vor großen Events (wie den Horror Nights) gibt es häufiger Bewegung im Shop.
+            </p>
+            <p>
+                Ein weiterer wichtiger Faktor sind Stornierungen oder nicht abgeschlossene Zahlungen. Wenn ein Nutzer Pässe in den Warenkorb legt, diese aber nicht innerhalb der Reservierungszeit bezahlt, fließen sie zurück in den Pool. Das bedeutet: Auch wenn gerade "ausverkauft" da steht, kann 15 Minuten später plötzlich wieder ein Pass verfügbar sein.
+            </p>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">4. Profi-Tipps für den Kaufprozess</h2>
+            <p>
+                Wenn du es in den Shop geschafft hast und die Pässe als "verfügbar" angezeigt werden, beachte diese Tipps:
+            </p>
+            <ul className="space-y-4">
+                <li className="flex items-start gap-4 bg-slate-50 p-4 rounded-xl">
+                    <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
+                    <div>
+                        <strong className="block text-[#00305e]">Nicht zögern:</strong>
+                        Leg die Pässe sofort in den Warenkorb. In den meisten Shops sind sie dort für eine kurze Zeit (oft 10-15 Min) für dich reserviert.
+                    </div>
+                </li>
+                <li className="flex items-start gap-4 bg-slate-50 p-4 rounded-xl">
+                    <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
+                    <div>
+                        <strong className="block text-[#00305e]">Zahlungsmittel bereit halten:</strong>
+                        Nutze schnelle Zahlungsmethoden wie PayPal oder Kreditkarte. Das Eintippen von IBANs für Lastschriften dauert zu lange und birgt Fehlerrisiken.
+                    </div>
+                </li>
+                <li className="flex items-start gap-4 bg-slate-50 p-4 rounded-xl">
+                    <div className="bg-indigo-600 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">3</div>
+                    <div>
+                        <strong className="block text-[#00305e]">Ein Pass nach dem anderen:</strong>
+                        Wenn du für eine ganze Familie kaufst, kann es manchmal schwierig sein, 4 oder 5 Pässe gleichzeitig zu bekommen, wenn das Restkontingent klein ist. Versuche es im Notfall mit kleineren Mengen.
+                    </div>
+                </li>
+            </ul>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">5. Was tun, wenn dauerhaft ausverkauft ist?</h2>
+            <p>
+                Es kann frustrierend sein: Du schaust zehnmal am Tag auf die Seite, und immer leuchtet dir das rote "Ausverkauft" entgegen. Viele Nutzer verfallen dann in den "F5-Wahn" und laden die Seite ständig neu. Das ist nicht nur zeitraubend, sondern oft auch erfolglos, da man genau die 5 Minuten verpasst, in denen das Fenster offen war.
+            </p>
+            <div className="bg-indigo-50 p-8 rounded-3xl border border-indigo-100 flex items-start gap-6">
+                <Timer className="text-indigo-600 shrink-0" size={32} />
+                <div>
+                    <h4 className="font-bold text-[#00305e] text-xl mb-2">Der Zeitfaktor ist entscheidend</h4>
+                    <p className="text-indigo-900 m-0 leading-relaxed">
+                        Statistiken zeigen, dass kleine Kontingente oft innerhalb von weniger als 12 Minuten wieder vergriffen sind. Wer manuell sucht, braucht eine enorme Portion Glück. Die Lösung ist die Automatisierung der Überwachung.
+                    </p>
+                </div>
+            </div>
+
+            <BlogInjectedCTA variant={2} />
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">6. Häufig gestellte Fragen (FAQ)</h2>
+            <div className="space-y-6">
+                <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="text-indigo-600 font-bold mb-2 flex items-center gap-2">
+                        <HelpCircle size={20}/> Kann ich den ResortPass auch vor Ort im Park kaufen?
+                    </h4>
+                    <p className="text-slate-600 m-0">Nein, der Verkauf erfolgt ausschließlich online über den Mack International Ticketshop. Vor Ort können lediglich bestehende Pässe verlängert oder physische Karten gedruckt werden (sofern online bereits erworben).</p>
+                </div>
+                <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="text-indigo-600 font-bold mb-2 flex items-center gap-2">
+                        <HelpCircle size={20}/> Gibt es eine Warteliste?
+                    </h4>
+                    <p className="text-slate-600 m-0">Der Europa-Park bietet aktuell keine offizielle Warteliste an. Es gilt das Prinzip: Wer zuerst kommt, mahlt zuerst.</p>
+                </div>
+                <div className="p-6 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <h4 className="text-indigo-600 font-bold mb-2 flex items-center gap-2">
+                        <HelpCircle size={20}/> Wie oft werden neue Pässe freigeschaltet?
+                    </h4>
+                    <p className="text-slate-600 m-0">Das variiert stark. In manchen Wochen gibt es fast täglich kleine Kontingente, in anderen Phasen bleibt der Shop über Wochen geschlossen. Das hängt stark von der aktuellen Auslastung des Parks ab.</p>
+                </div>
+            </div>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Fazit: Mit Geduld und Technik zum Ziel</h2>
+            <p>
+                Den Europa-Park ResortPass zu kaufen erfordert heute ein wenig strategisches Vorgehen. Eine gute Vorbereitung deines MackOne Accounts ist die Basis. Der eigentliche Schlüssel zum Erfolg ist jedoch die Information über die Verfügbarkeit in Echtzeit.
+            </p>
+            <p>
+                Lass dich nicht entmutigen, wenn es beim ersten Mal nicht klappt. Mit den richtigen Tools und ein wenig Schnelligkeit wirst auch du bald deine eigene Jahreskarte in den Händen halten und ein Jahr voller Abenteuer im Europa-Park Resort genießen können.
+            </p>
+
+            <div className="bg-[#00305e] text-white p-10 rounded-3xl shadow-xl text-center">
+                <h3 className="text-2xl font-black text-amber-400 mb-4 m-0 uppercase tracking-widest">🚀 Hol dir deinen Vorteil</h3>
+                <p className="text-indigo-100 mb-8 max-w-2xl mx-auto">
+                    Warum selbst suchen, wenn du dich automatisch benachrichtigen lassen kannst? Aktiviere unseren ResortPass Wächter und sei der Erste im Shop!
+                </p>
+                <Button onClick={() => navigate('landing')} className="bg-amber-400 text-indigo-900 border-0 mx-auto font-black px-10 py-4 text-xl hover:bg-yellow-300 transition-colors">
+                    Jetzt Überwachung starten
+                </Button>
+            </div>
+
+            <hr className="my-12 border-slate-200" />
+            <p className="text-slate-400 text-xs italic text-center">
+                Hinweis: Dieser Artikel dient der Information und basiert auf Erfahrungswerten. Wir stehen in keiner offiziellen Verbindung zum Europa-Park. Alle Angaben ohne Gewähr.
+            </p>
+          </div>
+        );
       case 'resortpass-guide-2026':
         return (
           <div className="space-y-8">
