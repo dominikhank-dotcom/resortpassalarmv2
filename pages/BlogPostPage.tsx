@@ -1,7 +1,7 @@
 
 import React from 'react';
 // Added CheckCircle and Ticket to the imports to fix "Cannot find name" errors
-import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket, ShoppingBag, UserCheck, Timer, MousePointer2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket, ShoppingBag, UserCheck, Timer, MousePointer2, HelpCircle as HelpIcon, Map, Bed } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { BLOG_POSTS } from './BlogOverviewPage';
@@ -62,6 +62,151 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
 
   const renderContent = () => {
     switch (slug) {
+      case 'resortpass-ausverkauft-was-jetzt':
+        return (
+          <div className="space-y-10">
+            <div className="bg-blue-50 border-l-8 border-indigo-600 p-8 rounded-r-3xl shadow-sm">
+                <h2 className="text-2xl font-bold text-indigo-900 mb-6 m-0 flex items-center gap-3"><HelpIcon className="text-indigo-600"/> 📋 Inhaltsübersicht</h2>
+                <ul className="list-none p-0 space-y-4 m-0 text-lg text-slate-700">
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Warum der Pass ausverkauft ist und was "Soll-Kontingente" sind.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Gibt es eine echte Warteliste? (Die bittere Wahrheit).</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Alternativen für Kurzentschlossene: Tagestickets & Mehrtages-Deals.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Der Hotel-Trick: So kommst du trotzdem rein.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Die "Wächter"-Strategie für den nächsten Drop.</li>
+                </ul>
+            </div>
+
+            <p className="text-xl leading-relaxed">
+                Du hast den Urlaub geplant, die Vorfreude ist riesig, und dann das: Du klickst auf den Ticket-Shop des Europa-Park und siehst nur ein rotes Banner mit der Aufschrift „Momentan leider ausverkauft“. Ob ResortPass Silver oder der begehrte Gold-Pass – die Kontingente sind seit Monaten ein knappes Gut. Viele Fans fühlen sich im Stich gelassen und fragen sich: Wie kann das sein? Und vor allem: Was mache ich jetzt? In diesem ausführlichen Guide zeigen wir dir, wie du die Wartezeit überbrückst und wie du doch noch zu deiner Jahreskarte kommst.
+            </p>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die aktuelle Lage: Warum ist der ResortPass ständig weg?</h2>
+            <p>
+                Der Europa-Park hat in den letzten zwei Jahren seine Strategie grundlegend geändert. Weg von der unlimitierten Clubkarte, hin zu einem gesteuerten ResortPass-System. Der Grund ist simpel: Kapazitätsmanagement. Um das Erlebnis für jeden Gast im Park (Wartezeiten, Gastronomie-Auslastung) zu optimieren, darf nur eine bestimmte Anzahl an Jahreskarten im Umlauf sein.
+            </p>
+            <p>
+                Sobald eine gewisse Anzahl an Pässen im Umlauf ist, stoppt der Verkauf automatisch. Neue Pässe werden erst wieder freigeschaltet, wenn bestehende Pässe nicht verlängert werden oder der Park entscheidet, die Kapazität geringfügig zu erhöhen. Das passiert oft in unangekündigten Schüben, den sogenannten "Drops".
+            </p>
+
+            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 flex items-start gap-4">
+              <AlertTriangle className="text-amber-600 shrink-0 mt-1" size={24} />
+              <div>
+                <h4 className="font-bold text-amber-900 mb-1">Gibt es eine Warteliste?</h4>
+                <p className="text-sm text-amber-800 m-0">
+                  Offiziell bietet der Europa-Park <strong>keine Warteliste</strong> an, auf der du dich eintragen kannst, um benachrichtigt zu werden. Der Support verweist meist auf "regelmäßiges Nachsehen im Shop". Das bedeutet für dich: Wer zuerst kommt, mahlt zuerst. Es gibt keine Priorisierung für treue Fans oder ehemalige Inhaber.
+                </p>
+              </div>
+            </div>
+
+            <BlogInjectedCTA variant={1} />
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Kurzfristige Alternativen: Wenn der Parkbesuch feststeht</h2>
+            <p>
+                Wenn dein Besuchstermin bereits steht und du keine Jahreskarte bekommen hast, musst du nicht verzagen. Hier sind die besten Wege, um trotzdem den Zauber von Rust zu erleben:
+            </p>
+
+            <div className="grid md:grid-cols-2 gap-6 my-8">
+              <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
+                <Ticket className="text-indigo-600 mb-4" size={32} />
+                <h4 className="font-bold text-lg mb-2">Tagestickets & Mehrtageskarten</h4>
+                <p className="text-sm text-slate-500 flex-grow">
+                  Klassisch, aber effektiv. Buche Einzeltickets frühzeitig online. Besonders die 2-Tages-Tickets bieten eine Ersparnis gegenüber zwei Einzeltitckets. 
+                </p>
+                <div className="mt-4 text-indigo-600 text-xs font-bold uppercase tracking-wider">Tipp: Reservierung nötig!</div>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
+                <Bed className="text-indigo-600 mb-4" size={32} />
+                <h4 className="font-bold text-lg mb-2">Der "Hotel-Trick"</h4>
+                <p className="text-sm text-slate-500 flex-grow">
+                  Als Übernachtungsgast in den Europa-Park Hotels hast du eine Eintrittsgarantie. Selbst wenn die Tageskontingente für normale Besucher erschöpft sind, bekommst du als Hotelgast fast immer noch Tickets an der Rezeption.
+                </p>
+                <div className="mt-4 text-indigo-600 text-xs font-bold uppercase tracking-wider">Kostspielig aber sicher</div>
+              </div>
+            </div>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Langfristige Strategie: So sicherst du dir den nächsten Drop</h2>
+            <p>
+                Manuelle Suche ist wie ein Lottospiel. Du kannst die Seite 50-mal am Tag aktualisieren und genau in den 10 Minuten nicht schauen, in denen 50 neue Gold-Pässe freigeschaltet wurden. Hier ist dein Schlachtplan:
+            </p>
+            <ol className="space-y-6 list-none p-0">
+              <li className="flex gap-4">
+                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
+                <div>
+                  <h4 className="font-bold text-slate-900">MackOne Account fix und fertig machen</h4>
+                  <p className="text-slate-600">
+                    Hinterlege deine Adresse, deine Zahlungsmittel und verifiziere deine E-Mail. Wenn die Pässe online gehen, zählt jede Sekunde. Du willst nicht erst dein Passwort zurücksetzen müssen.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
+                <div>
+                  <h4 className="font-bold text-slate-900">Wellen verstehen</h4>
+                  <p className="text-slate-600">
+                    Erfahrungsgemäß werden Kontingente oft an Wochentagen vormittags (zwischen 9 und 11 Uhr) freigegeben. Am Wochenende passiert selten etwas.
+                  </p>
+                </div>
+              </li>
+              <li className="flex gap-4">
+                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">3</div>
+                <div>
+                  <h4 className="font-bold text-slate-900">Automatisierung nutzen</h4>
+                  <p className="text-slate-600">
+                    Das ist der wichtigste Punkt. Tools wie ResortPassAlarm überwachen die Seite im Minutentakt für dich. Während du arbeitest oder schläfst, scannt der Wächter die Verfügbarkeit.
+                  </p>
+                </div>
+              </li>
+            </ol>
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Alternative: Andere Parks mit dem ResortPass entdecken</h2>
+            <p>
+                Wusstest du, dass du mit einem aktiven ResortPass auch andere Parks kostenlos besuchen kannst? Wenn der Europa-Park gerade überfüllt ist oder du auf deinen Pass wartest, schau dir die Partner-Vorteile an. 
+            </p>
+            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-200">
+              <div className="flex items-center gap-3 mb-4">
+                <Map className="text-indigo-600" />
+                <h4 className="font-bold text-[#00305e] text-xl m-0">Top Partnerparks (1x pro Laufzeit gratis)</h4>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-slate-600">
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Efteling (NL)</div>
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Liseberg (SE)</div>
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Port Aventura (ES)</div>
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Isla Mágica (ES)</div>
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Pleasure Beach (UK)</div>
+                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Emerald Park (IE)</div>
+              </div>
+              <p className="mt-4 text-xs text-slate-400 italic">
+                Hinweis: Diese Besuche sind erst möglich, wenn du deinen ResortPass bereits in Händen hältst. Sie sind ein großartiger Zusatznutzen, der den Pass noch wertvoller macht.
+              </p>
+            </div>
+
+            <BlogInjectedCTA variant={2} />
+
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Fazit: Nicht aufgeben, klug agieren</h2>
+            <p>
+                Die Frustration über ausverkaufte ResortPässe ist verständlich, aber mit der richtigen Strategie ist es nur eine Frage der Zeit, bis du deinen eigenen Pass hast. Nutze Tagestickets für dringende Besuche, bereite deinen MackOne Account perfekt vor und lass dich von automatisierten Systemen benachrichtigen. 
+            </p>
+            <p>
+                Denk daran: Sobald der Alarm auf deinem Handy eingeht, hast du meist ein Zeitfenster von 5 bis 15 Minuten. Wer dann vorbereitet ist, sichert sich sein Jahr voller Abenteuer im Europa-Park Resort.
+            </p>
+
+            <div className="bg-indigo-900 text-white p-10 rounded-3xl shadow-xl text-center">
+                <h3 className="text-2xl font-black text-[#ffcc00] mb-6 m-0 uppercase tracking-widest">Bereit für den nächsten Drop?</h3>
+                <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
+                    Überlasse dein Glück nicht dem Zufall. Werde Teil der ResortPassAlarm Community und erhalte sofort Bescheid, wenn die Pässe wieder verfügbar sind.
+                </p>
+                <Button onClick={() => navigate('landing')} className="bg-[#ffcc00] text-[#00305e] border-0 mx-auto font-black px-12 py-5 text-2xl hover:scale-105 shadow-2xl transition-all">
+                    Überwachung jetzt starten
+                </Button>
+            </div>
+
+            <hr className="my-12 border-slate-200" />
+            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-xs italic">
+                <p>Zuletzt aktualisiert: {postInfo.date}</p>
+                <p>Keine offizielle Seite des Europa-Park.</p>
+            </div>
+          </div>
+        );
       case 'resortpass-kaufen-tipps':
         return (
           <div className="space-y-10">
@@ -76,7 +221,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             </div>
 
             <p className="text-xl leading-relaxed">
-                Der Europa-Park ResortPass ist weit mehr als eine einfache Eintrittskarte. Er ist die Eintrittskarte in eine Welt voller Magie, Achterbahnen und unvergesslicher Momente. Doch für viele Fans beginnt das Abenteuer schon weit vor dem Parkeingang: beim Versuch, überhaupt einen der begehrten Pässe zu ergattern. Da der ResortPass Gold und Silver regelmäßig als „ausverkauft“ markiert ist, gleicht der Kaufprozess oft einer digitalen Schatzsuche. In diesem Guide erfährst du, wie du deine Chancen maximierst und was du tun kannst, wenn der Shop mal wieder keine Kontingente anzeigt.
+                Der Europa-Park ResortPass ist weit mehr als eine einfache Eintrittskarte. Er ist die Eintrittskarte in eine world voller Magie, Achterbahnen und unvergesslicher Momente. Doch für viele Fans beginnt das Abenteuer schon weit vor dem Parkeingang: beim Versuch, überhaupt einen der begehrten Pässe zu ergattern. Da der ResortPass Gold und Silver regelmäßig als „ausverkauft“ markiert ist, gleicht der Kaufprozess oft einer digitalen Schatzsuche. In diesem Guide erfährst du, wie du deine Chancen maximierst und was du tun kannst, wenn der Shop mal wieder keine Kontingente anzeigt.
             </p>
 
             <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">1. Warum ist der ResortPass so schwer zu bekommen?</h2>
@@ -147,7 +292,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                 Es kann frustrierend sein: Du schaust zehnmal am Tag auf die Seite, und immer leuchtet dir das rote "Ausverkauft" entgegen. Viele Nutzer verfallen dann in den "F5-Wahn" und laden die Seite ständig neu. Das ist nicht nur zeitraubend, sondern oft auch erfolglos, da man genau die 5 Minuten verpasst, in denen das Fenster offen war.
             </p>
             <div className="bg-indigo-50 p-8 rounded-3xl border border-indigo-100 flex items-start gap-6">
-                <Timer className="text-indigo-600 shrink-0" size={32} />
+                <div className="bg-white p-3 rounded-2xl shadow-sm text-indigo-600 shrink-0"><Timer size={32} /></div>
                 <div>
                     <h4 className="font-bold text-[#00305e] text-xl mb-2">Der Zeitfaktor ist entscheidend</h4>
                     <p className="text-indigo-900 m-0 leading-relaxed">
@@ -215,7 +360,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             <p>Du liebst den Europa-Park und überlegst, ob sich eine Jahreskarte für dich lohnt? Dann bist du hier genau richtig! Der ResortPass ist die offizielle Jahreskarte des Europa-Park und bietet dir unglaublich viele Möglichkeiten, Deutschlands besten Freizeitpark so oft zu besuchen, wie du möchtest. Aber was genau steckt dahinter? Welche Varianten gibt es? Und für wen lohnt sich welcher Pass? In diesem ultimativen Guide erklären wir dir Schritt für Schritt alles Wichtige zum Europa-Park ResortPass 2026.</p>
 
             <h2 className="text-2xl font-bold text-[#00305e] border-l-4 border-[#ffcc00] pl-4">Was ist der Europa-Park ResortPass?</h2>
-            <p>Der <strong>Europa-Park ResortPass</strong> ist die moderne Jahreskarte des Europa-Park Erlebnis-Resorts. Er wurde 2022 als Nachfolger der früheren ClubCard eingeführt und ermöglicht dir ein ganzes Jahr lang den Zugang zum Europa-Park – je nach gewählter Variante an bestimmten oder allen Öffnungstagen.</p>
+            <p>Der <strong>Europa-Park ResortPass</strong> ist die moderne Jahreskarte des Europa-Park Erlebnis-Resorts. Er wurde 2022 als Nachfolger der früheren ClubCard eingeführt und ermöglicht dir ein ganzes Jahr lang den Zugang zum Europa-Park – je nach gewählter variante an bestimmten oder allen Öffnungstagen.</p>
             <p>Der ResortPass ist nicht einfach nur eine Eintrittskarte. Er ist dein Schlüssel zu einem ganzen Jahr voller Abenteuer, Achterbahnen und magischer Momente in Deutschlands größtem Freizeitpark. Mit über 100 Attraktionen und Shows, 15 europäischen Themenbereichen und regelmäßigen Events wie dem Traumzeit-Dome, der Horror Nights – Traumatica oder der HALLOWinter-Saison gibt es das ganze Jahr über etwas zu erleben.</p>
             
             <div className="bg-yellow-50 border-2 border-yellow-200 p-6 rounded-2xl flex gap-4 items-start shadow-sm">
@@ -271,14 +416,14 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                     <li className="flex items-start gap-3"><Check size={24} className="text-[#d4af37] shrink-0 mt-1" /> <strong>ResortPass Silver:</strong> 295 € für Erwachsene, über 230 Besuchstage, ideal für Sparfüchse</li>
                     <li className="flex items-start gap-3"><Check size={24} className="text-[#d4af37] shrink-0 mt-1" /> <strong>ResortPass Gold:</strong> 475 € für Erwachsene, alle Öffnungstage + 2x Rulantica</li>
                     <li className="flex items-start gap-3"><Check size={24} className="text-[#d4af37] shrink-0 mt-1" /> <strong>Preisdifferenz:</strong> 180 € – aber lohnt sich das Upgrade?</li>
-                    <li className="flex items-start gap-3"><Check size={24} className="text-[#d4af37] shrink-0 mt-1" /> <strong>Entscheidungshilfe:</strong> Wir zeigen dir, welche Variante zu deinen Plänen passt</li>
+                    <li className="flex items-start gap-3"><Check size={24} className="text-[#d4af37] shrink-0 mt-1" /> <strong>Entscheidungshilfe:</strong> Wir zeigen dir, welche variante zu deinen Plänen passt</li>
                 </ul>
             </div>
 
-            <p className="text-xl leading-relaxed">Du willst dir endlich einen Europa-Park ResortPass zulegen, aber die Frage lässt dich nicht los: <strong>Silver oder Gold?</strong> Keine Sorge, du bist nicht allein! Diese Entscheidung stellt viele vor ein Dilemma. In diesem Artikel zeigen wir dir ganz genau, wo die Unterschiede liegen und für wen sich welche Variante wirklich lohnt.</p>
+            <p className="text-xl leading-relaxed">Du willst dir endlich einen Europa-Park ResortPass zulegen, aber die Frage lässt dich nicht los: <strong>Silver oder Gold?</strong> Keine Sorge, du bist nicht allein! Diese Entscheidung stellt viele vor ein Dilemma. In diesem Artikel zeigen wir dir ganz genau, wo die Unterschiede liegen und für wen sich welche variante wirklich lohnt.</p>
 
             <h2 className="text-3xl font-bold text-[#1a472a] mt-12 mb-6">Der direkte Vergleich: Silver vs. Gold</h2>
-            <p>Zunächst schauen wir uns die beiden Varianten im direkten Vergleich an. So siehst du auf einen Blick, wo die Unterschiede liegen:</p>
+            <p>Zunächst schauen wir uns die beiden varianten im direkten Vergleich an. So siehst du auf einen Blick, wo die Unterschiede liegen:</p>
 
             <div className="overflow-x-auto my-8">
                 <table className="w-full border-collapse bg-white rounded-3xl overflow-hidden border border-slate-200 shadow-xl text-sm md:text-base">
@@ -366,7 +511,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             </div>
 
             <h2 className="text-3xl font-bold text-[#1a472a] mt-12 mb-6">Die Rechnung: Ab wann lohnt sich welcher Pass?</h2>
-            <p>Schauen wir uns an, wann sich die jeweilige Variante rechnet. Ein normales Tagesticket für den Europa-Park kostet zwischen 64,50 € (Nebensaison) und 73 € (Hauptsaison).</p>
+            <p>Schauen wir uns an, wann sich die jeweilige variante rechnet. Ein normales Tagesticket für den Europa-Park kostet zwischen 64,50 € (Nebensaison) und 73 € (Hauptsaison).</p>
 
             <div className="grid md:grid-cols-2 gap-8 my-8">
                 <div className="bg-gradient-to-br from-[#d4af37] to-[#8b4513] text-white p-10 rounded-3xl text-center shadow-xl">
@@ -434,7 +579,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-10 space-y-8">
                 <div>
                     <h4 className="text-xl font-bold text-[#1a472a] mb-3">Kann ich vom Silver auf Gold upgraden?</h4>
-                    <p className="text-slate-600 m-0">Ein direktes Upgrade während der Laufzeit ist nicht möglich. Du kannst aber bei der nächsten Verlängerung auf Gold wechseln.</p>
+                    <p className="text-slate-600 m-0">Ein direktes Upgrade während der Laufzeit ist nicht möglich. Du kannst aber bei der nächsten verlängerung auf Gold wechseln.</p>
                 </div>
                 <div>
                     <h4 className="text-xl font-bold text-[#1a472a] mb-3">Gibt es auch einen ResortPass für Familien?</h4>
@@ -442,7 +587,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                 </div>
                 <div>
                     <h4 className="text-xl font-bold text-[#1a472a] mb-3">Muss ich meinen Besuch vorher reservieren?</h4>
-                    <p className="text-slate-600 m-0">Ja, bei beiden Varianten musst du deinen Besuchstag vorher über das ResortPass-Portal reservieren. Du kannst bis zu 5 Termine gleichzeitig buchen.</p>
+                    <p className="text-slate-600 m-0">Ja, bei beiden varianten musst du deinen Besuchstag vorher über das ResortPass-Portal reservieren. Du kannst bis zu 5 Termine gleichzeitig buchen.</p>
                 </div>
             </div>
 

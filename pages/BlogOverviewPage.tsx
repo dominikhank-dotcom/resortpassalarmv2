@@ -1,10 +1,18 @@
 
 import React from 'react';
-import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText, ShoppingBag } from 'lucide-react';
+import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText, ShoppingBag, AlertCircle } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 
 export const BLOG_POSTS = [
+  {
+    slug: 'resortpass-ausverkauft-was-jetzt',
+    title: 'ResortPass ausverkauft - was jetzt? Alternativen und Warteliste-Tipps',
+    excerpt: 'Die rote "Ausverkauft"-Meldung ist der Albtraum jedes Fans. Wir zeigen dir, wie du die offizielle Warteliste umgehst und welche Alternativen es gibt.',
+    date: '22. Mai 2024',
+    category: 'Strategie',
+    icon: <AlertCircle size={24} />
+  },
   {
     slug: 'resortpass-kaufen-tipps',
     title: 'ResortPass kaufen: So sicherst du dir deine Jahreskarte (inkl. Tipps bei Ausverkauf)',
