@@ -1,10 +1,26 @@
 
 import React from 'react';
-import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText, ShoppingBag, AlertCircle } from 'lucide-react';
+import { Calendar, ChevronRight, ArrowLeft, BookOpen, Star, Target, Calculator, FileText, ShoppingBag, AlertCircle, Users, DollarSign } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 
 export const BLOG_POSTS = [
+  {
+    slug: 'resortpass-vs-einzeltickets',
+    title: 'Europa-Park ResortPass vs. Einzeltickets: Ab wann sparst du wirklich Geld?',
+    excerpt: 'Die große Wirtschaftlichkeits-Analyse: Lohnt sich die Jahreskarte für dich? Wir vergleichen Preise, rechnen Szenarien durch und zeigen versteckte Ersparnisse.',
+    date: '23. Dezember 2025',
+    category: 'Ratgeber',
+    icon: <DollarSign size={24} />
+  },
+  {
+    slug: 'resortpass-familien-guide',
+    title: 'Europa-Park Jahreskarte für Familien: Kosten, Tipps & Erfahrungen',
+    excerpt: 'Lohnt sich der ResortPass für die ganze Familie? Wir rechnen die Kosten für 2026 durch, geben Tipps für die Ferienplanung und teilen echte Erfahrungen.',
+    date: '23. Dezember 2025',
+    category: 'Familie',
+    icon: <Users size={24} />
+  },
   {
     slug: 'resortpass-ausverkauft-was-jetzt',
     title: 'ResortPass ausverkauft - was jetzt? Alternativen und Warteliste-Tipps',
