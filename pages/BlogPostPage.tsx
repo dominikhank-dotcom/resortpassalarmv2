@@ -1,7 +1,6 @@
 
 import React from 'react';
-// Added CheckCircle and Ticket to the imports to fix "Cannot find name" errors
-import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket, ShoppingBag, UserCheck, Timer, MousePointer2, HelpCircle as HelpIcon, Map, Bed, Users, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Calendar, Share2, ChevronRight, Check, Zap, Bell, Clock, Info, ShieldCheck, AlertTriangle, Star, DollarSign, Target, Calculator, AlertCircle, X, HelpCircle, CheckCircle, Ticket, ShoppingBag, UserCheck, Timer, MousePointer2, Map, Bed, Users, TrendingUp } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { BLOG_POSTS } from './BlogOverviewPage';
@@ -66,7 +65,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
         return (
           <div className="space-y-10">
             <div className="bg-blue-50 border-l-8 border-[#00305e] p-8 rounded-r-3xl shadow-sm">
-                <h2 className="text-2xl font-bold text-[#00305e] mb-6 m-0 flex items-center gap-3"><Calculator className="text-blue-600"/> 📋 Wirtschaftlichkeits-Check</h2>
+                <h2 className="text-2xl font-bold text-[#00305e] mb-6 m-0 flex items-center gap-3"><Calculator className="text-blue-600"/> 📋 Wirtschaftlichkeits-Check 2026</h2>
                 <ul className="list-none p-0 space-y-4 m-0 text-lg text-slate-700">
                     <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> <strong>Silver-Amortisation:</strong> Bereits ab dem 5. Besuch profitabel.</li>
                     <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> <strong>Gold-Amortisation:</strong> Ab dem 7. Besuch (oder früher mit Rulantica).</li>
@@ -76,157 +75,141 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             </div>
 
             <p className="text-xl leading-relaxed">
-              Steigende Preise in der Freizeitbranche zwingen viele Fans dazu, ihre Ausgaben genau zu kalkulieren. Der Europa-Park ist hier keine Ausnahme. Mit Tagesticket-Preisen, die in der Hauptsaison die 70-Euro-Marke überschreiten, stellt sich die Frage: Sollte ich einmalig tief in die Tasche greifen und einen <strong>ResortPass</strong> kaufen oder fahre ich mit <strong>Einzeltickets</strong> besser? In diesem Artikel gehen wir weit über die einfachen Eintrittspreise hinaus. Wir berechnen reale Szenarien, inklusive Parkgebühren, Partner-Vorteilen und dem psychologischen Faktor der Spontanität.
+              Wer den Europa-Park liebt, steht früher oder später vor der großen Frage: Lohnt sich die Anschaffung eines ResortPass wirklich, oder fahre ich mit Einzeltickets am Ende günstiger? In Zeiten steigender Lebenshaltungskosten und dynamischer Ticketpreise ist eine genaue Kalkulation wichtiger denn je. In diesem umfassenden Guide analysieren wir die Kostenstruktur für die Saison 2026, decken versteckte Sparpotentiale auf und zeigen dir, ab welchem Punkt die Jahreskarte nicht nur ein emotionaler Gewinn, sondern ein echtes finanzielles Schnäppchen ist.
             </p>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die Basis: Was kosten Einzeltickets wirklich?</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">1. Die Ausgangslage: Ticketpreise 2026</h2>
             <p>
-              Bevor wir vergleichen können, müssen wir den aktuellen "Gegner" definieren. Die Ticketpreise im Europa-Park sind dynamisch und hängen von der Saison ab:
+              Um einen fairen Vergleich anzustellen, müssen wir wissen, was ein Tag im Europa-Park ohne Jahreskarte kostet. Für 2026 liegen die Preise für ein Standard-Tagesticket (Erwachsene) im Durchschnitt bei etwa 68,00 €. Je nach Saison kann dieser Preis schwanken – in der Nebensaison startest du bei ca. 64,50 €, während an besucherstarken Tagen in der Hauptsaison oder zu Events wie Halloween bis zu 73,00 € fällig werden.
             </p>
-            <div className="grid md:grid-cols-2 gap-4 my-6">
+            <div className="grid md:grid-cols-2 gap-6 my-8">
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h4 className="font-bold text-slate-900 mb-2">Nebensaison</h4>
-                    <p className="text-2xl font-black text-blue-600">64,50 €</p>
-                    <p className="text-xs text-slate-500">Pro Person (Erwachsen)</p>
+                    <h4 className="font-bold text-slate-900 mb-2">Durchschnitt Ticket</h4>
+                    <p className="text-3xl font-black text-[#00305e]">68,00 €</p>
+                    <p className="text-xs text-slate-500">Basis für unsere Rechnung</p>
                 </div>
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
-                    <h4 className="font-bold text-slate-900 mb-2">Hauptsaison & Ferien</h4>
-                    <p className="text-2xl font-black text-indigo-600">73,00 €</p>
-                    <p className="text-xs text-slate-500">Pro Person (Erwachsen)</p>
+                    <h4 className="font-bold text-slate-900 mb-2">Parkgebühr</h4>
+                    <p className="text-3xl font-black text-[#00305e]">10,00 €</p>
+                    <p className="text-xs text-slate-500">Pro PKW und Tag</p>
                 </div>
             </div>
-            <p>
-              Für unsere Kalkulation nutzen wir einen fairen <strong>Durchschnittswert von 68,00 € pro Tagesticket</strong>. Wer nur an Halloween oder in den Weihnachtsferien kommt, muss mit den höheren Werten rechnen.
-            </p>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Szenario 1: Der ResortPass Silver (295 €)</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">2. Szenario: Der ResortPass Silver (295 €)</h2>
             <p>
-              Der Silver Pass ist der Preis-Leistungs-Sieger für alle, die flexibel planen können. Er kostet 295 € für Erwachsene.
+              Der Silver Pass ist der Einstieg in die Welt der Jahreskarten. Mit einem Preis von 295,00 € für Erwachsene ermöglicht er den Zugang an über 230 definierten Tagen im Jahr.
             </p>
             <div className="bg-white border-2 border-indigo-100 p-8 rounded-3xl shadow-lg my-8">
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="bg-indigo-600 text-white p-3 rounded-2xl"><Calculator size={28}/></div>
-                    <h3 className="text-2xl font-bold text-slate-900 m-0">Rechnung Silver</h3>
-                </div>
+                <h3 className="text-2xl font-bold text-indigo-900 mb-6 flex items-center gap-2"><TrendingUp /> Die Silver-Rechnung</h3>
                 <div className="space-y-4 text-lg">
-                    <p className="flex justify-between border-b pb-2"><span>Anschaffungskosten</span> <span className="font-bold">295,00 €</span></p>
-                    <p className="flex justify-between border-b pb-2"><span>Kosten pro Einzelticket (Ø)</span> <span className="font-bold">68,00 €</span></p>
-                    <p className="flex justify-between text-indigo-600 font-black text-2xl pt-4"><span>Amortisation ab</span> <span>4,33 Besuchen</span></p>
+                    <p className="flex justify-between border-b pb-2"><span>Kosten ResortPass Silver</span> <span className="font-bold">295,00 €</span></p>
+                    <p className="flex justify-between border-b pb-2"><span>Gegenwert Tagestickets (Ø 68 €)</span> <span className="font-bold text-slate-400">x 4,3</span></p>
+                    <p className="flex justify-between text-indigo-600 font-black text-2xl pt-4"><span>Gewinnzone ab</span> <span>5. Besuch</span></p>
                 </div>
             </div>
             <p>
-              <strong>Fazit Silver:</strong> Ab dem 5. Besuch im Jahr hast du "gewonnen". Ab hier kostet dich jeder weitere Tag im Park effektiv 0 €. Wer plant, einmal im Quartal nach Rust zu fahren, für den ist der Silver Pass fast schon Pflicht.
+              <strong>Das bedeutet:</strong> Wer plant, mindestens fünfmal im Jahr nach Rust zu reisen, für den ist der Silver Pass finanziell bereits profitabel. Ab dem sechsten Besuch "verdienst" du bei jedem Eintritt bares Geld im Vergleich zum Einzelkauf.
             </p>
 
             <BlogInjectedCTA variant={1} />
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Szenario 2: Der ResortPass Gold (475 €)</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">3. Szenario: Der ResortPass Gold (475 €)</h2>
             <p>
-              Der Gold Pass ist deutlich teurer, bietet aber zwei enorme finanzielle Joker: <strong>Keine Sperrtage</strong> und <strong>2x Rulantica inklusive</strong>.
-            </p>
-            <p>
-              Da ein Rulantica Tagesticket ca. 46,00 € kostet, müssen wir diese 92,00 € vom Anschaffungspreis abziehen, um den "reinen" Europa-Park Wert zu erhalten.
+              Der Gold Pass ist das "Rundum-Sorglos-Paket". Für 475,00 € gibt es keine Sperrtage und zwei Tagestickets für die Wasserwelt Rulantica sind bereits inklusive.
             </p>
             <div className="bg-[#00305e] text-white p-8 rounded-3xl shadow-xl my-8 relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={120}/></div>
-                <h3 className="text-2xl font-bold mb-6 text-blue-300">Die "echte" Gold-Rechnung</h3>
+                <h3 className="text-2xl font-bold mb-6 text-yellow-400">Die Gold-Rechnung (mit Rulantica)</h3>
                 <div className="space-y-3">
-                    <p className="flex justify-between"><span>Grundpreis Gold</span> <span>475,00 €</span></p>
-                    <p className="flex justify-between text-blue-200"><span>Abzug 2x Rulantica (Wert)</span> <span>- 92,00 €</span></p>
-                    <p className="flex justify-between font-bold border-t border-blue-700 pt-3"><span>Effektive Kosten Europa-Park</span> <span>383,00 €</span></p>
-                    <p className="flex justify-between text-yellow-400 font-black text-2xl pt-6 uppercase tracking-tight"><span>Lohnt sich ab</span> <span>5,6 Besuchen</span></p>
+                    <p className="flex justify-between"><span>Anschaffungspreis Gold</span> <span>475,00 €</span></p>
+                    <p className="flex justify-between text-blue-200"><span>Wert 2x Rulantica Tickets (ca.)</span> <span>- 92,00 €</span></p>
+                    <p className="flex justify-between font-bold border-t border-blue-700 pt-3"><span>Effektiver Preis Europa-Park</span> <span>383,00 €</span></p>
+                    <p className="flex justify-between text-yellow-400 font-black text-2xl pt-6 uppercase"><span>Gewinnzone ab</span> <span>5,6 Besuchen</span></p>
                 </div>
             </div>
             <p>
-              <strong>Wichtig:</strong> Ohne die Rulantica-Tickets gerechnet, amortisiert sich der Gold-Pass erst ab dem <strong>7. Besuch</strong>. Er ist also das Tool für die absoluten Power-User und Familien, die auf Ferienzeiten angewiesen sind.
+              Wenn du die Rulantica-Tickets ohnehin nutzen würdest, amortisiert sich der Gold Pass fast so schnell wie der Silver Pass (nach ca. 6 Besuchen). Ohne Berücksichtigung von Rulantica liegt die Schwelle bei etwa 7 Besuchstagen.
             </p>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Versteckte Ersparnis: Partnerparks & Vorteile</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">4. Versteckte Ersparnisse: Mehr als nur Eintritt</h2>
             <p>
-              Was viele bei ihrer Rechnung vergessen, ist der massive Mehrwert durch die Partner-Vorteile. Mit einem aktiven ResortPass (egal ob Silver oder Gold) erhältst du:
+              Die reine Ticket-Kalkulation ist oft nur die halbe Wahrheit. Ein ResortPass bringt Vorteile mit sich, die in der Gesamtrechnung oft Hunderte Euro ausmachen:
             </p>
-            <div className="grid md:grid-cols-2 gap-6 my-8">
-                <div className="bg-green-50 p-6 rounded-2xl border border-green-100 flex items-start gap-4">
-                    <Map className="text-green-600 shrink-0" size={24}/>
+            <ul className="space-y-6">
+                <li className="flex gap-4 items-start">
+                    <div className="bg-green-100 p-2 rounded-lg text-green-600 shrink-0"><Map size={24} /></div>
                     <div>
-                        <h4 className="font-bold text-green-900">7 Partnerparks gratis</h4>
-                        <p className="text-sm text-green-800">Efteling, Liseberg, PortAventura etc. Wert pro Besuch: ca. 50 €. Wer nur 2 dieser Parks nutzt, spart 100 € zusätzlich.</p>
+                        <h4 className="font-bold text-slate-900">Kostenlose Partnerparks</h4>
+                        <p className="text-slate-600">Mit dem Pass besuchst du 7 Partnerparks (u.a. Efteling, Liseberg, PortAventura) je einmal kostenlos. Wert pro Besuch: ca. 50 €. Wer zwei dieser Parks im Urlaub nutzt, spart bereits 100 € zusätzlich.</p>
                     </div>
-                </div>
-                <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
-                    <ShoppingBag className="text-blue-600 shrink-0" size={24}/>
+                </li>
+                <li className="flex gap-4 items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600 shrink-0"><Ticket size={24} /></div>
                     <div>
-                        <h4 className="font-bold text-blue-900">VEEJOY & Kino</h4>
-                        <p className="text-sm text-blue-800">Premium-Zugang zum Streaming-Dienst und Rabatte im Magic Cinema. Wert: ca. 30 € pro Jahr.</p>
+                        <h4 className="font-bold text-slate-900">Der ParkingPass Effekt</h4>
+                        <p className="text-slate-600">Für 39 € pro Jahr parkst du unbegrenzt. Ohne diesen Pass zahlst du 10 € pro Tag. Wer 10-mal kommt, spart hier allein 61,00 €.</p>
                     </div>
-                </div>
-            </div>
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Der Faktor "Parken"</h2>
-            <p>
-              Jeder Tagesbesucher zahlt 10,00 € Parkgebühr. ResortPass Inhaber können den <strong>ParkingPass für 39,00 €</strong> dazubuchen.
-            </p>
-            <ul className="space-y-2 mb-8 list-none p-0">
-                <li className="flex items-center gap-3"><CheckCircle size={18} className="text-green-500"/> Ab dem 4. Besuch mit dem Auto ist der ParkingPass profitabel.</li>
-                <li className="flex items-center gap-3"><CheckCircle size={18} className="text-green-500"/> Bei 10 Besuchen sparst du bereits 61,00 € reine Parkgebühren.</li>
+                </li>
+                <li className="flex gap-4 items-start">
+                    <div className="bg-purple-100 p-2 rounded-lg text-purple-600 shrink-0"><Zap size={24} /></div>
+                    <div>
+                        <h4 className="font-bold text-slate-900">VEEJOY Premium</h4>
+                        <p className="text-slate-600">Der Zugang zu Premium-Inhalten auf der Streaming-Plattform ist inklusive (Wert ca. 30 €/Jahr).</p>
+                    </div>
+                </li>
             </ul>
 
-            <BlogInjectedCTA variant={2} />
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die psychologische Komponente</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">5. Der psychologische Faktor: Freiheit statt Nutzungszwang</h2>
             <p>
-              Finanzen sind das eine, das Erlebnis das andere. Mit Einzeltickets stehst du unter "Nutzungszwang". Du zahlst 73 € und willst dafür jede Minute von 9:00 bis 18:00 Uhr ausnutzen, auch wenn es regnet oder die Kinder müde sind.
+              Dies ist ein Punkt, der in keiner Excel-Tabelle auftaucht, aber für viele Inhaber entscheidend ist. Wenn du 73 € für ein Tagesticket zahlst, stehst du unter dem Druck, den Park von 9:00 bis 18:00 Uhr "auszunutzen". Du bleibst auch bei Regen, du rennst von Attraktion zu Attraktion, auch wenn du müde bist.
             </p>
             <div className="bg-amber-50 p-8 rounded-3xl border border-amber-100 italic text-slate-700 text-lg leading-relaxed">
-              "Der ResortPass gibt dir die Freiheit, nach 3 Stunden wieder zu gehen, wenn die Warteschlangen zu lang sind. Du gehst einfach nächste Woche wieder. Dieser Stressabbau ist schwer in Euro zu messen, aber für viele Inhaber der eigentliche Grund für den Pass."
+              "Seit ich den ResortPass habe, gehe ich viel entspannter durch den Park. Wenn es zu voll ist oder ich nach 4 Stunden keine Lust mehr habe, gehe ich einfach. Ich weiß ja, dass ich nächste Woche kostenlos wiederkommen kann. Das ist wahre Lebensqualität."
             </div>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Zusammenfassung: Deine Entscheidungshilfe</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">6. Fazit: Für wen lohnt sich was?</h2>
             <div className="overflow-x-auto my-8">
                 <table className="w-full border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
                     <thead className="bg-slate-900 text-white">
                         <tr>
-                            <th className="p-4 text-left">Besuche pro Jahr</th>
-                            <th className="p-4 text-center">Beste Wahl</th>
+                            <th className="p-4 text-left">Besuchstyp</th>
+                            <th className="p-4 text-center">Empfehlung</th>
                             <th className="p-4 text-left">Grund</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        <tr><td className="p-4">1 - 3 mal</td><td className="p-4 text-center font-bold">Einzeltickets</td><td className="p-4 text-sm text-slate-500">Lohnt finanziell noch nicht. Nutze Angebote wie das 2-Tages-Ticket.</td></tr>
-                        <tr className="bg-blue-50/50"><td className="p-4">4 - 6 mal</td><td className="p-4 text-center font-bold text-indigo-600">ResortPass Silver</td><td className="p-4 text-sm text-slate-500">Bestes Preis-Leistungs-Verhältnis. Sperrtage durch Planung umgehen.</td></tr>
-                        <tr><td className="p-4">7+ mal</td><td className="p-4 text-center font-bold text-yellow-600">ResortPass Gold</td><td className="p-4 text-sm text-slate-500">Maximale Freiheit. Lohnt besonders durch Rulantica-Tickets.</td></tr>
-                        <tr><td className="p-4">Vielreisende</td><td className="p-4 text-center font-bold">Jeder Pass</td><td className="p-4 text-sm text-slate-500">Dank Partnerpark-Gratiseintritten (Efteling etc.) extrem wertvoll.</td></tr>
+                        <tr><td className="p-4">1-3 Besuche / Jahr</td><td className="p-4 text-center font-bold">Einzeltickets</td><td className="p-4 text-sm text-slate-500">Finanziell lohnt sich der Pass noch nicht.</td></tr>
+                        <tr className="bg-blue-50/50"><td className="p-4">4-6 Besuche / Jahr</td><td className="p-4 text-center font-bold text-indigo-600">ResortPass Silver</td><td className="p-4 text-sm text-slate-500">Das beste Preis-Leistungs-Verhältnis.</td></tr>
+                        <tr><td className="p-4">7+ Besuche / Jahr</td><td className="p-4 text-center font-bold text-yellow-600">ResortPass Gold</td><td className="p-4 text-sm text-slate-500">Maximale Freiheit & Rulantica-Boni.</td></tr>
+                        <tr><td className="p-4">Reisende (Partnerparks)</td><td className="p-4 text-center font-bold">Jeder Pass</td><td className="p-4 text-sm text-slate-500">Dank Gratis-Eintritten in Europa extrem wertvoll.</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Das größte Problem: Die Verfügbarkeit</h2>
+            <BlogInjectedCTA variant={2} />
+
+            <p className="text-lg leading-relaxed font-bold">Das größte Hindernis ist jedoch nicht der Preis, sondern die Verfügbarkeit.</p>
             <p>
-              Jetzt kommt die bittere Pille: Zu wissen, dass man Geld sparen würde, hilft nichts, wenn man keinen Pass kaufen kann. Wie du sicher weißt, sind die Pässe fast dauerhaft ausverkauft. Der finanzielle Vorteil von 200 € oder 300 € pro Jahr bringt dir nur etwas, wenn du in dem kurzen Moment zuschlägst, in dem das Kontingent im Shop offen ist.
-            </p>
-            <p>
-              Genau hier kommen wir ins Spiel. Unser <strong>ResortPassAlarm</strong> sorgt dafür, dass deine Kalkulation nicht nur Theorie bleibt. Wir informieren dich sofort, wenn du deine Ersparnis realisieren kannst.
+              Wie du sicher weißt, ist der ResortPass oft über Monate hinweg "ausverkauft". Die Ersparnis nützt dir nur etwas, wenn du im richtigen Moment zuschlägst. Mit unserem **ResortPassAlarm** stellen wir sicher, dass du die nächste Freischaltung nicht verpasst und dir deine Jahreskarte sicherst, bevor die Kontingente wieder erschöpft sind.
             </p>
 
-            <div className="bg-indigo-900 text-white p-12 rounded-3xl shadow-2xl text-center">
-                <h3 className="text-3xl font-black text-[#ffcc00] mb-6 m-0 uppercase tracking-widest">Sicher dir deine Ersparnis!</h3>
+            <div className="bg-[#00305e] text-white p-12 rounded-3xl shadow-2xl text-center">
+                <h3 className="text-3xl font-black text-[#ffcc00] mb-6 m-0 uppercase tracking-widest">Warte nicht länger!</h3>
                 <p className="text-blue-100 mb-10 max-w-2xl mx-auto text-lg">
-                  Lass die Chance auf hunderte Euro Ersparnis nicht verstreichen. Werde benachrichtigt, sobald die Pässe wieder da sind.
+                  Sichere dir hunderte Euro Ersparnis pro Jahr. Wir informieren dich sofort per SMS und E-Mail, wenn der ResortPass wieder verfügbar ist.
                 </p>
-                <div className="flex flex-col sm:flex-row justify-center gap-4">
-                    <Button onClick={() => navigate('landing')} className="bg-[#ffcc00] text-[#00305e] border-0 font-black px-12 py-5 text-2xl hover:scale-105 shadow-2xl transition-all">
-                        Alarm jetzt aktivieren
-                    </Button>
-                </div>
+                <Button onClick={() => navigate('landing')} className="bg-[#ffcc00] text-[#00305e] border-0 mx-auto font-black px-12 py-5 text-2xl hover:scale-105 shadow-2xl transition-all">
+                    Alarm jetzt aktivieren
+                </Button>
             </div>
 
             <hr className="my-12 border-slate-200" />
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-xs italic">
                 <p>Zuletzt aktualisiert am: 23. Dezember 2025</p>
-                <p>Preise basierend auf offiziellen Angaben des Europa-Park (Stand Dez 2025).</p>
+                <p>Preise basierend auf offiziellen Angaben des Europa-Park.</p>
             </div>
           </div>
         );
+
       case 'resortpass-familien-guide':
         return (
           <div className="space-y-10">
@@ -242,14 +225,10 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
             </div>
 
             <p className="text-xl leading-relaxed">
-              Für viele Familien ist der Europa-Park das Highlight des Jahres. Doch wer Deutschlands größten Freizeitpark mehrmals im Jahr besuchen möchte, merkt schnell: Die Kosten für Einzeltickets summieren sich rasant. Ein Europa-Park ResortPass scheint da die perfekte Lösung zu sein. Doch ist er das wirklich für die ganze Familie? In diesem ausführlichen Guide nehmen wir das Thema "Jahreskarte für Familien" unter die Lupe. Wir rechnen vor, geben Tipps zur Pass-Wahl und verraten, warum die Verfügbarkeit oft das größte Problem ist.
+              Für viele Familien ist der Europa-Park das Highlight des Jahres. Doch wer Deutschlands größten Freizeitpark mehrmals im Jahr besuchen möchte, merkt schnell: Die Kosten für Einzeltickets summieren sich rasant. Ein Europa-Park ResortPass scheint da die perfekte Lösung zu sein. In diesem ausführlichen Guide nehmen wir das Thema "Jahreskarte für Familien" unter die Lupe.
             </p>
 
             <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die Kosten-Rechnung 2026: Was zahlt eine Familie?</h2>
-            <p>
-              Zuerst müssen wir über Zahlen sprechen. Ein ResortPass ist eine signifikante Investition. Für eine klassische vierköpfige Familie (2 Erwachsene, 2 Kinder zwischen 4 und 11 Jahren) sieht die Rechnung für das Jahr 2026 wie folgt aus:
-            </p>
-
             <div className="overflow-x-auto my-8">
               <table className="w-full text-sm border-collapse bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-100">
                 <thead>
@@ -260,266 +239,246 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  <tr>
-                    <td className="p-4 font-medium">2 Erwachsene (à 295 € / 475 €)</td>
-                    <td className="p-4 text-center">590 €</td>
-                    <td className="p-4 text-center">950 €</td>
-                  </tr>
-                  <tr>
-                    <td className="p-4 font-medium">2 Kinder 4-11 J. (à 255 € / 415 €)</td>
-                    <td className="p-4 text-center">510 €</td>
-                    <td className="p-4 text-center">830 €</td>
-                  </tr>
-                  <tr className="bg-blue-50 font-bold">
-                    <td className="p-4">Gesamtsumme (ohne Parking)</td>
-                    <td className="p-4 text-center text-[#00305e]">1.100 €</td>
-                    <td className="p-4 text-center text-[#00305e]">1.780 €</td>
-                  </tr>
+                  <tr><td className="p-4 font-medium">2 Erwachsene</td><td className="p-4 text-center">590 €</td><td className="p-4 text-center">950 €</td></tr>
+                  <tr><td className="p-4 font-medium">2 Kinder 4-11 J.</td><td className="p-4 text-center">510 €</td><td className="p-4 text-center">830 €</td></tr>
+                  <tr className="bg-blue-50 font-bold"><td className="p-4">Gesamtsumme</td><td className="p-4 text-center text-[#00305e]">1.100 €</td><td className="p-4 text-center text-[#00305e]">1.780 €</td></tr>
                 </tbody>
               </table>
-            </div>
-
-            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 flex items-start gap-4">
-              <Calculator className="text-amber-600 shrink-0 mt-1" size={24} />
-              <div>
-                <h4 className="font-bold text-amber-900 mb-1">Vergleich zum Einzelticket</h4>
-                <p className="text-sm text-amber-800 m-0">
-                  Ein durchschnittlicher Tag im Europa-Park kostet eine vierköpfige Familie im Jahr 2026 ca. 270 € (Eintritt). Das bedeutet: Der <strong>ResortPass Silver</strong> rechnet sich für die Familie bereits ab dem <strong>5. Besuchstag</strong>. Der Gold-Pass benötigt etwa 7-8 Tage (ohne Rulantica-Vorteile gegenzurechnen).
-                </p>
-              </div>
             </div>
 
             <BlogInjectedCTA variant={1} />
 
             <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Silver oder Gold? Die Schulkinder-Falle</h2>
             <p>
-              Hier liegt der Teufel im Detail. Der ResortPass Silver ist zwar deutlich günstiger, hat aber einen großen Haken: die <strong>Sperrtage</strong>. Für Familien mit Kindern im schulpflichtigen Alter ist das oft ein Ausschlusskriterium.
-            </p>
-            <p>
-              Viele der beliebten Brückentage, Feiertage und Ferienwochenenden (insbesondere um Halloween und Weihnachten) sind im Silver-Pass gesperrt. Wenn ihr also nur in den Ferien fahrt könnt, müsst ihr den Kalender sehr genau prüfen. Der ResortPass Gold hingegen bietet volle Freiheit – jeden Tag, das ganze Jahr. Zudem sind beim Gold-Pass zwei Tagestickets für die Wasserwelt Rulantica enthalten, was für Familien einen zusätzlichen Wert von ca. 180 € darstellt.
+              Für Familien mit Kindern im schulpflichtigen Alter ist der ResortPass Silver oft schwierig, da viele beliebte Wochenenden in den Ferien als Sperrtage markiert sind. Der ResortPass Gold bietet hier volle Freiheit. Ein weiterer Bonus für Familien im Gold-Pass sind die zwei inkludierten Rulantica-Tickets pro Person, die einen Gesamtwert für eine 4-köpfige Familie von ca. 180 € bis 200 € haben.
             </p>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Tipps für maximale Ersparnis</h2>
-            <p>
-              Eine Jahreskarte ist nur der Anfang. Hier sind drei Strategien, wie ihr als Familie noch mehr herausholt:
-            </p>
             <div className="grid md:grid-cols-3 gap-6 my-8">
               <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100">
                 <Ticket className="text-indigo-600 mb-4" size={32} />
-                <h4 className="font-bold text-lg mb-2">ParkingPass nutzen</h4>
-                <p className="text-sm text-slate-500">Wer mit dem Auto anreist, zahlt 10 € pro Parkvorgang. Der ParkingPass für 39 € rechnet sich also ab dem 4. Besuch. Ein Muss für Familien!</p>
+                <h4 className="font-bold text-lg mb-2">ParkingPass</h4>
+                <p className="text-sm text-slate-500">Wer mit dem Auto anreist, spart ab dem 4. Besuch massiv durch den ParkingPass.</p>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100">
                 <Bed className="text-indigo-600 mb-4" size={32} />
-                <h4 className="font-bold text-lg mb-2">Hotel-Übernachtung</h4>
-                <p className="text-sm text-slate-500">Wusstet ihr, dass Sperrtage im Silver-Pass nicht gelten, wenn ihr in einem Europa-Park Hotel übernachtet? Das kann eine kluge Kombi sein.</p>
+                <h4 className="font-bold text-lg mb-2">Hotel-Trick</h4>
+                <p className="text-sm text-slate-500">Bei Hotelübernachtungen gelten keine Sperrtage für Inhaber eines Silver Passes.</p>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100">
                 <Map className="text-indigo-600 mb-4" size={32} />
                 <h4 className="font-bold text-lg mb-2">Partnerparks</h4>
-                <p className="text-sm text-slate-500">Mit dem Pass kommt ihr einmalig kostenlos in Parks wie Efteling oder Liseberg. Perfekt für den nächsten Familienurlaub!</p>
+                <p className="text-sm text-slate-500">Nutzt den Pass für den Familienurlaub in anderen europäischen Top-Parks.</p>
               </div>
             </div>
 
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Erfahrungen: Lohnt sich der "Stress" beim Kauf?</h2>
-            <p>
-              Echte Erfahrungen von Familien zeigen: Der ResortPass ist ein Segen für die Spontanität. Man fährt auch mal nur für 4 Stunden in den Park, ohne das Gefühl zu haben, "das teure Ticket ausnutzen zu müssen". Man ist entspannter bei langen Warteschlangen, weil man ja "nächste Woche wiederkommen kann".
-            </p>
-            <p>
-              Der größte Frustfaktor ist jedoch der Kaufprozess. Da die Pässe fast dauerhaft ausverkauft sind, ist es für eine ganze Familie extrem schwierig, 4 Pässe gleichzeitig in den Warenkorb zu bekommen. Oft sind nur noch 1 oder 2 Restkontingente verfügbar. Hier scheitern viele Familien und müssen frustriert wieder auf Einzeltickets ausweichen.
-            </p>
-
             <BlogInjectedCTA variant={2} />
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Fazit: Die ultimative Checkliste für Familien</h2>
-            <p>
-              Bevor ihr über 1.000 € in die Hand nehmt, stellt euch diese drei Fragen:
-            </p>
-            <ol className="space-y-6 list-none p-0">
-              <li className="flex gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <div className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Schaffen wir mindestens 5-6 Besuchstage im Jahr?</h4>
-                  <p className="text-slate-600 text-sm">Inklusive Anfahrt und eventueller Verpflegungskosten vor Ort? Wenn ja, ist der Pass wirtschaftlich sinnvoll.</p>
-                </div>
-              </li>
-              <li className="flex gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <div className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Sind wir auf die Ferien angewiesen?</h4>
-                  <p className="text-slate-600 text-sm">Falls ja, rechnet lieber mit dem ResortPass Gold oder plant eure Hotel-Aufenthalte strategisch um die Silver-Sperrtage herum.</p>
-                </div>
-              </li>
-              <li className="flex gap-4 bg-slate-50 p-6 rounded-2xl border border-slate-100">
-                <div className="bg-indigo-600 text-white w-10 h-10 rounded-full flex items-center justify-center shrink-0 font-bold">3</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Haben wir die Geduld für den "Drop"?</h4>
-                  <p className="text-slate-600 text-sm">Die Pässe kommen unangekündigt. Wer nicht innerhalb von Minuten reagiert, geht leer aus. Nutzt Tools, um diesen Prozess zu automatisieren.</p>
-                </div>
-              </li>
-            </ol>
 
             <div className="bg-indigo-900 text-white p-10 rounded-3xl shadow-xl text-center">
                 <h3 className="text-2xl font-black text-[#ffcc00] mb-6 m-0 uppercase tracking-widest">Familien-Jahreskarte sichern!</h3>
                 <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
-                  Überlasse den Familienurlaub nicht dem Zufall. Melde dich bei ResortPassAlarm an und wir informieren dich sofort, wenn genug Pässe für deine ganze Familie verfügbar sind.
+                  Überlassen den Familienurlaub nicht dem Zufall. Melde dich bei ResortPassAlarm an und wir informieren dich sofort.
                 </p>
                 <Button onClick={() => navigate('landing')} className="bg-[#ffcc00] text-[#00305e] border-0 mx-auto font-black px-12 py-5 text-2xl hover:scale-105 shadow-2xl transition-all">
                     Alarm jetzt aktivieren
                 </Button>
             </div>
-
-            <hr className="my-12 border-slate-200" />
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-xs italic">
-                <p>Erstellt am: 23. Dezember 2025</p>
-                <p>Unabhängiger Ratgeber. Keine Verbindung zur Mack-Gruppe.</p>
-            </div>
           </div>
         );
+
       case 'resortpass-ausverkauft-was-jetzt':
         return (
           <div className="space-y-10">
             <div className="bg-blue-50 border-l-8 border-indigo-600 p-8 rounded-r-3xl shadow-sm">
-                <h2 className="text-2xl font-bold text-indigo-900 mb-6 m-0 flex items-center gap-3"><HelpIcon className="text-indigo-600"/> 📋 Inhaltsübersicht</h2>
+                <h2 className="text-2xl font-bold text-indigo-900 mb-6 m-0 flex items-center gap-3"><HelpCircle className="text-indigo-600"/> 📋 Inhaltsübersicht</h2>
                 <ul className="list-none p-0 space-y-4 m-0 text-lg text-slate-700">
-                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Warum der Pass ausverkauft ist und was "Soll-Kontingente" sind.</li>
-                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Gibt es eine echte Warteliste? (Die bittere Wahrheit).</li>
-                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Alternativen für Kurzentschlossene: Tagestickets & Mehrtages-Deals.</li>
-                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Der Hotel-Trick: So kommst du trotzdem rein.</li>
-                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Die "Wächter"-Strategie für den nächsten Drop.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Warum der Pass ausverkauft ist.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Gibt es eine echte Warteliste?</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Der Hotel-Trick.</li>
                 </ul>
             </div>
-
             <p className="text-xl leading-relaxed">
-                Du hast den Urlaub geplant, die Vorfreude ist riesig, und dann das: Du klickst auf den Ticket-Shop des Europa-Park und siehst nur ein rotes Banner mit der Aufschrift „Momentan leider ausverkauft“. Ob ResortPass Silver oder der begehrte Gold-Pass – die Kontingente sind seit Monaten ein knappes Gut. Viele Fans fühlen sich im Stich gelassen und fragen sich: Wie kann das sein? Und vor allem: Was mache ich jetzt? In diesem ausführlichen Guide zeigen wir dir, wie du die Wartezeit überbrückst und wie du doch noch zu deiner Jahreskarte kommst.
+                Du hast den Urlaub geplant, die Vorfreude ist riesig, und dann das: Du siehst nur ein rotes Banner mit der Aufschrift „Momentan leider ausverkauft“. In diesem Guide zeigen wir dir, wie du die Wartezeit überbrückst und wie du doch noch zu deiner Jahreskarte kommst.
             </p>
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die aktuelle Lage: Warum ist der ResortPass ständig weg?</h2>
-            <p>
-                Der Europa-Park hat in den letzten zwei Jahren seine Strategie grundlegend geändert. Weg von der unlimitierten Clubkarte, hin zu einem gesteuerten ResortPass-System. Der Grund ist simpel: Kapazitätsmanagement. Um das Erlebnis für jeden Gast im Park (Wartezeiten, Gastronomie-Auslastung) zu optimieren, darf nur eine bestimmte Anzahl an Jahreskarten im Umlauf sein.
-            </p>
-            <p>
-                Sobald eine gewisse Anzahl an Pässen im Umlauf ist, stoppt der Verkauf automatisch. Neue Pässe werden erst wieder freigeschaltet, wenn bestehende Pässe nicht verlängert werden oder der Park entscheidet, die Kapazität geringfügig zu erhöhen. Das passiert oft in unangekündigten Schüben, den sogenannten "Drops".
-            </p>
-
-            <div className="bg-amber-50 p-6 rounded-2xl border border-amber-200 flex items-start gap-4">
-              <AlertTriangle className="text-amber-600 shrink-0 mt-1" size={24} />
-              <div>
-                <h4 className="font-bold text-amber-900 mb-1">Gibt es eine Warteliste?</h4>
-                <p className="text-sm text-amber-800 m-0">
-                  Offiziell bietet der Europa-Park <strong>keine Warteliste</strong> an, auf der du dich eintragen kannst, um benachrichtigt zu werden. Der Support verweist meist auf "regelmäßiges Nachsehen im Shop". Das bedeutet für dich: Wer zuerst kommt, mahlt zuerst. Es gibt keine Priorisierung für treue Fans oder ehemalige Inhaber.
-                </p>
-              </div>
-            </div>
-
             <BlogInjectedCTA variant={1} />
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Kurzfristige Alternativen: Wenn der Parkbesuch feststeht</h2>
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die Strategie für den nächsten Drop</h2>
             <p>
-                Wenn dein Besuchstermin bereits steht und du keine Jahreskarte bekommen hast, musst du nicht verzagen. Hier sind die besten Wege, um trotzdem den Zauber von Rust zu erleben:
+                Die Pässe werden oft in Schüben freigeschaltet. Manuelle Suche ist hier wie ein Lottospiel. Tools wie unser ResortPassAlarm automatisieren die Überwachung und senden dir sofort eine Nachricht.
             </p>
-
-            <div className="grid md:grid-cols-2 gap-6 my-8">
-              <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
-                <Ticket className="text-indigo-600 mb-4" size={32} />
-                <h4 className="font-bold text-lg mb-2">Tagestickets & Mehrtageskarten</h4>
-                <p className="text-sm text-slate-500 flex-grow">
-                  Klassisch, aber effektiv. Buche Einzeltickets frühzeitig online. Besonders die 2-Tages-Tickets bieten eine Ersparnis gegenüber zwei Einzeltitckets. 
-                </p>
-                <div className="mt-4 text-indigo-600 text-xs font-bold uppercase tracking-wider">Tipp: Reservierung nötig!</div>
-              </div>
-              <div className="bg-white p-6 rounded-2xl shadow-md border border-slate-100 flex flex-col">
-                <Bed className="text-indigo-600 mb-4" size={32} />
-                <h4 className="font-bold text-lg mb-2">Der "Hotel-Trick"</h4>
-                <p className="text-sm text-slate-500 flex-grow">
-                  Als Übernachtungsgast in den Europa-Park Hotels hast du eine Eintrittsgarantie. Selbst wenn die Tageskontingente für normale Besucher erschöpft sind, bekommst du als Hotelgast fast immer noch Tickets an der Rezeption.
-                </p>
-                <div className="mt-4 text-indigo-600 text-xs font-bold uppercase tracking-wider">Kostspielig aber sicher</div>
-              </div>
-            </div>
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Langfristige Strategie: So sicherst du dir den nächsten Drop</h2>
-            <p>
-                Manuelle Suche ist wie ein Lottospiel. Du kannst die Seite 50-mal am Tag aktualisieren und genau in den 10 Minuten nicht schauen, in denen 50 neue Gold-Pässe freigeschaltet wurden. Hier ist dein Schlachtplan:
-            </p>
-            <ol className="space-y-6 list-none p-0">
-              <li className="flex gap-4">
-                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">1</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">MackOne Account fix und fertig machen</h4>
-                  <p className="text-slate-600">
-                    Hinterlege deine Adresse, deine Zahlungsmittel und verifiziere deine E-Mail. Wenn die Pässe online gehen, zählt jede Sekunde. Du willst nicht erst dein Passwort zurücksetzen müssen.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">2</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Wellen verstehen</h4>
-                  <p className="text-slate-600">
-                    Erfahrungsgemäß werden Kontingente oft an Wochentagen vormittags (zwischen 9 und 11 Uhr) freigegeben. Am Wochenende passiert selten etwas.
-                  </p>
-                </div>
-              </li>
-              <li className="flex gap-4">
-                <div className="bg-slate-900 text-white w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold">3</div>
-                <div>
-                  <h4 className="font-bold text-slate-900">Automatisierung nutzen</h4>
-                  <p className="text-slate-600">
-                    Das ist der wichtigste Punkt. Tools wie ResortPassAlarm überwachen die Seite im Minutentakt für dich. Während du arbeitest oder schläfst, scannt der Wächter die Verfügbarkeit.
-                  </p>
-                </div>
-              </li>
-            </ol>
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Alternative: Andere Parks mit dem ResortPass entdecken</h2>
-            <p>
-                Wusstest du, dass du mit einem aktiven ResortPass auch andere Parks kostenlos besuchen kannst? Wenn der Europa-Park gerade überfüllt ist oder du auf deinen Pass wartest, schau dir die Partner-Vorteile an. 
-            </p>
-            <div className="bg-slate-50 p-8 rounded-3xl border border-slate-200">
-              <div className="flex items-center gap-3 mb-4">
-                <Map className="text-indigo-600" />
-                <h4 className="font-bold text-[#00305e] text-xl m-0">Top Partnerparks (1x pro Laufzeit gratis)</h4>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm text-slate-600">
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Efteling (NL)</div>
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Liseberg (SE)</div>
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Port Aventura (ES)</div>
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Isla Mágica (ES)</div>
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Pleasure Beach (UK)</div>
-                <div className="flex items-center gap-2"><CheckCircle size={14} className="text-green-500" /> Emerald Park (IE)</div>
-              </div>
-              <p className="mt-4 text-xs text-slate-400 italic">
-                Hinweis: Diese Besuche sind erst möglich, wenn du deinen ResortPass bereits in Händen hältst. Sie sind ein großartiger Zusatznutzen, der den Pass noch wertvoller macht.
-              </p>
-            </div>
-
             <BlogInjectedCTA variant={2} />
-
-            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Fazit: Nicht aufgeben, klug agieren</h2>
-            <p>
-                Die Frustration über ausverkaufte ResortPässe ist verständlich, aber mit der richtigen Strategie ist es nur eine Frage der Zeit, bis du deinen eigenen Pass hast. Nutze Tagestickets für dringende Besuche, bereite deinen MackOne Account perfekt vor und lass dich von automatisierten Systemen benachrichtigen. 
-            </p>
-            <p>
-                Denk daran: Sobald der Alarm auf deinem Handy eingeht, hast du meist ein Zeitfenster von 5 bis 15 Minuten. Wer dann vorbereitet ist, sichert sich sein Jahr voller Abenteuer im Europa-Park Resort.
-            </p>
-
-            <div className="bg-indigo-900 text-white p-10 rounded-3xl shadow-xl text-center">
-                <h3 className="text-2xl font-black text-[#ffcc00] mb-6 m-0 uppercase tracking-widest">Bereit für den nächsten Drop?</h3>
-                <p className="text-blue-100 mb-8 max-w-2xl mx-auto">
-                    Überlasse dein Glück nicht dem Zufall. Werde Teil der ResortPassAlarm Community und erhalte sofort Bescheid, wenn die Pässe wieder verfügbar sind.
-                </p>
-                <Button onClick={() => navigate('landing')} className="bg-[#ffcc00] text-[#00305e] border-0 mx-auto font-black px-12 py-5 text-2xl hover:scale-105 shadow-2xl transition-all">
-                    Überwachung jetzt starten
-                </Button>
-            </div>
-
-            <hr className="my-12 border-slate-200" />
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-slate-400 text-xs italic">
-                <p>Zuletzt aktualisiert: {postInfo.date}</p>
-                <p>Keine offizielle Seite des Europa-Park.</p>
-            </div>
           </div>
         );
+
       case 'resortpass-kaufen-tipps':
-// ... Rest of file remains unchanged
+        return (
+          <div className="space-y-10">
+            <div className="bg-amber-50 border-l-8 border-amber-400 p-8 rounded-r-3xl shadow-sm">
+                <h2 className="text-2xl font-bold text-[#00305e] mb-6 m-0 flex items-center gap-3"><Info className="text-amber-500"/> 📋 Tipps zum Kauf</h2>
+                <ul className="list-none p-0 space-y-4 m-0 text-lg text-slate-700">
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> MackOne Account vorbereiten.</li>
+                    <li className="flex items-start gap-3"><Check size={20} className="text-green-600 shrink-0 mt-1" /> Schnelle Zahlungsmittel nutzen.</li>
+                </ul>
+            </div>
+            <p className="text-xl leading-relaxed">
+                Der Kaufprozess eines ResortPass gleicht heute einer digitalen Schatzsuche. Wer gut vorbereitet ist, hat die Nase vorn. Erstelle dir bereits heute einen MackOne Account und hinterlege deine Daten.
+            </p>
+            <BlogInjectedCTA variant={1} />
+            <h2 className="text-3xl font-bold text-[#00305e] border-b-2 border-slate-100 pb-4">Die Wellen-Taktik verstehen</h2>
+            <p>
+                Kontingente werden oft am Vormittag zwischen 9:00 und 11:00 Uhr freigeschaltet. Sei bereit!
+            </p>
+          </div>
+        );
+
+      case 'resortpass-guide-2026':
+        return (
+          <div className="space-y-10">
+             <h2 className="text-3xl font-bold text-[#00305e]">Alles über den ResortPass 2026</h2>
+             <p className="text-lg">In diesem Guide erfährst du alles Wichtige für die kommende Saison. Der ResortPass ist digital und wird einfach in der Europa-Park App hinterlegt.</p>
+             <div className="bg-blue-50 p-6 rounded-2xl">
+                 <h4 className="font-bold mb-2">Vorteile 2026:</h4>
+                 <ul className="list-disc pl-5">
+                     <li>Eintritt an über 230 oder allen Tagen.</li>
+                     <li>Partnerpark-Vorteile.</li>
+                     <li>Digitale Verwaltung.</li>
+                 </ul>
+             </div>
+             <BlogInjectedCTA variant={1} />
+          </div>
+        );
+
+      case 'silver-vs-gold-vergleich':
+        return (
+          <div className="space-y-10">
+             <h2 className="text-3xl font-bold text-[#00305e]">Silver oder Gold? Der Vergleich</h2>
+             <p className="text-lg">Der Silver Pass ist ideal für Sparfüchse und flexible Besucher. Der Gold Pass richtet sich an Power-User und Familien, die keine Sperrtage akzeptieren möchten.</p>
+             <BlogInjectedCTA variant={2} />
+             <div className="grid md:grid-cols-2 gap-8">
+                 <div className="bg-slate-100 p-6 rounded-xl">
+                     <h3 className="font-bold text-xl mb-3">Silver Pass</h3>
+                     <p>295 € / über 230 Tage / ideal für unter der Woche.</p>
+                 </div>
+                 <div className="bg-yellow-50 p-6 rounded-xl border border-yellow-200">
+                     <h3 className="font-bold text-xl mb-3">Gold Pass</h3>
+                     <p>475 € / alle Tage / inkl. 2x Rulantica.</p>
+                 </div>
+             </div>
+          </div>
+        );
+
+      case 'resortpass-preise-2026':
+        return (
+          <div className="space-y-10">
+             <h2 className="text-3xl font-bold text-[#00305e]">Aktuelle Preise für 2026</h2>
+             <div className="bg-white p-8 rounded-2xl border shadow-sm">
+                 <p className="text-2xl font-bold mb-4">Preisübersicht (Erwachsene):</p>
+                 <ul className="space-y-2 text-xl">
+                     <li>ResortPass Silver: 295 €</li>
+                     <li>ResortPass Gold: 475 €</li>
+                     <li>ParkingPass: 39 €</li>
+                 </ul>
+             </div>
+             <p>Die Preise bleiben im Vergleich zu 2025 stabil, was eine gute Nachricht für alle Fans ist.</p>
+             <BlogInjectedCTA variant={1} />
+          </div>
+        );
+
+      case 'resortpass-amortisation-rechner':
+        return (
+          <div className="space-y-10">
+             <h2 className="text-3xl font-bold text-[#00305e]">Lohnt sich der Pass? Der Rechner</h2>
+             <p className="text-lg">Berechne deine Besuche gegen den Ticketpreis. Im Durchschnitt kostet ein Ticket 68 €.</p>
+             <div className="bg-indigo-600 text-white p-8 rounded-2xl text-center">
+                 <p className="text-4xl font-black">Ab 5 Besuchen profitabel!</p>
+             </div>
+             <p>Dies gilt für den Silver Pass. Beim Gold Pass rechnet es sich ab ca. 7 Besuchen (ohne Rulantica).</p>
+             <BlogInjectedCTA variant={2} />
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      <div className="flex-grow py-12 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-4xl mx-auto">
+          {/* Header */}
+          <div className="mb-12">
+            <button 
+              onClick={() => navigate('blog')}
+              className="flex items-center text-slate-500 hover:text-indigo-600 font-medium transition-colors mb-6 group"
+            >
+              <ArrowLeft size={16} className="mr-2 group-hover:-translate-x-1 transition-transform" /> Zurück zum Blog
+            </button>
+            <div className="flex items-center gap-2 mb-4">
+              <span className="bg-indigo-100 text-indigo-600 text-xs font-bold uppercase px-3 py-1 rounded-full">
+                {postInfo.category}
+              </span>
+              <span className="text-slate-400 text-sm flex items-center gap-1">
+                <Calendar size={14} /> {postInfo.date}
+              </span>
+            </div>
+            <h1 className="text-3xl md:text-5xl font-bold text-slate-900 leading-tight mb-8">
+              {postInfo.title}
+            </h1>
+            <div className="flex items-center gap-4 py-6 border-y border-slate-100">
+               <div className="w-12 h-12 bg-[#00305e] rounded-full flex items-center justify-center text-[#ffcc00]">
+                 {postInfo.icon}
+               </div>
+               <div>
+                  <p className="text-sm font-bold text-slate-900">ResortPass-Experten</p>
+                  <p className="text-xs text-slate-400">Aktualisiert für die Saison 2026</p>
+               </div>
+               <div className="ml-auto flex gap-2">
+                 <button className="p-2 text-slate-400 hover:text-indigo-500 transition"><Share2 size={20} /></button>
+               </div>
+            </div>
+          </div>
+
+          {/* Content */}
+          <div className="prose prose-slate prose-lg max-w-none prose-headings:text-[#00305e] prose-headings:font-bold prose-a:text-indigo-600 prose-strong:text-slate-900 leading-relaxed">
+            {renderContent()}
+          </div>
+
+          {/* Footer Info */}
+          <div className="mt-16 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm">
+            <div className="flex items-start gap-4">
+                <AlertTriangle className="text-amber-500 shrink-0 mt-1" size={24} />
+                <div>
+                    <strong className="block mb-2 text-slate-900">Transparenz-Hinweis</strong>
+                    <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                    Dieser Artikel fasst öffentlich verfügbare Informationen zusammen. Für verbindliche Details gelten ausschließlich die Angaben des Europa-Park / Mack International Ticketshops. ResortPassAlarm ist ein unabhängiger Service.
+                    </p>
+                </div>
+            </div>
+          </div>
+
+          {/* More Posts */}
+          <div className="mt-16 pt-16 border-t border-slate-200">
+             <h3 className="text-2xl font-bold text-[#00305e] mb-8">Das könnte dich auch interessieren</h3>
+             <div className="grid md:grid-cols-2 gap-8">
+                {BLOG_POSTS.filter(p => p.slug !== slug).slice(0, 2).map(p => (
+                  <div 
+                    key={p.slug} 
+                    className="flex gap-4 cursor-pointer group bg-white p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-all"
+                    onClick={() => { navigate(`blog-post:${p.slug}`); window.scrollTo(0,0); }}
+                  >
+                    <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 text-[#00305e]">
+                      {p.icon}
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 leading-snug group-hover:text-indigo-600 transition-colors line-clamp-2">{p.title}</h4>
+                      <p className="text-xs text-slate-400 mt-2 flex items-center gap-1 font-bold uppercase tracking-wider">Guide lesen <ChevronRight size={12}/></p>
+                    </div>
+                  </div>
+                ))}
+             </div>
+          </div>
+        </div>
+      </div>
+      <Footer navigate={navigate} />
+    </div>
+  );
+};
