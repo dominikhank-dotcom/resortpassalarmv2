@@ -3,15 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Power, UserMinus, Trash2
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Power, UserMinus, Trash2, BookOpen, FileText, Wand2, Eye, RotateCw
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { generateAdminInsights } from '../services/geminiService';
 import { 
-  sendTemplateTest, 
-  testBrowseAiConnection, 
-  testGeminiConnection, 
   manageSubscription, 
   getCustomerDetails, 
   updateSystemSettings, 
@@ -23,6 +19,7 @@ import {
   deleteAccount
 } from '../services/backendService';
 import { EmailTemplate } from '../types';
+import { supabase } from '../lib/supabase';
 
 interface AdminDashboardProps {
   commissionRate: number;
@@ -36,8 +33,14 @@ interface AdminDashboardProps {
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
   commissionRate, onUpdateCommission, prices, onUpdatePrices, productUrls, onUpdateProductUrls 
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'emails' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'emails' | 'blog' | 'settings'>('overview');
   
+  // Blog Generator State
+  const [blogPosts, setBlogPosts] = useState<any[]>([]);
+  const [isGeneratingBlog, setIsGeneratingBlog] = useState(false);
+  const [newBlog, setNewBlog] = useState({ title: '', wordCount: 1000 });
+  const [blogLoading, setBlogLoading] = useState(false);
+
   // Date Picker State
   const [dateRange, setDateRange] = useState({
       start: new Date(new Date().setDate(new Date().getDate() - 28)).toISOString().split('T')[0],
@@ -57,7 +60,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   const [loading, setLoading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [aiInsights, setAiInsights] = useState("");
 
   // System Status State
   const [sysStatus, setSysStatus] = useState({ gold: 'sold_out', silver: 'sold_out', lastChecked: '...' });
@@ -89,21 +91,67 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     loadStats();
     loadSystemSettings();
-  }, [dateRange]); // Reload stats when date changes
+  }, [dateRange]);
 
   useEffect(() => {
-    if (activeTab === 'customers') {
-        loadAllUsers();
-        setSortConfig({ key: 'created_at', direction: 'desc' });
-        setCurrentPage(1);
-    }
-    if (activeTab === 'partners') {
-        loadAllUsers(); 
-        setSortConfig({ key: 'created_at', direction: 'desc' });
-        setCurrentPage(1);
-    }
+    if (activeTab === 'customers' || activeTab === 'partners') loadAllUsers();
     if (activeTab === 'emails') loadTemplates();
+    if (activeTab === 'blog') loadBlogPosts();
   }, [activeTab]);
+
+  const loadBlogPosts = async () => {
+    setBlogLoading(true);
+    try {
+      const res = await fetch('/api/blog-posts');
+      const data = await res.json();
+      setBlogPosts(data);
+    } catch (e) { console.error(e); }
+    finally { setBlogLoading(false); }
+  };
+
+  const handleGenerateBlog = async (existingPost?: any) => {
+    const title = existingPost ? existingPost.title : newBlog.title;
+    const wordCount = existingPost ? existingPost.word_count_target : newBlog.wordCount;
+
+    if (!title) return alert("Bitte Titel eingeben");
+
+    setIsGeneratingBlog(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const res = await fetch('/api/generate-blog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          title, 
+          wordCount, 
+          adminId: user?.id,
+          existingId: existingPost?.id
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Artikel erfolgreich generiert!");
+        loadBlogPosts();
+        if (!existingPost) setNewBlog({ title: '', wordCount: 1000 });
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (e: any) { alert("Fehler: " + e.message); }
+    finally { setIsGeneratingBlog(false); }
+  };
+
+  const handleDeleteBlog = async (id: string) => {
+    if (!confirm("Artikel wirklich löschen?")) return;
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await fetch('/api/blog-posts', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, adminId: user?.id })
+      });
+      loadBlogPosts();
+    } catch (e: any) { alert(e.message); }
+  };
 
   const loadStats = async () => {
     try {
@@ -111,9 +159,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const response = await fetch(`/api/admin-stats${query}`);
         const data = await response.json();
         if (data && !data.error) setStats(data);
-    } catch (e) {
-        console.error("Stats load failed", e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const loadSystemSettings = async () => {
@@ -141,7 +187,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             const partners = data.users.filter((u: any) => u.role === 'AFFILIATE'); 
             setPartnerList(partners); 
         }
-    } catch (e) { console.error("Load Users Error", e); }
+    } catch (e) { console.error(e); }
   };
 
   const loadTemplates = async () => {
@@ -149,23 +195,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       const t = await getEmailTemplates();
       if (t) setTemplates(t);
       setIsTemplatesLoading(false);
-  };
-
-  const handleDeleteByAdmin = async () => {
-    if (!selectedCustomer) return;
-    if (!confirm(`⚠️ ACHTUNG: Möchtest du den Account von ${selectedCustomer.profile.email} wirklich löschen?\n\nDer Zugang wird gesperrt und Daten ggf. anonymisiert.`)) return;
-
-    setIsDeleting(true);
-    try {
-      const result = await deleteAccount(selectedCustomer.profile.id);
-      alert(result.message);
-      setSelectedCustomer(null);
-      loadAllUsers(); // Refresh list
-    } catch (e: any) {
-      alert("Fehler bei Löschung: " + e.message);
-    } finally {
-      setIsDeleting(false);
-    }
   };
 
   const handleDatePresetChange = (preset: string) => {
@@ -180,7 +209,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     else if (preset === 'thisMonth') { start = new Date(now.getFullYear(), now.getMonth(), 1); }
     else if (preset === 'lastMonth') { start.setDate(1); start.setMonth(start.getMonth() - 1); const lastDayPrevMonth = new Date(start.getFullYear(), start.getMonth() + 1, 0); end.setTime(lastDayPrevMonth.getTime()); }
     else if (preset === 'thisYear') { start = new Date(new Date().getFullYear(), 0, 1); }
-    else if (preset === 'custom') { return; }
     setDateRange({ start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] });
   };
 
@@ -192,7 +220,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleUpdateStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       if (!confirm(`Bist du sicher? Dies sendet Alarme für ${type.toUpperCase()} wenn 'available'!`)) return;
-      try { await updateSystemStatus(type, status); alert(`Status für ${type} auf ${status} gesetzt.`); loadSystemSettings(); } catch (e: any) { alert("Fehler: " + e.message); }
+      try { await updateSystemStatus(type, status); alert(`Status auf ${status} gesetzt.`); loadSystemSettings(); } catch (e: any) { alert(e.message); }
   };
 
   const handleOpenCustomerDetail = async (userId: string) => {
@@ -225,18 +253,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               email: customerForm.email,
               firstName: customerForm.firstName,
               lastName: customerForm.lastName,
-              address: {
-                  street: customerForm.street,
-                  houseNumber: customerForm.houseNumber,
-                  zip: customerForm.zip,
-                  city: customerForm.city,
-                  country: customerForm.country
-              }
+              address: { street: customerForm.street, houseNumber: customerForm.houseNumber, zip: customerForm.zip, city: customerForm.city, country: customerForm.country }
           });
           alert("Kunde gespeichert!");
           setEditCustomerMode(false);
           handleOpenCustomerDetail(selectedCustomer.profile.id);
-      } catch (e: any) { alert("Fehler: " + e.message); }
+      } catch (e: any) { alert(e.message); }
   };
 
   const handleManageSub = async (action: 'grant_free' | 'revoke_free' | 'cancel_sub') => {
@@ -258,7 +280,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleSavePrices = async () => {
-    try { await updateSystemSettings('price_new_customers', prices.new.toString()); alert("Preise gespeichert!"); } catch(e: any) { alert("Fehler: " + e.message); }
+    try { await updateSystemSettings('price_new_customers', prices.new.toString()); alert("Preise gespeichert!"); } catch(e: any) { alert(e.message); }
   };
   
   const handleSaveUrls = async () => {
@@ -267,7 +289,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const handleSaveTemplate = async () => {
       if (!selectedTemplate) return;
-      try { await saveEmailTemplate(selectedTemplate); alert("Template gespeichert!"); loadTemplates(); } catch (e: any) { alert("Fehler: " + e.message); }
+      try { await saveEmailTemplate(selectedTemplate); alert("Template gespeichert!"); loadTemplates(); } catch (e: any) { alert(e.message); }
   };
 
   const getProcessedList = (rawList: any[]) => {
@@ -283,16 +305,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           list = [...list].sort((a, b) => {
               let valA = a[sortConfig.key];
               let valB = b[sortConfig.key];
-              if (sortConfig.key === 'status') {
-                   const statusRank = (s: any) => {
-                       if (s.sub_status === 'active' && !s.cancel_at_period_end) return 4;
-                       if (s.sub_status === 'active' && s.cancel_at_period_end) return 3;
-                       if (s.sub_status === 'trialing') return 2;
-                       return 1; 
-                   };
-                   valA = statusRank(a);
-                   valB = statusRank(b);
-              }
               if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
               if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
               return 0;
@@ -314,7 +326,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                      <option value={25}>25</option>
                      <option value={50}>50</option>
                      <option value={100}>100</option>
-                     <option value={250}>250</option>
                      <option value={-1}>Alle</option>
                  </select>
                  <span className="text-sm text-slate-500">Einträge (Gesamt: {totalItems})</span>
@@ -341,6 +352,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                    { id: 'overview', label: 'Übersicht', icon: LayoutDashboard },
                    { id: 'customers', label: 'Kunden', icon: Users },
                    { id: 'partners', label: 'Partner', icon: Handshake },
+                   { id: 'blog', label: 'Blog', icon: BookOpen },
                    { id: 'emails', label: 'E-Mails', icon: Mail },
                    { id: 'settings', label: 'Einstellungen', icon: Sliders }
                  ].map(tab => (
@@ -355,12 +367,106 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       <div className="max-w-7xl mx-auto p-6">
           
+          {activeTab === 'blog' && (
+            <div className="space-y-6 animate-in fade-in">
+              {/* Blog Generator Form */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2"><Sparkles className="text-amber-500" size={18} /> KI Blog-Generator</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Artikel-Titel</label>
+                    <input 
+                      type="text" 
+                      placeholder="z.B. 10 Tipps für den Europa-Park im Sommer" 
+                      value={newBlog.title}
+                      onChange={e => setNewBlog({...newBlog, title: e.target.value})}
+                      className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    />
+                  </div>
+                  <div className="flex gap-4">
+                    <div className="w-32">
+                      <label className="block text-sm font-medium text-slate-700 mb-1">Wortanzahl</label>
+                      <input 
+                        type="number" 
+                        value={newBlog.wordCount}
+                        onChange={e => setNewBlog({...newBlog, wordCount: Number(e.target.value)})}
+                        className="w-full p-2.5 border rounded-lg outline-none"
+                      />
+                    </div>
+                    <Button 
+                      onClick={() => handleGenerateBlog()} 
+                      disabled={isGeneratingBlog}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                    >
+                      {isGeneratingBlog ? <><RefreshCw className="animate-spin" size={18} /> Generiere...</> : <><Wand2 size={18} /> Artikel generieren</>}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Blog Posts List */}
+              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                <div className="flex justify-between items-center mb-6">
+                  <h3 className="font-bold text-slate-900 flex items-center gap-2"><FileText size={18} /> Veröffentlichte Artikel</h3>
+                  <Button size="sm" variant="outline" onClick={loadBlogPosts} disabled={blogLoading}><RefreshCw className={blogLoading ? "animate-spin" : ""} size={14} /></Button>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
+                      <tr>
+                        <th className="px-4 py-3">Datum / Titel</th>
+                        <th className="px-4 py-3">Kategorie</th>
+                        <th className="px-4 py-3">Status</th>
+                        <th className="px-4 py-3 text-right">Aktionen</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {blogPosts.map(post => (
+                        <tr key={post.id} className="hover:bg-slate-50">
+                          <td className="px-4 py-3">
+                            <div className="text-[10px] text-slate-400 font-mono">{post.date}</div>
+                            <div className="font-bold text-slate-900">{post.title}</div>
+                            <div className="text-[10px] text-blue-500 font-mono">/blog/{post.slug}</div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-xs font-bold">{post.category}</span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle size={12}/> Live</span>
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <div className="flex justify-end gap-2">
+                              <a href={`/blog/${post.slug}`} target="_blank" className="p-2 text-slate-400 hover:text-blue-600 transition" title="Ansehen"><Eye size={16}/></a>
+                              <button 
+                                onClick={() => handleGenerateBlog(post)} 
+                                disabled={isGeneratingBlog}
+                                className="p-2 text-slate-400 hover:text-amber-600 transition" 
+                                title="Neu generieren"
+                              >
+                                <RotateCw className={isGeneratingBlog ? "animate-spin" : ""} size={16}/>
+                              </button>
+                              <button onClick={() => handleDeleteBlog(post.id)} className="p-2 text-slate-400 hover:text-red-600 transition" title="Löschen"><Trash2 size={16}/></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {blogPosts.length === 0 && !blogLoading && (
+                        <tr><td colSpan={4} className="p-12 text-center text-slate-400 italic">Noch keine Blog-Artikel vorhanden.</td></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'overview' && (
               <div className="space-y-6 animate-in fade-in">
                   <div className="flex justify-end mb-4">
                       <div className="bg-white p-2 rounded-lg border border-slate-200 flex items-center gap-2 shadow-sm">
                           <div className="border-r border-slate-200 pr-2 mr-2">
-                             <select value={datePreset} onChange={(e) => handleDatePresetChange(e.target.value)} className="bg-transparent text-sm outline-none font-medium text-slate-700">
+                             <select value={datePreset} onChange={(e) => handleDatePresetChange(e.target.value)} className="bg-transparent text-sm outline-none font-medium text-slate-700 cursor-pointer">
                                  <option value="today">Heute</option>
                                  <option value="yesterday">Gestern</option>
                                  <option value="last7">Letzte 7 Tage</option>
@@ -372,22 +478,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              </select>
                           </div>
                           <Calendar size={16} className="text-slate-500" />
-                          <input type="date" value={dateRange.start} onChange={e => { setDateRange({...dateRange, start: e.target.value}); setDatePreset('custom'); }} className="text-sm outline-none bg-transparent" />
+                          <input type="date" value={dateRange.start} onChange={e => { setDateRange({...dateRange, start: e.target.value}); setDatePreset('custom'); }} className="text-sm outline-none bg-transparent cursor-pointer" />
                           <span className="text-slate-400">-</span>
-                          <input type="date" value={dateRange.end} onChange={e => { setDateRange({...dateRange, end: e.target.value}); setDatePreset('custom'); }} className="text-sm outline-none bg-transparent" />
+                          <input type="date" value={dateRange.end} onChange={e => { setDateRange({...dateRange, end: e.target.value}); setDatePreset('custom'); }} className="text-sm outline-none bg-transparent cursor-pointer" />
                       </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                       <div className="bg-white p-4 rounded-xl shadow-sm border border-green-200 bg-green-50/50">
                           <div className="flex justify-between items-start">
-                              <div><p className="text-green-800 text-xs uppercase font-bold">Aktive Abos (Ungekündigt)</p><p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeUncanceled}</p></div>
+                              <div><p className="text-green-800 text-xs uppercase font-bold">Aktive Abos</p><p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeUncanceled}</p></div>
                               <CheckCircle className="text-green-600 opacity-50" size={20} />
                           </div>
                       </div>
                       <div className="bg-white p-4 rounded-xl shadow-sm border border-amber-200 bg-amber-50/50">
                           <div className="flex justify-between items-start">
-                              <div><p className="text-amber-800 text-xs uppercase font-bold">Gekündigte (Laufende)</p><p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeCanceling}</p></div>
+                              <div><p className="text-amber-800 text-xs uppercase font-bold">Laufend (Gekündigt)</p><p className="text-2xl font-bold text-slate-900 mt-1">{stats.activeCanceling}</p></div>
                               <UserMinus className="text-amber-600 opacity-50" size={20} />
                           </div>
                       </div>
@@ -417,7 +523,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <ResponsiveContainer width="100%" height="100%">
                               <AreaChart data={stats.history}>
                                   <defs><linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#4F46E5" stopOpacity={0.8}/><stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/></linearGradient></defs>
-                                  <XAxis dataKey="date" tick={{fontSize: 12}} /><YAxis tick={{fontSize: 12}} /><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><Tooltip /><Area type="monotone" dataKey="revenue" stroke="#4F46E5" fillOpacity={1} fill="url(#colorRevenue)" name="Est. Revenue" /><Area type="monotone" dataKey="newSubs" stroke="#10b981" fill="none" name="New Subs" /></AreaChart>
+                                  <XAxis dataKey="date" tick={{fontSize: 12}} /><YAxis tick={{fontSize: 12}} /><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" /><Tooltip /><Area type="monotone" dataKey="revenue" stroke="#4F46E5" fillOpacity={1} fill="url(#colorRevenue)" name="Revenue" /><Area type="monotone" dataKey="newSubs" stroke="#10b981" fill="none" name="New Subs" /></AreaChart>
                           </ResponsiveContainer>
                       </div>
                   </div>
@@ -429,12 +535,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="font-bold text-slate-900 flex items-center gap-2"><Users size={18} /> Kunden</h3>
-                        <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="Suchen..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 border rounded-lg text-sm w-64" /></div>
+                        <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input type="text" placeholder="Suchen..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 pr-4 py-2 border rounded-lg text-sm w-64 outline-none" /></div>
                       </div>
                       <div className="overflow-x-auto">
                           <table className="w-full text-sm text-left">
                               <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
-                                  <tr><th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('created_at')}>Kunde</th><th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('status')}>Status</th><th className="px-4 py-3">Partner-Code</th><th className="px-4 py-3 text-right">Aktion</th></tr>
+                                  <tr><th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('created_at')}>Kunde</th><th className="px-4 py-3 cursor-pointer" onClick={() => handleSort('status')}>Status</th><th className="px-4 py-3">Ref</th><th className="px-4 py-3 text-right">Aktion</th></tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
                                   {visibleCustomers.map((u: any) => (
@@ -442,7 +548,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                                           <td className="px-4 py-3"><div className="font-bold text-slate-900">{u.name}</div><div className="text-slate-500 text-xs">{u.email}</div></td>
                                           <td className="px-4 py-3">
                                               {u.cancel_at_period_end ? <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded text-xs font-bold border border-amber-200">Gekündigt</span> : (u.sub_status === 'active' || u.sub_status === 'trialing' ? <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded text-xs font-bold border border-green-200">Aktiv</span> : <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-xs border border-slate-200">Inaktiv</span>)}
-                                              <div className="text-[10px] text-slate-400 mt-0.5">{u.plan}</div>
                                           </td>
                                           <td className="px-4 py-3">{u.referred_by ? <span className="font-mono bg-indigo-50 text-indigo-600 px-1 rounded">{u.referred_by}</span> : <span className="text-slate-300">-</span>}</td>
                                           <td className="px-4 py-3 text-right"><Button size="sm" variant="outline" onClick={() => handleOpenCustomerDetail(u.id)}>Details</Button></td>
@@ -456,14 +561,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
           )}
 
-          {/* PARTNERS TAB */}
           {activeTab === 'partners' && (
               <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Handshake size={18} /> Partner Provisionen</h3>
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Handshake size={18} /> Partner</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                           <div>
-                              <label className="block text-sm font-medium text-slate-700 mb-1">Provision für NEUE Partner (%)</label>
+                              <label className="block text-sm font-medium text-slate-700 mb-1">Provision (%)</label>
                               <div className="flex gap-2">
                                   <input type="number" value={partnerSettings.newRate} onChange={e => setPartnerSettings({...partnerSettings, newRate: Number(e.target.value)})} className="border rounded px-3 py-2 w-24 font-bold text-lg" />
                                   <Button onClick={handleSavePartnerSettings}>Speichern</Button>
@@ -476,7 +580,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                             <thead className="bg-slate-50 text-slate-500 uppercase text-xs">
-                                <tr><th className="px-4 py-3">Partner</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Webseite</th><th className="px-4 py-3">Gesamtprovision</th><th className="px-4 py-3">Status</th></tr>
+                                <tr><th className="px-4 py-3">Partner</th><th className="px-4 py-3">Code</th><th className="px-4 py-3">Web</th><th className="px-4 py-3">Provision</th><th className="px-4 py-3">Status</th></tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
                                 {visiblePartners.map((p: any) => (
@@ -496,7 +600,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
           )}
 
-          {/* EMAILS TAB */}
           {activeTab === 'emails' && (
              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-140px)] animate-in fade-in">
                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
@@ -530,7 +633,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
              </div>
           )}
 
-          {/* SETTINGS TAB */}
           {activeTab === 'settings' && (
               <div className="space-y-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -538,10 +640,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <div><label className="block text-sm font-medium text-slate-700 mb-1">Preis für Neukunden (€)</label><input type="number" step="0.01" value={prices.new} onChange={e => onUpdatePrices({...prices, new: Number(e.target.value)})} className="w-full p-2 border rounded" /></div>
                       </div>
-                      <div className="mt-4 flex justify-end"><Button size="sm" onClick={handleSavePrices}>Preise Speichern</Button></div>
+                      <div className="mt-4 flex justify-end"><Button size="sm" onClick={handleSavePrices}>Speichern</Button></div>
                   </div>
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity size={18} /> System Status Override</h3>
+                      <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Activity size={18} /> System Status</h3>
                       <div className="space-y-4">
                           <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg"><span className="font-medium text-slate-700">Gold Status</span><div className="flex gap-2"><Button size="sm" variant={sysStatus.gold === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('gold', 'available')}>Available</Button><Button size="sm" variant={sysStatus.gold === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('gold', 'sold_out')}>Sold Out</Button></div></div>
                           <div className="flex justify-between items-center p-3 bg-slate-50 rounded-lg"><span className="font-medium text-slate-700">Silver Status</span><div className="flex gap-2"><Button size="sm" variant={sysStatus.silver === 'available' ? 'primary' : 'outline'} onClick={() => handleUpdateStatus('silver', 'available')}>Available</Button><Button size="sm" variant={sysStatus.silver === 'sold_out' ? 'danger' : 'outline'} onClick={() => handleUpdateStatus('silver', 'sold_out')}>Sold Out</Button></div></div>
@@ -550,8 +652,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Link2 size={18} /> Ticket URLs</h3>
                       <div className="space-y-4">
-                          <div><label className="text-xs font-bold text-slate-500 uppercase">Gold URL</label><input type="text" value={productUrls.gold} onChange={e => onUpdateProductUrls({...productUrls, gold: e.target.value})} className="w-full p-2 border rounded text-sm mt-1" /></div>
-                          <div><label className="text-xs font-bold text-slate-500 uppercase">Silver URL</label><input type="text" value={productUrls.silver} onChange={e => onUpdateProductUrls({...productUrls, silver: e.target.value})} className="w-full p-2 border rounded text-sm mt-1" /></div>
+                          <div><label className="text-xs font-bold text-slate-500 uppercase">Gold URL</label><input type="text" value={productUrls.gold} onChange={e => onUpdateProductUrls({...productUrls, gold: e.target.value})} className="w-full p-2 border rounded text-sm mt-1 outline-none" /></div>
+                          <div><label className="text-xs font-bold text-slate-500 uppercase">Silver URL</label><input type="text" value={productUrls.silver} onChange={e => onUpdateProductUrls({...productUrls, silver: e.target.value})} className="w-full p-2 border rounded text-sm mt-1 outline-none" /></div>
                       </div>
                       <div className="mt-4 flex justify-end"><Button size="sm" onClick={handleSaveUrls}>URLs Speichern</Button></div>
                   </div>
@@ -577,7 +679,6 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               </div>
                               <div className="flex flex-col gap-2">
                                   {selectedCustomer.subscription?.plan_type !== 'Manuell (Gratis)' && (<Button size="sm" variant="outline" onClick={() => handleManageSub('grant_free')}><Gift size={14} className="mr-2"/> Gratis Abo aktivieren</Button>)}
-                                  {selectedCustomer.subscription?.status === 'active' && selectedCustomer.subscription?.stripe_subscription_id && (<Button size="sm" variant="outline" className="text-red-600 border-red-200" onClick={() => handleManageSub('cancel_sub')}><XCircle size={14} className="mr-2"/> Stripe Kündigen</Button>)}
                               </div>
                           </div>
                       </div>
@@ -595,24 +696,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               )}
                           </div>
                           <div className="grid grid-cols-2 gap-4">
-                              <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vorname</label><input type="text" disabled={!editCustomerMode} value={customerForm.firstName} onChange={e => setCustomerForm({...customerForm, firstName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" /></div>
-                              <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachname</label><input type="text" disabled={!editCustomerMode} value={customerForm.lastName} onChange={e => setCustomerForm({...customerForm, lastName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" /></div>
-                              <div className="col-span-2"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input type="email" disabled={!editCustomerMode} value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50" /></div>
+                              <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Vorname</label><input type="text" disabled={!editCustomerMode} value={customerForm.firstName} onChange={e => setCustomerForm({...customerForm, firstName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50 outline-none" /></div>
+                              <div><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nachname</label><input type="text" disabled={!editCustomerMode} value={customerForm.lastName} onChange={e => setCustomerForm({...customerForm, lastName: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50 outline-none" /></div>
+                              <div className="col-span-2"><label className="block text-xs font-bold text-slate-500 uppercase mb-1">Email</label><input type="email" disabled={!editCustomerMode} value={customerForm.email} onChange={e => setCustomerForm({...customerForm, email: e.target.value})} className="w-full p-2 border rounded disabled:bg-slate-50 outline-none" /></div>
                           </div>
-                      </div>
-
-                      <div className="pt-6 border-t border-red-100 bg-red-50 p-4 rounded-xl">
-                          <h3 className="font-bold text-red-800 text-sm uppercase mb-2 flex items-center gap-2"><Trash2 size={16} /> Admin Löschfunktion</h3>
-                          <p className="text-xs text-red-600 mb-4">Löscht den Nutzer (DSGVO). Historische Daten bleiben ggf. anonymisiert erhalten.</p>
-                          <Button 
-                            variant="danger" 
-                            size="sm" 
-                            className="w-full justify-center" 
-                            onClick={handleDeleteByAdmin}
-                            disabled={isDeleting}
-                          >
-                            {isDeleting ? 'Wird gelöscht...' : 'Nutzer-Account löschen'}
-                          </Button>
                       </div>
                   </div>
               </div>
