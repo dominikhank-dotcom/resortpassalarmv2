@@ -18,23 +18,27 @@ export default async function handler(req: any, res: any) {
     if (!admin || admin.role !== 'ADMIN') return res.status(403).json({ error: 'Unauthorized' });
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = ai.models.generateContent({
+    
+    // Complex text task -> Gemini 3 Pro
+    const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Schreibe einen ausführlichen, professionellen und hilfreichen Blog-Artikel für die Webseite 'ResortPassAlarm'.
+      contents: `Du bist ein erfahrener Content-Creator für 'ResortPassAlarm.com', eine Seite, die Europa-Park Fans hilft, Jahreskarten zu ergattern.
       
-      Thema/Titel: ${title}
-      Ziel-Länge: ca. ${wordCount} Wörter.
-      Stil: Experten-Ratgeber für den Europa-Park, enthusiastisch aber ehrlich, SEO-optimiert.
-      
-      WICHTIGE VORGABEN:
-      1. Formatiere den Inhalt NUR mit HTML-Tags (<h2>, <p>, <ul>, <li>, <strong>). Keine <html>, <body> oder <head> Tags.
-      2. Integriere 2-3 natürliche Hinweise auf 'ResortPassAlarm' als das ultimative Tool, um bei ausverkauften Pässen sofort benachrichtigt zu werden.
-      3. Erzeuge eine passende Kategorie (z.B. Strategie, Tipps, Familie, Finanzen).
-      4. Erzeuge ein passendes Lucide-Icon-Name (z.B. Ticket, Star, Users, Calculator, Shield).
-      5. Erzeuge ein kurzes Excerpt (max 160 Zeichen) für die Blog-Übersicht.
-      6. Erzeuge einen URL-freundlichen Slug aus dem Titel.
+      AUFGABE:
+      Schreibe einen fesselnden, hilfreichen Blog-Artikel.
+      Titel: ${title}
+      Länge: ca. ${wordCount} Wörter.
+      Sprache: Deutsch (Du-Form, enthusiastisch aber seriös).
 
-      Antworte im JSON Format.`,
+      STRUKTUR & STIL:
+      1. Nutze ausschließlich HTML-Tags für die Formatierung (<h2>, <h3>, <p>, <ul>, <li>, <strong>). Keine Markdowns.
+      2. Der Artikel muss 2-3 natürliche Empfehlungen für den 'ResortPassAlarm' enthalten. Erkläre, dass unser Tool die Verfügbarkeit 24/7 prüft und sofort per SMS/E-Mail alarmiert, wenn Pässe wieder da sind.
+      3. Erstelle eine passende Kategorie (Ratgeber, Wissen, News, Strategie oder Finanzen).
+      4. Wähle einen passenden Lucide-Icon Namen (z.B. Ticket, Star, Users, Calculator, Shield, Map).
+      5. Erstelle ein prägnantes Excerpt (max. 160 Zeichen).
+      6. Erzeuge einen URL-Slug.
+
+      ANTWORTE NUR IM JSON-FORMAT.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -51,8 +55,7 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    const result = await model;
-    const blogData = JSON.parse(result.text);
+    const blogData = JSON.parse(response.text);
 
     const postToSave = {
       title,

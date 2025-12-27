@@ -115,6 +115,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
     if (!title) return alert("Bitte Titel eingeben");
 
+    const confirmed = existingPost ? confirm(`Möchtest du den Artikel "${title}" wirklich komplett neu generieren? Der alte Inhalt wird überschrieben.`) : true;
+    if (!confirmed) return;
+
     setIsGeneratingBlog(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -130,7 +133,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       });
       const data = await res.json();
       if (data.success) {
-        alert("Artikel erfolgreich generiert!");
+        alert("Artikel erfolgreich veröffentlicht!");
         loadBlogPosts();
         if (!existingPost) setNewBlog({ title: '', wordCount: 1000 });
       } else {
@@ -141,7 +144,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const handleDeleteBlog = async (id: string) => {
-    if (!confirm("Artikel wirklich löschen?")) return;
+    if (!confirm("Möchtest du diesen Artikel unwiderruflich aus dem Blog löschen?")) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       await fetch('/api/blog-posts', {
@@ -398,7 +401,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       disabled={isGeneratingBlog}
                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold"
                     >
-                      {isGeneratingBlog ? <><RefreshCw className="animate-spin" size={18} /> Generiere...</> : <><Wand2 size={18} /> Artikel generieren</>}
+                      {isGeneratingBlog ? <><RefreshCw className="animate-spin" size={18} /> Veröffentliche...</> : <><Wand2 size={18} /> Artikel generieren</>}
                     </Button>
                   </div>
                 </div>
@@ -423,7 +426,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {blogPosts.map(post => (
-                        <tr key={post.id} className="hover:bg-slate-50">
+                        <tr key={post.id} className="hover:bg-slate-50 group">
                           <td className="px-4 py-3">
                             <div className="text-[10px] text-slate-400 font-mono">{post.date}</div>
                             <div className="font-bold text-slate-900">{post.title}</div>
@@ -436,17 +439,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <span className="flex items-center gap-1 text-green-600 font-bold text-xs"><CheckCircle size={12}/> Live</span>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <div className="flex justify-end gap-2">
-                              <a href={`/blog/${post.slug}`} target="_blank" className="p-2 text-slate-400 hover:text-blue-600 transition" title="Ansehen"><Eye size={16}/></a>
+                            <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <a href={`/blog/${post.slug}`} target="_blank" className="p-2 text-slate-400 hover:text-blue-600 transition" title="Link anzeigen"><Eye size={18}/></a>
                               <button 
                                 onClick={() => handleGenerateBlog(post)} 
                                 disabled={isGeneratingBlog}
                                 className="p-2 text-slate-400 hover:text-amber-600 transition" 
                                 title="Neu generieren"
                               >
-                                <RotateCw className={isGeneratingBlog ? "animate-spin" : ""} size={16}/>
+                                <RotateCw className={isGeneratingBlog ? "animate-spin" : ""} size={18}/>
                               </button>
-                              <button onClick={() => handleDeleteBlog(post.id)} className="p-2 text-slate-400 hover:text-red-600 transition" title="Löschen"><Trash2 size={16}/></button>
+                              <button onClick={() => handleDeleteBlog(post.id)} className="p-2 text-slate-400 hover:text-red-600 transition" title="Löschen"><Trash2 size={18}/></button>
                             </div>
                           </td>
                         </tr>
