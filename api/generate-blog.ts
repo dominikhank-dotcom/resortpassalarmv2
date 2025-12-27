@@ -22,21 +22,25 @@ export default async function handler(req: any, res: any) {
       model: 'gemini-3-pro-preview',
       contents: `Du bist ein erfahrener Content-Creator für 'ResortPassAlarm.com'.
       
-      AUFGABE: Schreibe einen fesselnden Artikel im speziellen "Ratgeber-Stil".
+      AUFGABE: Schreibe einen fesselnden Artikel im "Ratgeber-Stil" (Beispiel: Wirtschaftlichkeitsrechnung).
       Titel: ${title}
       Länge: ca. ${wordCount} Wörter.
-      Sprache: Deutsch (Du-Form, leidenschaftlich).
+      Sprache: Deutsch (Du-Form, leidenschaftlich, seriös).
 
-      STRUKTUR-VORGABEN (NUTZE DIESE HTML-STRUKTUREN):
-      1. Einleitungstext (p).
-      2. TL;DR Bereich: <div class="tldr"><h2>TL;DR</h2><div class="tldr-grid"><div class="tldr-item"><strong>Punkt 1</strong></div>...</div></div>
-      3. Kalkulations-Boxen für Wirtschaftlichkeit: <div class="calculator-box"><h3>Titel</h3><div class="calculation-row"><div class="label">Bezeichnung</div><div class="value">Betrag</div></div>...<div class="result-highlight"><div class="big-number">Ergebnis</div></div></div>
-      4. Vergleichs-Karten (Silver vs Gold): <div class="comparison-cards"><div class="comparison-card"><div class="card-header silver"><h4>Silver</h4></div><div class="card-body">...</div></div>...</div>
-      5. Banner für Hinweise: <div class="info-banner">...</div>, <div class="tip-banner">...</div>, <div class="warning-banner">...</div>
+      WICHTIGSTE REGEL ZUM PRODUKT:
+      ResortPassAlarm hilft Menschen, die NOCH KEINEN ResortPass haben. 
+      Wir überwachen den Ticket-Shop und informieren Nutzer, sobald ResortPass Silver oder Gold wieder ZUM KAUF verfügbar sind.
+      BEACHTE: Wir überwachen NICHT die Buchungsslots/Besuchstage für bestehende Inhaber. Schreib das niemals falsch!
+
+      STRUKTUR-VORGABEN (NUTZE DIESE HTML-KLASSEN):
+      1. Einleitungstext (<p>).
+      2. TL;DR Bereich: <div class="tldr"><h2>TL;DR – Die Kurzfassung</h2><div class="tldr-grid"><div class="tldr-item"><strong>Punkt</strong></div></div></div>
+      3. Kalkulations-Boxen: <div class="calculator-box"><h3>Titel</h3><div class="calculation-row"><div class="calculation-label">Text</div><div class="calculation-value">Betrag</div></div><div class="result-highlight"><div class="big-number">Ergebnis</div></div></div>
+      4. Vergleichs-Karten: <div class="comparison-cards"><div class="comparison-card"><div class="card-header silver"><h4>Silver</h4><div class="card-price">295 €</div></div><div class="card-body">...</div></div></div>
+      5. Banner: <div class="info-banner">...</div>, <div class="tip-banner">...</div>, <div class="warning-banner">...</div>
       6. Szenarien: <div class="scenario-card"><h4>Szenario</h4>...<div class="scenario-verdict">Fazit</div></div>
 
       WICHTIG: 
-      - Integriere ResortPassAlarm als Lösung für Verfügbarkeitsprobleme (2-3 Mal).
       - Nutze ausschließlich HTML-Tags.
       - Erzeuge ein passendes Excerpt (max 160 Zeichen).
       - Erzeuge einen Slug.`,
