@@ -1,9 +1,25 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --blog-primary: #16423c;
+  --blog-secondary: #6a9c89;
+  --blog-accent: #c4dad2;
+  --blog-highlight: #e9efec;
+}
+
 body {
   font-family: 'Inter', sans-serif;
+}
+
+.font-archivo {
+  font-family: 'Archivo', sans-serif;
+}
+
+.font-lato {
+  font-family: 'Lato', sans-serif;
 }
 
 @keyframes radar {

@@ -13,32 +13,33 @@ export default async function handler(req: any, res: any) {
   const { title, wordCount, adminId, existingId } = req.body;
 
   try {
-    // Admin Check
     const { data: admin } = await supabase.from('profiles').select('role').eq('id', adminId).single();
     if (!admin || admin.role !== 'ADMIN') return res.status(403).json({ error: 'Unauthorized' });
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    // Complex text task -> Gemini 3 Pro
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
-      contents: `Du bist ein erfahrener Content-Creator für 'ResortPassAlarm.com', eine Seite, die Europa-Park Fans hilft, Jahreskarten zu ergattern.
+      contents: `Du bist ein erfahrener Content-Creator für 'ResortPassAlarm.com'.
       
-      AUFGABE:
-      Schreibe einen fesselnden, hilfreichen Blog-Artikel.
+      AUFGABE: Schreibe einen fesselnden Artikel im speziellen "Ratgeber-Stil".
       Titel: ${title}
       Länge: ca. ${wordCount} Wörter.
-      Sprache: Deutsch (Du-Form, enthusiastisch aber seriös).
+      Sprache: Deutsch (Du-Form, leidenschaftlich).
 
-      STRUKTUR & STIL:
-      1. Nutze ausschließlich HTML-Tags für die Formatierung (<h2>, <h3>, <p>, <ul>, <li>, <strong>). Keine Markdowns.
-      2. Der Artikel muss 2-3 natürliche Empfehlungen für den 'ResortPassAlarm' enthalten. Erkläre, dass unser Tool die Verfügbarkeit 24/7 prüft und sofort per SMS/E-Mail alarmiert, wenn Pässe wieder da sind.
-      3. Erstelle eine passende Kategorie (Ratgeber, Wissen, News, Strategie oder Finanzen).
-      4. Wähle einen passenden Lucide-Icon Namen (z.B. Ticket, Star, Users, Calculator, Shield, Map).
-      5. Erstelle ein prägnantes Excerpt (max. 160 Zeichen).
-      6. Erzeuge einen URL-Slug.
+      STRUKTUR-VORGABEN (NUTZE DIESE HTML-STRUKTUREN):
+      1. Einleitungstext (p).
+      2. TL;DR Bereich: <div class="tldr"><h2>TL;DR</h2><div class="tldr-grid"><div class="tldr-item"><strong>Punkt 1</strong></div>...</div></div>
+      3. Kalkulations-Boxen für Wirtschaftlichkeit: <div class="calculator-box"><h3>Titel</h3><div class="calculation-row"><div class="label">Bezeichnung</div><div class="value">Betrag</div></div>...<div class="result-highlight"><div class="big-number">Ergebnis</div></div></div>
+      4. Vergleichs-Karten (Silver vs Gold): <div class="comparison-cards"><div class="comparison-card"><div class="card-header silver"><h4>Silver</h4></div><div class="card-body">...</div></div>...</div>
+      5. Banner für Hinweise: <div class="info-banner">...</div>, <div class="tip-banner">...</div>, <div class="warning-banner">...</div>
+      6. Szenarien: <div class="scenario-card"><h4>Szenario</h4>...<div class="scenario-verdict">Fazit</div></div>
 
-      ANTWORTE NUR IM JSON-FORMAT.`,
+      WICHTIG: 
+      - Integriere ResortPassAlarm als Lösung für Verfügbarkeitsprobleme (2-3 Mal).
+      - Nutze ausschließlich HTML-Tags.
+      - Erzeuge ein passendes Excerpt (max 160 Zeichen).
+      - Erzeuge einen Slug.`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -78,9 +79,7 @@ export default async function handler(req: any, res: any) {
     }
 
     return res.status(200).json({ success: true, slug: blogData.slug });
-
   } catch (error: any) {
-    console.error("Blog Gen Error:", error);
     return res.status(500).json({ error: error.message });
   }
 }
