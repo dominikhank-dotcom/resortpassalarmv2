@@ -32,6 +32,10 @@ export default async function handler(req: any, res: any) {
       Wir überwachen den Ticket-Shop und informieren Nutzer, sobald ResortPass Silver oder Gold wieder ZUM KAUF verfügbar sind.
       BEACHTE: Wir überwachen NICHT die Buchungsslots/Besuchstage für bestehende Inhaber. Schreib das niemals falsch!
 
+      LINK-REGEL:
+      Alle Buttons oder Handlungsaufforderungen (CTAs) zum Service müssen auf die STARTSEITE verlinken. 
+      Nutze dafür keine festen URLs, sondern beschreibe in den Texten, dass der Nutzer auf die Startseite gehen soll, um den Alarm zu aktivieren.
+
       STRUKTUR-VORGABEN (NUTZE DIESE HTML-KLASSEN):
       1. Einleitungstext (<p>).
       2. TL;DR Bereich: <div class="tldr"><h2>TL;DR – Die Kurzfassung</h2><div class="tldr-grid"><div class="tldr-item"><strong>Punkt</strong></div></div></div>

@@ -202,7 +202,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                     Verliere keine Zeit mit manuellem Suchen. Unser Wächter überwacht die Server 24/7 und schickt dir sofort eine <strong>SMS & E-Mail</strong>, sobald neue ResortPässe <u>zum Kauf</u> freigeschaltet werden.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-6 items-center">
-                      <Button onClick={() => navigate('user-signup')} className="bg-[#5046e5] hover:bg-indigo-700 text-white border-0 px-10 py-5 font-archivo font-black text-xl shadow-xl shadow-indigo-500/20 w-full sm:w-auto transform hover:scale-105 transition-all">
+                      <Button onClick={() => navigate('landing')} className="bg-[#5046e5] hover:bg-indigo-700 text-white border-0 px-10 py-5 font-archivo font-black text-xl shadow-xl shadow-indigo-500/20 w-full sm:w-auto transform hover:scale-105 transition-all">
                           JETZT ALARM AKTIVIEREN <ArrowRight size={22} className="ml-2" />
                       </Button>
                       <div className="flex items-center gap-4">
