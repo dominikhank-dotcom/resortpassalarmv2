@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { Ticket, User, LogOut, Menu, X, BookOpen } from 'lucide-react';
+import { Ticket, User, LogOut, Menu, X } from 'lucide-react';
 import { UserRole } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -21,11 +20,13 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
   };
 
   const handleLogout = async () => {
+    // Real Supabase Logout
     await supabase.auth.signOut();
     setRole(UserRole.GUEST);
     handleNav('landing');
   };
 
+  // Europa Park Blue approx #00305e, Yellow approx #ffcc00
   return (
     <nav className="bg-[#00305e] border-b border-blue-900 sticky top-0 z-50 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -39,15 +40,8 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
             </span>
           </div>
 
+          {/* Desktop Menu */}
           <div className="hidden md:flex items-center space-x-4">
-            <button 
-              onClick={() => handleNav('blog')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition font-medium ${currentPage.includes('blog') ? 'text-[#ffcc00]' : 'text-blue-100 hover:text-white'}`}
-            >
-              <BookOpen size={18} />
-              Blog
-            </button>
-
             {role === UserRole.GUEST ? (
               <>
                 {currentPage !== 'affiliate-info' && (
@@ -71,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
               <>
                 <button 
                   onClick={() => handleNav(role === UserRole.AFFILIATE ? 'affiliate' : 'dashboard')} 
-                  className={`font-medium ${currentPage !== 'landing' && !currentPage.includes('blog') ? 'text-[#ffcc00]' : 'text-blue-200'}`}
+                  className={`font-medium ${currentPage !== 'landing' ? 'text-[#ffcc00]' : 'text-blue-200'}`}
                 >
                   Dashboard
                 </button>
@@ -91,6 +85,7 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
             )}
           </div>
 
+          {/* Mobile Menu Button */}
           <div className="flex items-center md:hidden">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-blue-200 hover:text-white">
               {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -99,13 +94,15 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
         </div>
       </div>
 
+      {/* Mobile Menu */}
       {isMenuOpen && (
         <div className="md:hidden bg-[#00305e] border-t border-blue-800 py-4 px-4 space-y-3 shadow-lg">
-          <button onClick={() => handleNav('blog')} className="block w-full text-left py-2 text-blue-100">Blog</button>
           {role === UserRole.GUEST ? (
             <>
               <button onClick={() => handleNav('landing')} className="block w-full text-left py-2 text-blue-100">Home</button>
-              <button onClick={() => handleNav('login')} className="block w-full text-center py-2 mt-2 bg-[#ffcc00] text-[#00305e] font-bold rounded-lg">Anmelden</button>
+              {currentPage !== 'affiliate-info' && (
+                <button onClick={() => handleNav('login')} className="block w-full text-center py-2 mt-2 bg-[#ffcc00] text-[#00305e] font-bold rounded-lg">Anmelden</button>
+              )}
             </>
           ) : (
             <>

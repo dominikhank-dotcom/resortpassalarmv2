@@ -1,20 +1,27 @@
-
 import { GoogleGenAI } from "@google/genai";
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method !== 'GET') {
     return res.status(405).json({ success: false, message: 'Method not allowed' });
   }
 
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'API_KEY fehlt in den Environment Variables.' 
+    });
+  }
+
   try {
-    /* Initialize with direct process.env.API_KEY as per guidelines */
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey });
     
-    /* Use gemini-3-flash-preview for basic text tasks */
+    // Simple test prompt using the efficient flash model
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-2.5-flash',
       contents: "Antworte nur mit dem Wort: 'Erfolg'",
     });
 
@@ -32,7 +39,7 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-  } catch (error: any) {
+  } catch (error) {
     console.error("Gemini Test Error:", error);
     return res.status(500).json({ 
       success: false, 

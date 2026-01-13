@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface FooterProps {
@@ -20,7 +19,6 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
         </div>
         
         <div className="flex flex-wrap justify-center gap-6 text-sm font-medium">
-          <button onClick={() => navigate('blog')} className="text-[#ffcc00] hover:text-yellow-400 transition font-bold">Blog</button>
           <button onClick={() => navigate('imprint')} className="hover:text-white transition">Impressum</button>
           <button onClick={() => navigate('privacy')} className="hover:text-white transition">Datenschutz</button>
           <button onClick={() => navigate('terms')} className="hover:text-white transition">AGB</button>
