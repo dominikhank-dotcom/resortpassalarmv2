@@ -7,53 +7,56 @@ const supabase = createClient(
 );
 
 export default async function handler(req: any, res: any) {
-  res.setHeader('Content-Type', 'text/xml');
-  res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate');
+  res.setHeader('Content-Type', 'application/xml');
 
-  const siteUrl = process.env.VITE_SITE_URL || 'https://resortpassalarm.com';
-  const lastMod = new Date().toISOString().split('T')[0];
-
-  // Statische Seiten
-  const staticPages = [
-    '',
-    '/affiliate-info',
-    '/user-signup',
-    '/affiliate-signup',
-    '/imprint',
-    '/privacy',
-    '/terms',
-    '/revocation'
-  ];
-
-  let blogUrls: string[] = [];
   try {
-    // Abfrage der Blog-Artikel aus Supabase
-    // Ich nehme an, die Tabelle heißt 'blog_posts' und hat eine Spalte 'slug'
+    // Basis-URL ermitteln (Standard: resortpassalarm.com)
+    const baseUrl = process.env.VITE_SITE_URL || 'https://resortpassalarm.com';
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
+
+    // 1. Statische Seiten definieren
+    const staticPages = [
+      '',
+      '/blog',
+      '/imprint',
+      '/privacy',
+      '/terms',
+      '/revocation',
+      '/affiliate-info'
+    ];
+
+    // 2. Dynamische Blogartikel aus Supabase laden
     const { data: posts } = await supabase
       .from('blog_posts')
-      .select('slug, updated_at')
-      .eq('is_published', true);
+      .select('slug, updated_at');
 
-    if (posts) {
-      blogUrls = posts.map(post => `/blog/${post.slug}`);
-    }
-  } catch (e) {
-    console.error("Sitemap: Fehler beim Laden der Blogartikel", e);
+    const blogUrls = (posts || []).map(post => ({
+      url: `/blog/${post.slug}`,
+      lastmod: post.updated_at ? new Date(post.updated_at).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+    }));
+
+    // 3. XML generieren
+    const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  ${staticPages.map(page => `
+  <url>
+    <loc>${cleanBaseUrl}${page}</loc>
+    <lastmod>${new Date().toISOString().split('T')[0]}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>${page === '' ? '1.0' : '0.8'}</priority>
+  </url>`).join('')}
+  ${blogUrls.map(item => `
+  <url>
+    <loc>${cleanBaseUrl}${item.url}</loc>
+    <lastmod>${item.lastmod}</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>`).join('')}
+</urlset>`;
+
+    return res.status(200).send(sitemap);
+  } catch (error: any) {
+    console.error("Sitemap Error:", error);
+    return res.status(500).send('Error generating sitemap');
   }
-
-  const allPages = [...staticPages, ...blogUrls];
-
-  const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
-    <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-      ${allPages.map(path => `
-        <url>
-          <loc>${siteUrl}${path}</loc>
-          <lastmod>${lastMod}</lastmod>
-          <changefreq>${path === '' ? 'daily' : 'weekly'}</changefreq>
-          <priority>${path === '' ? '1.0' : '0.7'}</priority>
-        </url>
-      `).join('')}
-    </urlset>`;
-
-  res.status(200).send(sitemap.trim());
 }
