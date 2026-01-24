@@ -62,8 +62,11 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
             Verpasse nie wieder den <br />
             <span className="text-[#ffcc00]">ResortPass</span>
           </h1>
-          <p className="text-lg md:text-xl text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-lg md:text-xl text-slate-300 mb-4 max-w-2xl mx-auto leading-relaxed">
             Der Europa-Park ResortPass ist ständig ausverkauft. Unser Tool prüft die Verfügbarkeit in kurzen Abständen und benachrichtigt dich sofort.
+          </p>
+          <p className="text-xs text-slate-500 mb-10 font-medium">
+            Hinweis: Unabhängiger Service - keine offizielle Seite des Europa-Park Resorts.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
             <button 
@@ -261,6 +264,10 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {[
+              { 
+                q: "Ist das ein offizieller Service des EP?", 
+                a: "Nein. Dies ist ein unabhängiger Fan-Service, es besteht kein Zusammenhang zum Europa-Park. Dies ist keine offizielle Seite des Europa-Park Resorts." 
+              },
               { 
                 q: "Was bringt mir ResortPassAlarm?", 
                 a: "Du sparst dir das ständige, nervige Neuladen der Ticket-Seite. Unser System prüft rund um die Uhr in kurzen Abständen die Verfügbarkeit und benachrichtigt dich sofort, wenn Gold oder Silver Pässe freigeschaltet werden." 
