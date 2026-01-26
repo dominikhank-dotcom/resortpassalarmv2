@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2, Ticket } from 'lucide-react';
+import { Lock, ShieldCheck, Mail, User, ArrowRight, AlertCircle, CheckCircle, Loader2, Ticket, Info } from 'lucide-react';
 import { Button } from '../components/Button';
 import { supabase, getEnv } from '../lib/supabase';
 
@@ -142,6 +142,9 @@ export const UserSignupPage: React.FC<UserSignupProps> = ({ onLoginClick, onRegi
         </h2>
         <p className="mt-2 text-center text-sm text-slate-600">
           Der erste Schritt zu deinem ResortPass. Es fallen hier keine Kosten an.
+        </p>
+        <p className="mt-2 text-center text-xs text-slate-400 flex items-center justify-center gap-1">
+          <Info size={12} /> Transparenz-Hinweis: Unabhängiger Fan-Service. Dies ist keine offizielle Seite des Europa-Park Resorts.
         </p>
       </div>
 
