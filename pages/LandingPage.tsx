@@ -230,7 +230,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
                 <span className="text-[#ffcc00]">⚡</span> Warum du schnell sein musst
               </h3>
               <p className="text-slate-300 leading-relaxed text-lg">
-                Der Europa-Park gibt ResortPässe oft in nur kleinen Kontingenten frei. Oft sind die Jahreskarten dann nach kurzer Zeit wieder ausverkauft.
+                Der Europa-Park gibt ResortPässe in begrenzten Kontingenten frei. Die Jahreskarten könnten nach kurzer Zeit wieder ausverkauft sein.
               </p>
             </div>
             <div className="space-y-6">
@@ -258,7 +258,7 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
       <section className="py-24 px-4 bg-[#f8fafc]">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Häufige Fragen</h2>
+            <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-4">Fragen & Antworten</h2>
             <p className="text-slate-500 text-lg">Alles, was du über den ResortPassAlarm wissen musst.</p>
           </div>
 

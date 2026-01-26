@@ -209,7 +209,7 @@ export const BlogPostPage: React.FC<BlogPostPageProps> = ({ slug, navigate }) =>
                            <div className="flex -space-x-3">
                                {[1,2,3].map(i => <div key={i} className="w-10 h-10 rounded-full border-2 border-[#001529] bg-slate-400"></div>)}
                            </div>
-                           <span className="text-sm text-blue-300 font-bold">Bereits 4.000+ Glückliche Nutzer</span>
+                           <span className="text-sm text-blue-300 font-bold">Nur glückliche Europa-Park Fans</span>
                       </div>
                   </div>
               </div>
