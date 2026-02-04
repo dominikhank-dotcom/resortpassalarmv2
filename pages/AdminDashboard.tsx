@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Users, Settings, 
   TrendingUp, DollarSign, Activity, Mail, 
-  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Power, UserMinus, Trash2, BookOpen, FileText, Wand2, Eye, RotateCw
+  Sparkles, Gift, RefreshCw, Check, Save, UserX, XCircle, Search, CheckCircle, Handshake, CreditCard, Sliders, AlertCircle, Send, Link, Link2, Calendar, Edit2, X, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ArrowUpDown, Power, UserMinus, Trash2, BookOpen, FileText, Wand2, Eye, RotateCw, PauseCircle, PlayCircle
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -34,6 +34,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   commissionRate, onUpdateCommission, prices, onUpdatePrices, productUrls, onUpdateProductUrls 
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'emails' | 'blog' | 'settings'>('overview');
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   
   // Blog Generator State
   const [blogPosts, setBlogPosts] = useState<any[]>([]);
@@ -173,6 +174,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               silver: s.status_silver || 'sold_out',
               lastChecked: s.last_checked || '...'
           });
+          setMaintenanceMode(s.maintenance_mode === 'true');
           if (s.global_commission_rate) {
               const rate = Number(s.global_commission_rate);
               setPartnerSettings({ newRate: rate });
@@ -224,6 +226,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleUpdateStatus = async (type: 'gold' | 'silver', status: 'available' | 'sold_out') => {
       if (!confirm(`Bist du sicher? Dies sendet Alarme für ${type.toUpperCase()} wenn 'available'!`)) return;
       try { await updateSystemStatus(type, status); alert(`Status auf ${status} gesetzt.`); loadSystemSettings(); } catch (e: any) { alert(e.message); }
+  };
+
+  const handleToggleMaintenance = async () => {
+    const newValue = !maintenanceMode;
+    const msg = newValue 
+      ? "Soll der Wartungsmodus wirklich AKTIVIERT werden? Neue Kundenregistrierungen werden blockiert."
+      : "Soll der Wartungsmodus DEAKTIVIERT werden? Registrierungen sind wieder möglich.";
+    
+    if (!confirm(msg)) return;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      await updateSystemSettings('maintenance_mode', newValue.toString());
+      setMaintenanceMode(newValue);
+      alert(newValue ? "Wartungsmodus ist nun aktiv." : "Wartungsmodus deaktiviert.");
+    } catch (e: any) {
+      alert("Fehler: " + e.message);
+    }
   };
 
   const handleOpenCustomerDetail = async (userId: string) => {
@@ -638,6 +659,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
           {activeTab === 'settings' && (
               <div className="space-y-6 animate-in fade-in">
+                  {/* Maintenance Mode Section */}
+                  <div className={`p-6 rounded-xl shadow-sm border transition-all ${maintenanceMode ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                          <div className="flex items-start gap-4">
+                              <div className={`p-3 rounded-xl ${maintenanceMode ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
+                                  <PauseCircle size={24} />
+                              </div>
+                              <div>
+                                  <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                      Wartungsmodus & Pausierung
+                                      {maintenanceMode && <span className="bg-red-600 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full animate-pulse">Aktiv</span>}
+                                  </h3>
+                                  <p className="text-sm text-slate-500 max-w-xl mt-1">
+                                      Deaktiviere vorübergehend die Neuregistrierung für Kunden. Bestehende Kunden können sich weiterhin einloggen und ihren Schutz nutzen.
+                                  </p>
+                              </div>
+                          </div>
+                          <Button 
+                              variant={maintenanceMode ? 'primary' : 'outline'} 
+                              onClick={handleToggleMaintenance}
+                              className={maintenanceMode ? 'bg-green-600 hover:bg-green-700 border-green-600' : 'text-red-600 border-red-200 hover:bg-red-50'}
+                          >
+                              {maintenanceMode ? <><PlayCircle size={18} /> Wartungsmodus beenden</> : <><PauseCircle size={18} /> Registrierung pausieren</>}
+                          </Button>
+                      </div>
+                  </div>
+
                   <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
                       <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><CreditCard size={18} /> Abo Preise</h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

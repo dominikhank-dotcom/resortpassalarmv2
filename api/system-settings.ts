@@ -1,7 +1,6 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Init Supabase with Service Role Key to bypass RLS for writing if needed, 
-// though we usually rely on user session. For settings, we might want to enforce admin check here.
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -16,7 +15,6 @@ export default async function handler(req: any, res: any) {
           
           if (error) throw error;
           
-          // Convert array to object
           const settings = {};
           if (data) {
             data.forEach((item: any) => {
@@ -35,7 +33,6 @@ export default async function handler(req: any, res: any) {
           return res.status(400).json({ error: 'Missing key, value or userId' });
       }
 
-      // Verify Admin Role
       const { data: user } = await supabase
         .from('profiles')
         .select('role')
@@ -49,7 +46,7 @@ export default async function handler(req: any, res: any) {
       try {
           const { error } = await supabase
             .from('system_settings')
-            .upsert({ key, value, updated_at: new Date().toISOString() });
+            .upsert({ key, value: value.toString(), updated_at: new Date().toISOString() });
           
           if (error) throw error;
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Clock, Check, HelpCircle, ArrowRight, Loader2, Lightbulb } from 'lucide-react';
+import { Clock, Check, HelpCircle, ArrowRight, Loader2, Lightbulb, PauseCircle } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Footer } from '../components/Footer';
 import { getSystemSettings } from '../services/backendService';
@@ -11,9 +11,10 @@ interface LandingProps {
   onAffiliateInfo: () => void;
   navigate: (page: string) => void;
   price: number;
+  isMaintenanceMode?: boolean;
 }
 
-export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onAffiliateInfo, navigate, price }) => {
+export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onAffiliateInfo, navigate, price, isMaintenanceMode = false }) => {
   const [status, setStatus] = useState({
     gold: 'sold_out',
     silver: 'sold_out',
@@ -68,20 +69,31 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           <p className="text-xs text-slate-500 mb-10 font-medium">
             Hinweis: Unabhängiger Service - keine offizielle Seite des Europa-Park Resorts.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-            <button 
-              onClick={onSignup}
-              className="w-full sm:w-auto bg-[#5046e5] hover:bg-[#4338ca] text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg"
-            >
-              Jetzt Überwachung Starten <ArrowRight size={20} />
-            </button>
-            <button 
-              onClick={scrollToHowItWorks}
-              className="w-full sm:w-auto border-2 border-slate-700 hover:border-slate-500 text-slate-300 px-8 py-4 rounded-xl font-bold text-lg transition-all"
-            >
-              Wie es funktioniert
-            </button>
-          </div>
+
+          {isMaintenanceMode ? (
+              <div className="max-w-xl mx-auto bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6 mb-12 animate-in fade-in zoom-in">
+                  <div className="flex items-center justify-center gap-3 text-amber-400 font-bold text-lg">
+                      <PauseCircle size={28} />
+                      Wir machen Pause - neue Anmeldungen sind aktuell nicht möglich.
+                  </div>
+                  <p className="text-amber-200/70 text-sm mt-2">Bestehende Kunden können sich weiterhin einloggen.</p>
+              </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
+              <button 
+                onClick={onSignup}
+                className="w-full sm:w-auto bg-[#5046e5] hover:bg-[#4338ca] text-white px-8 py-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition-all shadow-lg"
+              >
+                Jetzt Überwachung Starten <ArrowRight size={20} />
+              </button>
+              <button 
+                onClick={scrollToHowItWorks}
+                className="w-full sm:w-auto border-2 border-slate-700 hover:border-slate-500 text-slate-300 px-8 py-4 rounded-xl font-bold text-lg transition-all"
+              >
+                Wie es funktioniert
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
@@ -203,12 +215,18 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
                 </div>
               </div>
 
-              <button 
-                onClick={onSignup}
-                className="w-full bg-[#5046e5] hover:bg-[#4338ca] text-white py-5 rounded-2xl font-bold text-xl transition-all shadow-lg active:scale-[0.98]"
-              >
-                Jetzt buchen
-              </button>
+              {isMaintenanceMode ? (
+                  <div className="w-full bg-slate-100 text-slate-500 py-5 rounded-2xl font-bold text-xl text-center border-2 border-dashed border-slate-200">
+                      Anmeldung aktuell nicht möglich
+                  </div>
+              ) : (
+                <button 
+                  onClick={onSignup}
+                  className="w-full bg-[#5046e5] hover:bg-[#4338ca] text-white py-5 rounded-2xl font-bold text-xl transition-all shadow-lg active:scale-[0.98]"
+                >
+                  Jetzt buchen
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -244,12 +262,18 @@ export const LandingPage: React.FC<LandingProps> = ({ onSignup, onAffiliate, onA
           </div>
 
           <div className="mt-16 text-center">
-            <button 
-              onClick={onSignup}
-              className="bg-[#5046e5] hover:bg-[#4338ca] text-white px-10 py-5 rounded-2xl font-bold text-xl transition-all shadow-xl"
-            >
-              Überwachung starten
-            </button>
+            {isMaintenanceMode ? (
+                 <div className="inline-block bg-white/5 border border-white/10 px-8 py-4 rounded-2xl text-slate-400 font-bold">
+                    Pausiert
+                 </div>
+            ) : (
+                <button 
+                onClick={onSignup}
+                className="bg-[#5046e5] hover:bg-[#4338ca] text-white px-10 py-5 rounded-2xl font-bold text-xl transition-all shadow-xl"
+                >
+                Überwachung starten
+                </button>
+            )}
           </div>
         </div>
       </section>

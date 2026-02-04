@@ -272,6 +272,7 @@ const LoginScreen: React.FC<{
 const App: React.FC = () => {
   const [role, setRole] = useState<UserRole>(UserRole.GUEST);
   const [userName, setUserName] = useState<string>(''); 
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   
   // PAGE RESOLVER HELPER
   const resolvePageFromPath = (path: string) => {
@@ -321,6 +322,7 @@ const App: React.FC = () => {
           if (settings.global_commission_rate) setGlobalCommissionRate(Number(settings.global_commission_rate));
           if (settings.price_new_customers) setPrices(p => ({...p, new: Number(settings.price_new_customers)}));
           if (settings.price_existing_customers) setPrices(p => ({...p, existing: Number(settings.price_existing_customers)}));
+          if (settings.maintenance_mode) setMaintenanceMode(settings.maintenance_mode === 'true');
        }
     };
     loadSettings();
@@ -418,6 +420,13 @@ const App: React.FC = () => {
   }, []);
 
   const navigate = (page: string) => {
+    // SECURITY: Block user-signup if maintenance mode is on
+    if (page === 'user-signup' && maintenanceMode) {
+      setCurrentPage('landing');
+      window.history.pushState(null, '', '/');
+      return;
+    }
+
     setCurrentPage(page);
     window.scrollTo(0, 0);
     if (page !== 'login' && page !== 'affiliate-login') setLoginNotification(null);
@@ -455,6 +464,7 @@ const App: React.FC = () => {
       case 'affiliate-login':
         return <LoginScreen role={UserRole.AFFILIATE} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('affiliate-signup')} notification={loginNotification} />;
       case 'user-signup':
+        if (maintenanceMode) return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} isMaintenanceMode={maintenanceMode} />;
         return <UserSignupPage onLoginClick={() => navigate('login')} onRegister={() => {}} onNavigate={navigate} />;
       case 'admin-login':
         return <LoginScreen role={UserRole.ADMIN} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} notification={loginNotification} />;
@@ -475,7 +485,7 @@ const App: React.FC = () => {
       case 'login':
          return <LoginScreen role={UserRole.CUSTOMER} setRole={handleSetRole} onLogin={handlePostLogin} onCancel={() => navigate('landing')} onRegisterClick={() => navigate('user-signup')} notification={loginNotification} />;
       default: 
-        return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} />;
+        return <LandingPage onSignup={() => navigate('user-signup')} onAffiliate={() => navigate('affiliate-login')} onAffiliateInfo={() => navigate('affiliate-info')} navigate={navigate} price={prices.new} isMaintenanceMode={maintenanceMode} />;
     }
   };
 
@@ -493,7 +503,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
       {!currentPage.includes('login') && !currentPage.includes('signup') && (
-        <Navbar role={role} setRole={handleSetRole} navigate={navigate} currentPage={currentPage} userName={userName} />
+        <Navbar role={role} setRole={handleSetRole} navigate={navigate} currentPage={currentPage} userName={userName} isMaintenanceMode={maintenanceMode} />
       )}
       <main>
         {renderContent()}

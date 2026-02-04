@@ -10,9 +10,10 @@ interface NavbarProps {
   navigate: (page: string) => void;
   currentPage: string;
   userName?: string;
+  isMaintenanceMode?: boolean;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, currentPage, userName }) => {
+export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, currentPage, userName, isMaintenanceMode = false }) => {
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
 
   const handleNav = (page: string) => {
@@ -58,12 +59,14 @@ export const Navbar: React.FC<NavbarProps> = ({ role, setRole, navigate, current
                     >
                       Login
                     </button>
-                    <button 
-                      onClick={() => handleNav('user-signup')}
-                      className="bg-[#ffcc00] text-[#00305e] px-4 py-2 rounded-lg hover:bg-yellow-400 font-bold transition shadow-sm"
-                    >
-                      Jetzt Starten
-                    </button>
+                    {!isMaintenanceMode && (
+                        <button 
+                          onClick={() => handleNav('user-signup')}
+                          className="bg-[#ffcc00] text-[#00305e] px-4 py-2 rounded-lg hover:bg-yellow-400 font-bold transition shadow-sm"
+                        >
+                          Jetzt Starten
+                        </button>
+                    )}
                   </>
                 )}
               </>
